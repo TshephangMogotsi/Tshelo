@@ -14,10 +14,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.digitalnatives.tshelo",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "bundleIdentifier": "com.datasentinels.tshelo",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
