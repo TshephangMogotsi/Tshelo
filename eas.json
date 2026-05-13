@@ -1,35 +1,21 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 18.11.0",
+    "appVersionSource": "remote"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
     "preview": {
-      "ios": {
-        "resourceClass": "default"
-      }
-    },
-    "preview2": {
-      "ios": {
-        "resourceClass": "default"
-      }
-    },
-    "preview3": {
-      "ios": {
-        "resourceClass": "default"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "ios": {
-        "resourceClass": "default"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "action": "archive",
-        "resourceClass": "default"
-      }
-    }
+    "production": {}
   }
 }
