@@ -1,17 +1,22 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import AuthNavigator from './navigation/AuthNavigator'
 import MainNavigator from './navigation/MainNavigator'
 
-// Switch to MainNavigator to preview main screens, AuthNavigator for auth flow
-const PREVIEW_MAIN = true
+function RootNavigator() {
+  const { isAuthenticated } = useAuth()
+  return isAuthenticated ? <MainNavigator /> : <AuthNavigator />
+}
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        {PREVIEW_MAIN ? <MainNavigator /> : <AuthNavigator />}
-      </NavigationContainer>
+      <AuthProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
     </SafeAreaProvider>
   )
 }

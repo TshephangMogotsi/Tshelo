@@ -10,6 +10,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { useAuth } from '../../context/AuthContext'
 
 const { height } = Dimensions.get('window')
 
@@ -18,6 +19,8 @@ type Props = {
 }
 
 export default function WelcomeScreen({ navigation }: Props) {
+  const { signIn } = useAuth()
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
@@ -59,6 +62,14 @@ export default function WelcomeScreen({ navigation }: Props) {
           activeOpacity={0.85}
         >
           <Text style={styles.secondaryButtonText}>Create an Account</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.devSkipButton}
+          onPress={signIn}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.devSkipText}>⚡ Dev: Skip to App</Text>
         </TouchableOpacity>
 
         <Text style={styles.legal}>
@@ -174,6 +185,16 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 16,
     fontWeight: '700',
+  },
+  devSkipButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  devSkipText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    fontWeight: '600',
   },
   legal: {
     fontSize: 12,

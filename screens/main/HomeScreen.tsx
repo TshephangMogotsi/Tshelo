@@ -11,6 +11,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MainStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { useAuth } from '../../context/AuthContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'Home'>
@@ -153,6 +154,7 @@ function EmptyFunds({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => 
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  const { signOut } = useAuth()
   const displayName = 'Kefilwe'   // replace with auth user
   const tokenBalance = 3          // replace with user.token_balance
 
@@ -168,10 +170,15 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.greeting}>Hello, {displayName} 👋</Text>
           <Text style={styles.subGreeting}>Here are your active funds</Text>
         </View>
+        <View style={styles.headerRight}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={signOut} activeOpacity={0.8}>
+          <Text style={styles.logoutText}>↩ Log out</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.tokenBadge} activeOpacity={0.8} onPress={() => navigation.navigate('TokenPurchase')}>
           <Text style={styles.tokenEmoji}>🪙</Text>
           <Text style={styles.tokenCount}>{tokenBalance}</Text>
         </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -255,6 +262,22 @@ const styles = StyleSheet.create({
   subGreeting: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.65)',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  logoutBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  logoutText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
   },
   tokenBadge: {
     flexDirection: 'row',

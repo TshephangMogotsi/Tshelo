@@ -9,11 +9,14 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { supabase } from '../../lib/supabase'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OTP'>
@@ -33,6 +36,7 @@ export default function OTPScreen({ navigation, route }: Props) {
   const { phone, mode } = route.params
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [countdown, setCountdown] = useState(RESEND_COUNTDOWN)
+  const [loading, setLoading] = useState(false)
   const inputRefs = useRef<Array<TextInput | null>>([])
 
   const otp = digits.join('')
@@ -63,18 +67,35 @@ export default function OTPScreen({ navigation, route }: Props) {
     }
   }
 
-  function handleResend() {
+  async function handleResend() {
+    const { error } = await supabase.auth.signInWithOtp({ phone })
+    if (error) {
+      Alert.alert('Error', error.message)
+      return
+    }
     setCountdown(RESEND_COUNTDOWN)
     setDigits(Array(OTP_LENGTH).fill(''))
     inputRefs.current[0]?.focus()
   }
 
-  function handleVerify() {
+  async function handleVerify() {
     if (!isComplete) return
+    setLoading(true)
+    const { error } = await supabase.auth.verifyOtp({
+      phone,
+      token: otp,
+      type: 'sms',
+    })
+    setLoading(false)
+    if (error) {
+      Alert.alert('Invalid code', 'The code is incorrect or has expired. Try again.')
+      return
+    }
     if (mode === 'register') {
       navigation.navigate('Register', { phone })
     }
-    // login and recover will navigate to main app (not yet built)
+    // For login/recover: AuthContext listener detects the new session
+    // and automatically switches to MainNavigator — no extra navigation needed
   }
 
   const maskedPhone = phone.replace(/(\+267)(\d{2})(\d+)(\d{2})/, '$1 $2**** $4')
@@ -141,10 +162,15 @@ export default function OTPScreen({ navigation, route }: Props) {
             style={[styles.primaryButton, !isComplete && styles.buttonDisabled]}
             onPress={handleVerify}
             activeOpacity={isComplete ? 0.85 : 1}
+            disabled={loading}
           >
-            <Text style={[styles.primaryButtonText, !isComplete && styles.buttonTextDisabled]}>
-              Verify
-            </Text>
+            {loading ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <Text style={[styles.primaryButtonText, !isComplete && styles.buttonTextDisabled]}>
+                Verify
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity

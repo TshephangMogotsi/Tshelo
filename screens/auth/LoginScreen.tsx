@@ -10,10 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { supabase } from '../../lib/supabase'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>
@@ -21,9 +24,23 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const [phone, setPhone] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const cleanedPhone = phone.replace(/\D/g, '')
   const isValid = cleanedPhone.length === 8
+
+  async function handleSendOTP() {
+    if (!isValid) return
+    const fullPhone = `+267${cleanedPhone}`
+    setLoading(true)
+    const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })
+    setLoading(false)
+    if (error) {
+      Alert.alert('Error', error.message)
+      return
+    }
+    navigation.navigate('OTP', { phone: fullPhone, mode: 'login' })
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -73,18 +90,17 @@ export default function LoginScreen({ navigation }: Props) {
 
           <TouchableOpacity
             style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
-            onPress={() =>
-              isValid &&
-              navigation.navigate('OTP', {
-                phone: `+267${cleanedPhone}`,
-                mode: 'login',
-              })
-            }
+            onPress={handleSendOTP}
             activeOpacity={isValid ? 0.85 : 1}
+            disabled={loading}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>
-              Send OTP
-            </Text>
+            {loading ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>
+                Send OTP
+              </Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.footer}>
