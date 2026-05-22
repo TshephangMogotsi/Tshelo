@@ -20,6 +20,7 @@ import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OTP'>
@@ -122,27 +123,34 @@ export default function OTPScreen({ navigation, route }: Props) {
     }
   }
 
+  const { isDark } = useTheme()
+  const bg       = isDark ? '#1A1C24' : '#F4F2EB'
+  const inputBg  = isDark ? '#2D2E41' : '#FFFFFF'
+  const textCol  = isDark ? '#F2F2F7' : colors.textPrimary
+  const mutedCol = isDark ? '#8A8A9A' : colors.textMuted
+  const borderCol = isDark ? '#3A3A5C' : colors.border
+
   const maskedPhone = phone.replace(/(\+267)(\d{2})(\d+)(\d{2})/, '$1 $2****$4')
   const timer = `${String(Math.floor(countdown / 60)).padStart(2, '0')}:${String(countdown % 60).padStart(2, '0')}`
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F4F2EB" />
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
 
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={textCol} />
           </TouchableOpacity>
 
           <View style={styles.header}>
             <Text style={styles.heading}>Verify your number</Text>
-            <Text style={styles.subheading}>
+            <Text style={[styles.subheading, { color: mutedCol }]}>
               Enter the 6-digit code sent to{'\n'}
-              <Text style={styles.phoneHighlight}>{maskedPhone}</Text>
+              <Text style={[styles.phoneHighlight, { color: textCol }]}>{maskedPhone}</Text>
             </Text>
           </View>
 
@@ -152,7 +160,7 @@ export default function OTPScreen({ navigation, route }: Props) {
               <TextInput
                 key={i}
                 ref={ref => { inputRefs.current[i] = ref }}
-                style={styles.otpBox}
+                style={[styles.otpBox, { backgroundColor: inputBg, color: textCol }]}
                 value={digit}
                 onChangeText={v => handleDigit(v, i)}
                 onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
@@ -168,8 +176,8 @@ export default function OTPScreen({ navigation, route }: Props) {
           {/* Resend */}
           <View style={styles.resendRow}>
             {countdown > 0 ? (
-              <Text style={styles.resendCountdown}>
-                Resend in <Text style={styles.resendTimer}>{timer}</Text>
+              <Text style={[styles.resendCountdown, { color: mutedCol }]}>
+                Resend in <Text style={[styles.resendTimer, { color: textCol }]}>{timer}</Text>
               </Text>
             ) : (
               <TouchableOpacity onPress={handleResend}>
@@ -191,7 +199,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           </TouchableOpacity>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
+            <Text style={[styles.footerText, { color: textCol }]}>
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
             </Text>
             <TouchableOpacity onPress={() => navigation.replace(mode === 'login' ? 'Register' : 'Login')}>
@@ -205,7 +213,7 @@ export default function OTPScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: '#F4F2EB' },
+  safe:  { flex: 1 },
   flex:  { flex: 1 },
   container: {
     flex: 1,
@@ -228,7 +236,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 30,
     fontFamily: fonts.display.bold,
-    color: '#7439E0',
+    color: '#9D86FF',
     marginBottom: 10,
   },
   subheading: {
@@ -250,11 +258,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 58,
     borderRadius: 14,
-    backgroundColor: colors.surface,
     textAlign: 'center',
     fontSize: 22,
     fontWeight: '700',
-    color: colors.textPrimary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

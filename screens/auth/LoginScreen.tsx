@@ -19,12 +19,20 @@ import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
+import { useTheme } from '../../context/ThemeContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>
 }
 
 export default function LoginScreen({ navigation }: Props) {
+  const { isDark } = useTheme()
+  const bg       = isDark ? '#1A1C24' : '#F4F2EB'
+  const inputBg  = isDark ? '#2D2E41' : '#FFFFFF'
+  const textCol  = isDark ? '#F2F2F7' : colors.textPrimary
+  const mutedCol = isDark ? '#8A8A9A' : colors.textMuted
+  const borderCol = isDark ? '#3A3A5C' : colors.border
+
   const [phone, setPhone] = useState('')
   const [focused, setFocused] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -43,8 +51,8 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -55,29 +63,29 @@ export default function LoginScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={textCol} />
           </TouchableOpacity>
 
           <View style={styles.header}>
             <Text style={styles.heading}>Welcome back</Text>
-            <Text style={styles.subheading}>
-              Enter your Botswana number to continue.
+            <Text style={[styles.subheading, { color: mutedCol }]}>
+              Enter your phone number to continue
             </Text>
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.label}>Phone Number</Text>
-            <View style={[styles.phoneRow, focused && styles.phoneRowFocused]}>
+            <Text style={[styles.label, { color: textCol }]}>Phone Number</Text>
+            <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: focused ? colors.primary : borderCol }]}>
               <View style={styles.countryCode}>
                 <Text style={styles.countryFlag}>🇧🇼</Text>
-                <Text style={styles.countryCodeText}>+267</Text>
+                <Text style={[styles.countryCodeText, { color: textCol }]}>+267</Text>
               </View>
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: borderCol }]} />
               <TextInput
-                style={styles.phoneInput}
-                placeholder="71 234 567"
-                placeholderTextColor={colors.textMuted}
+                style={[styles.phoneInput, { color: textCol }]}
+                placeholder="71 000 000"
+                placeholderTextColor={mutedCol}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -88,8 +96,8 @@ export default function LoginScreen({ navigation }: Props) {
                 onSubmitEditing={handleSendOTP}
               />
             </View>
-            <Text style={styles.hint}>
-              We'll send a one-time code to verify it's you.
+            <Text style={[styles.hint, { color: mutedCol }]}>
+              We'll send a one time code to verify its you
             </Text>
           </View>
 
@@ -106,9 +114,9 @@ export default function LoginScreen({ navigation }: Props) {
           </TouchableOpacity>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Text style={[styles.footerText, { color: textCol }]}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.replace('Register')}>
-              <Text style={styles.footerLink}>Create one</Text>
+              <Text style={styles.footerLink}>Create One</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -117,7 +125,7 @@ export default function LoginScreen({ navigation }: Props) {
           style={styles.recoverLink}
           onPress={() => navigation.navigate('Support')}
         >
-          <Text style={styles.recoverText}>Can't access your number? Get help</Text>
+          <Text style={[styles.recoverText, { color: mutedCol }]}>Can't access your number? Get help</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -125,7 +133,7 @@ export default function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: '#F4F2EB' },
+  safe:  { flex: 1 },
   flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -137,18 +145,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 36,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   header: { marginBottom: 36 },
   heading: {
     fontSize: 30,
     fontFamily: fonts.display.bold,
-    color: '#7439E0',
+    color: '#9D86FF',
     marginBottom: 8,
   },
   subheading: {
@@ -169,19 +175,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: 16,
-    backgroundColor: colors.surface,
     overflow: 'hidden',
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  phoneRowFocused: {
-    borderColor: colors.borderFocus,
   },
   countryCode: {
     flexDirection: 'row',
@@ -199,12 +195,10 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 24,
-    backgroundColor: colors.border,
   },
   phoneInput: {
     flex: 1,
     fontSize: 16,
-    color: colors.textPrimary,
     paddingHorizontal: 16,
     paddingVertical: 16,
   },

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  Animated,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
+import { useTheme } from '../../context/ThemeContext'
 
 type Category = {
   id: string
@@ -34,6 +36,12 @@ const CATEGORIES: Category[] = [
 
 export default function SupportScreen() {
   const navigation = useNavigation()
+  const { isDark } = useTheme()
+  const bg        = isDark ? '#1A1C24' : colors.background
+  const inputBg   = isDark ? '#2D2E41' : colors.surface
+  const textCol   = isDark ? '#F2F2F7' : colors.textPrimary
+  const mutedCol  = isDark ? '#8A8A9A' : colors.textMuted
+  const borderCol = isDark ? '#3A3A5C' : colors.border
 
   const [category, setCategory] = useState<string | null>(null)
   const [name,     setName]     = useState('')
@@ -45,6 +53,20 @@ export default function SupportScreen() {
   const [nameFocused,   setNameFocused]   = useState(false)
   const [phoneFocused,  setPhoneFocused]  = useState(false)
   const [messageFocused,setMessageFocused]= useState(false)
+
+  const pulseAnim = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    if (!submitted) return
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.18, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true }),
+      ])
+    )
+    pulse.start()
+    return () => pulse.stop()
+  }, [submitted])
 
   const isValid =
     category !== null &&
@@ -86,25 +108,26 @@ export default function SupportScreen() {
   // ── Success state ─────────────────────────────────────────────
   if (submitted) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={styles.successSafe}>
+        <StatusBar barStyle="light-content" backgroundColor="#7439E0" />
         <View style={styles.successContainer}>
-          <View style={styles.successGlow}>
-            <View style={styles.successIconWrap}>
-              <Ionicons name="checkmark" size={36} color={colors.primary} />
+          <View style={styles.successCircleWrapper}>
+            <Animated.View style={[styles.successOuterRing, { transform: [{ scale: pulseAnim }] }]} />
+            <View style={styles.successInnerCircle}>
+              <Ionicons name="checkmark" size={38} color="#2D2040" />
             </View>
           </View>
-          <Text style={styles.successHeading}>Ticket submitted</Text>
+          <Text style={styles.successHeading}>Ticket Submitted</Text>
           <Text style={styles.successBody}>
             We've received your message and will get back to you within 24 hours.
             Check your email for updates.
           </Text>
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={styles.successButton}
             onPress={() => navigation.goBack()}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryButtonText}>Done</Text>
+            <Text style={styles.successButtonText}>Done</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -113,8 +136,8 @@ export default function SupportScreen() {
 
   // ── Form ──────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -126,37 +149,33 @@ export default function SupportScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Back */}
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={textCol} />
           </TouchableOpacity>
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.heading}>Get Help</Text>
-            <Text style={styles.subheading}>
+            <Text style={[styles.heading, { color: '#9D86FF' }]}>Get Help</Text>
+            <Text style={[styles.subheading, { color: mutedCol }]}>
               Tell us what's going on and we'll get back to you as soon as possible.
             </Text>
           </View>
 
           {/* Category */}
           <View style={styles.field}>
-            <Text style={styles.label}>Category</Text>
+            <Text style={[styles.label, { color: textCol }]}>Category</Text>
             <View style={styles.categoryGrid}>
               {CATEGORIES.map(cat => {
                 const active = category === cat.id
                 return (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.categoryChip, active && styles.categoryChipActive]}
+                    style={[styles.categoryChip, { backgroundColor: inputBg, borderColor: active ? colors.primary : borderCol }, active && styles.categoryChipActive]}
                     onPress={() => setCategory(cat.id)}
                     activeOpacity={0.75}
                   >
-                    <Ionicons
-                      name={cat.icon}
-                      size={15}
-                      color={active ? colors.primary : colors.textMuted}
-                    />
-                    <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                    <Ionicons name={cat.icon} size={15} color={active ? colors.primary : mutedCol} />
+                    <Text style={[styles.categoryChipText, { color: active ? colors.primary : mutedCol }, active && styles.categoryChipTextActive]}>
                       {cat.label}
                     </Text>
                   </TouchableOpacity>
@@ -167,11 +186,11 @@ export default function SupportScreen() {
 
           {/* Name */}
           <View style={styles.field}>
-            <Text style={styles.label}>Your Name</Text>
+            <Text style={[styles.label, { color: textCol }]}>Your Name</Text>
             <TextInput
-              style={[styles.input, nameFocused && styles.inputFocused]}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: nameFocused ? colors.primary : borderCol, color: textCol }]}
               placeholder="e.g. Kefilwe Moeti"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={mutedCol}
               value={name}
               onChangeText={setName}
               onFocus={() => setNameFocused(true)}
@@ -183,17 +202,17 @@ export default function SupportScreen() {
 
           {/* Phone */}
           <View style={styles.field}>
-            <Text style={styles.label}>Phone Number <Text style={styles.optional}>(optional)</Text></Text>
-            <View style={[styles.phoneRow, phoneFocused && styles.phoneRowFocused]}>
+            <Text style={[styles.label, { color: textCol }]}>Phone Number <Text style={[styles.optional, { color: mutedCol }]}>(optional)</Text></Text>
+            <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: phoneFocused ? colors.primary : borderCol }]}>
               <View style={styles.countryCode}>
                 <Text style={styles.flag}>🇧🇼</Text>
-                <Text style={styles.countryCodeText}>+267</Text>
+                <Text style={[styles.countryCodeText, { color: textCol }]}>+267</Text>
               </View>
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: borderCol }]} />
               <TextInput
-                style={styles.phoneInput}
+                style={[styles.phoneInput, { color: textCol }]}
                 placeholder="71 234 567"
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={mutedCol}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -207,11 +226,11 @@ export default function SupportScreen() {
 
           {/* Message */}
           <View style={styles.field}>
-            <Text style={styles.label}>Message</Text>
+            <Text style={[styles.label, { color: textCol }]}>Message</Text>
             <TextInput
-              style={[styles.textarea, messageFocused && styles.inputFocused]}
+              style={[styles.textarea, { backgroundColor: inputBg, borderColor: messageFocused ? colors.primary : borderCol, color: textCol }]}
               placeholder="Describe your issue in as much detail as possible…"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={mutedCol}
               value={message}
               onChangeText={setMessage}
               onFocus={() => setMessageFocused(true)}
@@ -221,12 +240,12 @@ export default function SupportScreen() {
               textAlignVertical="top"
               returnKeyType="default"
             />
-            <Text style={styles.charCount}>{message.trim().length} / 500</Text>
+            <Text style={[styles.charCount, { color: mutedCol }]}>{message.trim().length} / 500</Text>
           </View>
 
           {/* Submit */}
           <TouchableOpacity
-            style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
+            style={[styles.primaryButton, isValid && styles.buttonActive]}
             onPress={handleSubmit}
             activeOpacity={isValid ? 0.85 : 1}
             disabled={loading || !isValid}
@@ -235,15 +254,14 @@ export default function SupportScreen() {
               ? <ActivityIndicator color="#fff" />
               : (
                 <View style={styles.submitInner}>
-                  <Ionicons name="send-outline" size={16} color="#fff" />
-                  <Text style={styles.primaryButtonText}>Send message</Text>
+                  <Ionicons name="send-outline" size={16} color={isValid ? '#fff' : '#676767'} />
+                  <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>Send message</Text>
                 </View>
               )
             }
           </TouchableOpacity>
 
-          {/* Footer note */}
-          <Text style={styles.footerNote}>
+          <Text style={[styles.footerNote, { color: mutedCol }]}>
             We typically respond within 24 hours on business days.
           </Text>
         </ScrollView>
@@ -423,21 +441,19 @@ const styles = StyleSheet.create({
 
   // Button
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#D4D4D8',
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
     marginBottom: 16,
+  },
+  buttonActive: {
+    backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
-  },
-  buttonDisabled: {
-    backgroundColor: colors.disabled,
-    shadowOpacity: 0,
-    elevation: 0,
   },
   submitInner: {
     flexDirection: 'row',
@@ -445,10 +461,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#676767',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
+  },
+  primaryButtonTextActive: {
+    color: '#FFFFFF',
   },
 
   footerNote: {
@@ -459,43 +478,63 @@ const styles = StyleSheet.create({
   },
 
   // Success state
+  successSafe: {
+    flex: 1,
+    backgroundColor: '#7439E0',
+  },
   successContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  successGlow: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primaryLight,
+  successCircleWrapper: {
+    width: 128,
+    height: 128,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 28,
+    marginBottom: 36,
   },
-  successIconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: colors.surface,
+  successOuterRing: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  successInnerCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
   },
   successHeading: {
     fontSize: 28,
     fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
+    color: '#FFFFFF',
     marginBottom: 12,
     textAlign: 'center',
   },
   successBody: {
     fontSize: 15,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.75)',
     lineHeight: 22,
     textAlign: 'center',
-    marginBottom: 36,
+    marginBottom: 48,
+  },
+  successButton: {
+    backgroundColor: '#EAE4FB',
+    borderRadius: 28,
+    paddingVertical: 17,
+    alignItems: 'center',
+    width: '100%',
+  },
+  successButtonText: {
+    color: '#7439E0',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 })

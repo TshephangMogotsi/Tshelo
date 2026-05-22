@@ -20,6 +20,7 @@ import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import BankPicker, { BankFormValue } from '../../components/BankPicker'
+import { useTheme } from '../../context/ThemeContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
@@ -89,9 +90,16 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const detectedMeta = provider ? PROVIDER_META[provider] : null
 
+  const { isDark } = useTheme()
+  const bg        = isDark ? '#1A1C24' : '#F4F2EB'
+  const inputBg   = isDark ? '#2D2E41' : '#FFFFFF'
+  const textCol   = isDark ? '#F2F2F7' : colors.textPrimary
+  const mutedCol  = isDark ? '#8A8A9A' : colors.textMuted
+  const borderCol = isDark ? '#3A3A5C' : colors.border
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -102,24 +110,24 @@ export default function RegisterScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={textCol} />
           </TouchableOpacity>
 
           <View style={styles.header}>
             <Text style={styles.heading}>Create your account</Text>
-            <Text style={styles.subheading}>
+            <Text style={[styles.subheading, { color: mutedCol }]}>
               Tell us about yourself, we'll verify your number after
             </Text>
           </View>
 
           {/* ── Full name ─────────────────────────────── */}
           <View style={styles.field}>
-            <Text style={styles.label}>Full Name</Text>
+            <Text style={[styles.label, { color: textCol }]}>Full Name</Text>
             <TextInput
-              style={[styles.input, nameFocused && styles.inputFocused]}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: nameFocused ? colors.primary : borderCol, color: textCol }]}
               placeholder="e.g. Kefilwe Moeti"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={mutedCol}
               value={name}
               onChangeText={setName}
               onFocus={() => setNameFocused(true)}
@@ -132,21 +140,21 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {/* ── Phone number ──────────────────────────── */}
           <View style={styles.field}>
-            <Text style={styles.label}>Phone Number</Text>
-            <Text style={styles.fieldSub}>
+            <Text style={[styles.label, { color: textCol }]}>Phone Number</Text>
+            <Text style={[styles.fieldSub, { color: mutedCol }]}>
               Your mobile money provider will be detected automatically.
             </Text>
-            <View style={[styles.phoneRow, phoneFocused && styles.rowFocused]}>
+            <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: phoneFocused ? colors.primary : borderCol }]}>
               <View style={styles.countryCode}>
                 <Text style={styles.flag}>🇧🇼</Text>
-                <Text style={styles.countryCodeText}>+267</Text>
+                <Text style={[styles.countryCodeText, { color: textCol }]}>+267</Text>
               </View>
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: borderCol }]} />
               <TextInput
                 ref={phoneRef}
-                style={styles.phoneInput}
-                placeholder="71 234 567"
-                placeholderTextColor={colors.textMuted}
+                style={[styles.phoneInput, { color: textCol }]}
+                placeholder="71 000 000"
+                placeholderTextColor={mutedCol}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -157,7 +165,6 @@ export default function RegisterScreen({ navigation }: Props) {
               />
             </View>
 
-            {/* Provider pill — auto-detected */}
             {detectedMeta ? (
               <View style={[styles.providerPill, { backgroundColor: detectedMeta.color + '18' }]}>
                 <View style={[styles.providerDot, { backgroundColor: detectedMeta.color }]} />
@@ -168,8 +175,8 @@ export default function RegisterScreen({ navigation }: Props) {
               </View>
             ) : cleanPhone.length >= 2 ? (
               <View style={styles.providerUnknown}>
-                <Ionicons name="alert-circle-outline" size={14} color={colors.textMuted} />
-                <Text style={styles.providerUnknownText}>
+                <Ionicons name="alert-circle-outline" size={14} color={mutedCol} />
+                <Text style={[styles.providerUnknownText, { color: mutedCol }]}>
                   Number not recognised — mobile money may not be available
                 </Text>
               </View>
@@ -178,20 +185,20 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {/* ── Bank details ──────────────────────────── */}
           <View style={styles.field}>
-            <Text style={styles.sectionLabel}>Banking Details <Text style={styles.sectionLabelOptional}>(OPTIONAL)</Text></Text>
+            <Text style={[styles.sectionLabel, { color: textCol }]}>Banking Details <Text style={[styles.sectionLabelOptional, { color: textCol }]}>(OPTIONAL)</Text></Text>
           </View>
-          <BankPicker value={bank} onChange={setBank} />
+          <BankPicker value={bank} onChange={setBank} isDark={isDark} inputBg={inputBg} textCol={textCol} mutedCol={mutedCol} borderCol={borderCol} />
 
           {/* ── Consent ───────────────────────────────── */}
           <TouchableOpacity
-            style={styles.consentRow}
+            style={[styles.consentRow, { backgroundColor: inputBg, borderColor: borderCol }]}
             onPress={() => setConsent(v => !v)}
             activeOpacity={0.8}
           >
-            <View style={[styles.checkbox, consent && styles.checkboxChecked]}>
+            <View style={[styles.checkbox, { borderColor: isDark ? '#6B6B7B' : borderCol, backgroundColor: isDark && !consent ? '#3A3A4A' : 'transparent' }, consent && styles.checkboxChecked]}>
               {consent && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
-            <Text style={styles.consentText}>
+            <Text style={[styles.consentText, { color: isDark ? 'rgba(255,255,255,0.8)' : mutedCol }]}>
               I agree to Tshelo's{' '}
               <Text style={styles.consentLink}>Terms of Service</Text>
               {' '}and{' '}
@@ -214,7 +221,7 @@ export default function RegisterScreen({ navigation }: Props) {
           </TouchableOpacity>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
+            <Text style={[styles.footerText, { color: textCol }]}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.replace('Login')}>
               <Text style={styles.footerLink}>Log in</Text>
             </TouchableOpacity>
@@ -226,7 +233,7 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: '#F4F2EB' },
+  safe:  { flex: 1 },
   flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -249,7 +256,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 30,
     fontFamily: fonts.display.bold,
-    color: '#7439E0',
+    color: '#9D86FF',
     marginBottom: 8,
   },
   subheading: {

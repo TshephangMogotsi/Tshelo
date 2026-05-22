@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { fonts } from '../../theme/typography'
+import { useTheme } from '../../context/ThemeContext'
 
 const { width: W } = Dimensions.get('window')
 
@@ -44,6 +45,11 @@ const SLIDES: Slide[] = [
 type Props = { onDone: () => void }
 
 export default function OnboardingScreen({ onDone }: Props) {
+  const { isDark } = useTheme()
+  const cardBg      = isDark ? '#1A1C24' : '#FFFFFF'
+  const headingColor = isDark ? '#FFFFFF' : '#0D0D0D'
+  const bodyColor    = isDark ? 'rgba(255,255,255,0.65)' : '#52525B'
+
   const [index, setIndex] = useState(0)
   const flatRef  = useRef<FlatList<Slide>>(null)
   const scrollX  = useRef(new Animated.Value(0)).current
@@ -121,7 +127,7 @@ export default function OnboardingScreen({ onDone }: Props) {
       />
 
       {/* Bottom card */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: cardBg }]}>
         {/* All slide texts stacked — each fades/slides with scroll */}
         <View style={styles.textBlock}>
           {SLIDES.map((slide, i) => (
@@ -135,8 +141,8 @@ export default function OnboardingScreen({ onDone }: Props) {
                 },
               ]}
             >
-              <Text style={styles.heading}>{slide.title}</Text>
-              <Text style={styles.body}>{slide.body}</Text>
+              <Text style={[styles.heading, { color: headingColor }]}>{slide.title}</Text>
+              <Text style={[styles.body, { color: bodyColor }]}>{slide.body}</Text>
             </Animated.View>
           ))}
         </View>
@@ -175,7 +181,6 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     paddingHorizontal: 28,
@@ -190,13 +195,11 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 32,
     fontFamily: fonts.display.bold,
-    color: '#0D0D0D',
     lineHeight: 40,
     marginBottom: 14,
   },
   body: {
     fontSize: 15,
-    color: '#52525B',
     lineHeight: 22,
   },
 

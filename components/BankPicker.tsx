@@ -26,11 +26,21 @@ export type BankFormValue = {
 }
 
 type Props = {
-  value:    BankFormValue
-  onChange: (v: BankFormValue) => void
+  value:     BankFormValue
+  onChange:  (v: BankFormValue) => void
+  isDark?:   boolean
+  inputBg?:  string
+  textCol?:  string
+  mutedCol?: string
+  borderCol?: string
 }
 
-export default function BankPicker({ value, onChange }: Props) {
+export default function BankPicker({ value, onChange, isDark = false, inputBg, textCol, mutedCol, borderCol }: Props) {
+  const _inputBg   = inputBg   ?? (isDark ? '#2D2E41' : colors.surface)
+  const _textCol   = textCol   ?? (isDark ? '#F2F2F7' : colors.textPrimary)
+  const _mutedCol  = mutedCol  ?? (isDark ? '#8A8A9A' : colors.textMuted)
+  const _borderCol = borderCol ?? (isDark ? '#3A3A5C' : colors.border)
+
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [acctFocused, setAcctFocused] = useState(false)
@@ -55,29 +65,27 @@ export default function BankPicker({ value, onChange }: Props) {
 
       {/* ── Bank selector ──────────────────────────── */}
       <View style={styles.field}>
-        <Text style={styles.label}>Bank</Text>
+        <Text style={[styles.label, { color: _textCol }]}>Bank</Text>
         <TouchableOpacity
-          style={styles.bankSelector}
+          style={[styles.bankSelector, { backgroundColor: _inputBg, borderColor: _borderCol }]}
           onPress={() => setPickerOpen(true)}
           activeOpacity={0.7}
         >
           {value.bankName ? (
             <View style={styles.bankSelected}>
               <View style={styles.bankInitial}>
-                <Text style={styles.bankInitialText}>
-                  {value.bankName.charAt(0)}
-                </Text>
+                <Text style={styles.bankInitialText}>{value.bankName.charAt(0)}</Text>
               </View>
               <View style={styles.bankSelectedInfo}>
-                <Text style={styles.bankSelectedName}>{value.bankName}</Text>
-                <Text style={styles.bankBranchCode}>Branch code: {value.branchCode}</Text>
+                <Text style={[styles.bankSelectedName, { color: _textCol }]}>{value.bankName}</Text>
+                <Text style={[styles.bankBranchCode, { color: _mutedCol }]}>Branch code: {value.branchCode}</Text>
               </View>
-              <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-down" size={18} color={_mutedCol} />
             </View>
           ) : (
             <View style={styles.bankPlaceholder}>
-              <Text style={styles.bankPlaceholderText}>Select your bank</Text>
-              <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+              <Text style={[styles.bankPlaceholderText, { color: _mutedCol }]}>Select your bank</Text>
+              <Ionicons name="chevron-down" size={18} color={_mutedCol} />
             </View>
           )}
         </TouchableOpacity>
@@ -85,9 +93,9 @@ export default function BankPicker({ value, onChange }: Props) {
 
       {/* ── Branch code (read-only, auto-filled) ───── */}
       <View style={styles.field}>
-        <Text style={styles.label}>Branch Code</Text>
-        <View style={styles.input}>
-          <Text style={value.branchCode ? styles.branchCodeValue : styles.branchCodePlaceholder}>
+        <Text style={[styles.label, { color: _textCol }]}>Branch Code</Text>
+        <View style={[styles.input, { backgroundColor: _inputBg, borderColor: _borderCol }]}>
+          <Text style={{ color: value.branchCode ? _textCol : _mutedCol, fontSize: 16 }}>
             {value.branchCode || '000000'}
           </Text>
         </View>
@@ -95,11 +103,11 @@ export default function BankPicker({ value, onChange }: Props) {
 
       {/* ── Account number ─────────────────────────── */}
       <View style={styles.field}>
-        <Text style={styles.label}>Account Number</Text>
+        <Text style={[styles.label, { color: _textCol }]}>Account Number</Text>
         <TextInput
-          style={[styles.input, acctFocused && styles.inputFocused]}
+          style={[styles.input, { backgroundColor: _inputBg, borderColor: acctFocused ? colors.primary : _borderCol, color: _textCol }]}
           placeholder="e.g. 628000000000"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={_mutedCol}
           keyboardType="number-pad"
           value={value.accountNumber}
           onChangeText={setAccountNumber}
@@ -117,25 +125,25 @@ export default function BankPicker({ value, onChange }: Props) {
         presentationStyle="pageSheet"
         onRequestClose={() => setPickerOpen(false)}
       >
-        <SafeAreaView style={styles.modal}>
-          <StatusBar barStyle="dark-content" />
+        <SafeAreaView style={[styles.modal, { backgroundColor: isDark ? '#1A1C24' : colors.background }]}>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Bank</Text>
+          <View style={[styles.modalHeader, { backgroundColor: _inputBg, borderBottomColor: _borderCol }]}>
+            <Text style={[styles.modalTitle, { color: _textCol }]}>Select Bank</Text>
             <TouchableOpacity
-              style={styles.modalClose}
+              style={[styles.modalClose, { backgroundColor: isDark ? '#1A1C24' : colors.background }]}
               onPress={() => setPickerOpen(false)}
             >
-              <Ionicons name="close" size={20} color={colors.textPrimary} />
+              <Ionicons name="close" size={20} color={_textCol} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchRow}>
-            <Ionicons name="search-outline" size={18} color={colors.textMuted} style={styles.searchIcon} />
+          <View style={[styles.searchRow, { backgroundColor: _inputBg, borderColor: _borderCol }]}>
+            <Ionicons name="search-outline" size={18} color={_mutedCol} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: _textCol }]}
               placeholder="Search banks…"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={_mutedCol}
               value={search}
               onChangeText={setSearch}
               autoFocus
@@ -143,7 +151,7 @@ export default function BankPicker({ value, onChange }: Props) {
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                <Ionicons name="close-circle" size={18} color={_mutedCol} />
               </TouchableOpacity>
             )}
           </View>
@@ -152,7 +160,7 @@ export default function BankPicker({ value, onChange }: Props) {
             data={filteredBanks}
             keyExtractor={item => item.name}
             contentContainerStyle={styles.bankList}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: _borderCol }]} />}
             renderItem={({ item }) => {
               const isSelected = value.bankName === item.name
               return (
@@ -161,16 +169,16 @@ export default function BankPicker({ value, onChange }: Props) {
                   onPress={() => selectBank(item)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.bankRowInitial, isSelected && styles.bankRowInitialSelected]}>
-                    <Text style={[styles.bankRowInitialText, isSelected && styles.bankRowInitialTextSelected]}>
+                  <View style={[styles.bankRowInitial, { backgroundColor: _inputBg, borderColor: _borderCol }, isSelected && styles.bankRowInitialSelected]}>
+                    <Text style={[styles.bankRowInitialText, { color: _textCol }, isSelected && styles.bankRowInitialTextSelected]}>
                       {item.shortName.charAt(0)}
                     </Text>
                   </View>
                   <View style={styles.bankRowInfo}>
-                    <Text style={[styles.bankRowName, isSelected && styles.bankRowNameSelected]}>
+                    <Text style={[styles.bankRowName, { color: _textCol }, isSelected && styles.bankRowNameSelected]}>
                       {item.name}
                     </Text>
-                    <Text style={styles.bankRowCode}>Branch: {item.branchCode}</Text>
+                    <Text style={[styles.bankRowCode, { color: _mutedCol }]}>Branch: {item.branchCode}</Text>
                   </View>
                   {isSelected && (
                     <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
@@ -192,7 +200,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 8,
@@ -200,17 +207,10 @@ const styles = StyleSheet.create({
 
   // ── Bank selector
   bankSelector: {
-    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   bankPlaceholder: {
     flexDirection: 'row',
@@ -253,19 +253,11 @@ const styles = StyleSheet.create({
 
   // ── Account number
   input: {
-    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 15,
     fontSize: 16,
-    color: colors.textPrimary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   inputFocused: {
     borderColor: colors.borderFocus,
