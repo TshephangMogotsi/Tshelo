@@ -6,10 +6,15 @@ import {
   StatusBar,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
+
+const GRADIENT_START = '#7657F0'
+const GRADIENT_END   = '#8874E1'
+const LAVENDER       = '#EAE4FB'
+const PURPLE         = '#7657F0'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Welcome'>
@@ -17,112 +22,106 @@ type Props = {
 
 export default function WelcomeScreen({ navigation }: Props) {
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} translucent />
+    <LinearGradient colors={[GRADIENT_START, GRADIENT_END]} style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
 
-      {/* ── Hero ───────────────────────────────────── */}
-      <View style={styles.hero}>
-        <Text style={styles.appName}>TSHELO</Text>
-      </View>
+        {/* Logo */}
+        <View style={styles.logoArea}>
+          <Text style={styles.logo}>T</Text>
+        </View>
 
-      {/* ── Card ───────────────────────────────────── */}
-      <View style={styles.card}>
-        <Text style={styles.heading}>
-          Community Savings{'\n'}Made Simple
-        </Text>
-        <Text style={styles.body}>
-          Track contributions for funerals, weddings, graduations and more,
-          transparently and securely.
-        </Text>
+        {/* Bottom content */}
+        <View style={styles.bottom}>
+          <Text style={styles.heading}>Community Savings{'\n'}Made Simple</Text>
+          <Text style={styles.body}>
+            Track contributions for funerals, weddings, graduations and more,
+            transparently and securely
+          </Text>
 
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Login')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.primaryButtonText}>LOGIN</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginText}>LOGIN</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('Register')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.secondaryButtonText}>Create an Account</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={() => navigation.navigate('Register')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.registerText}>Create an Account</Text>
+          </TouchableOpacity>
+        </View>
+
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   safe: {
     flex: 1,
-    backgroundColor: colors.primary,
   },
 
-  // ── Hero
-  hero: {
+  logoArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
   },
-  appName: {
-    fontSize: 42,
+  logo: {
+    fontSize: 80,
     fontFamily: fonts.display.bold,
     color: '#FFFFFF',
-    letterSpacing: 6,
   },
 
-  // ── Card
-  card: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
+  bottom: {
     paddingHorizontal: 28,
-    paddingTop: 36,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   heading: {
     fontSize: 34,
     fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
-    lineHeight: 42,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    lineHeight: 36,
     marginBottom: 14,
   },
   body: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 32,
+    fontSize: 22,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 26,
+    marginBottom: 51,
   },
-  primaryButton: {
-    backgroundColor: colors.primary,
+
+  loginButton: {
+    backgroundColor: '#7439E0',
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
   },
-  primaryButtonText: {
+  loginText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 1.5,
   },
-  secondaryButton: {
-    backgroundColor: colors.primaryLight,
+
+  registerButton: {
+    backgroundColor: LAVENDER,
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
+    marginBottom: 50,
   },
-  secondaryButtonText: {
-    color: colors.primary,
+  registerText: {
+    color: PURPLE,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.2,

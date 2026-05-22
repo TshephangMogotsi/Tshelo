@@ -109,7 +109,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={styles.header}>
             <Text style={styles.heading}>Create your account</Text>
             <Text style={styles.subheading}>
-              Tell us about yourself — we'll verify your number after.
+              Tell us about yourself, we'll verify your number after
             </Text>
           </View>
 
@@ -154,7 +154,6 @@ export default function RegisterScreen({ navigation }: Props) {
                 onBlur={() => setPhoneFocused(false)}
                 maxLength={9}
                 returnKeyType="next"
-                onSubmitEditing={() => bankRef.current?.focus()}
               />
             </View>
 
@@ -179,7 +178,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {/* ── Bank details ──────────────────────────── */}
           <View style={styles.field}>
-            <Text style={styles.sectionLabel}>Bank Details</Text>
+            <Text style={styles.sectionLabel}>Banking Details <Text style={styles.sectionLabelOptional}>(OPTIONAL)</Text></Text>
           </View>
           <BankPicker value={bank} onChange={setBank} />
 
@@ -203,14 +202,14 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {/* ── Submit ────────────────────────────────── */}
           <TouchableOpacity
-            style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
+            style={[styles.primaryButton, isValid && styles.buttonActive]}
             onPress={handleSendOTP}
             activeOpacity={isValid ? 0.85 : 1}
             disabled={loading}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>Send OTP</Text>
+              : <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>Create an Account</Text>
             }
           </TouchableOpacity>
 
@@ -227,7 +226,7 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: colors.background },
+  safe:  { flex: 1, backgroundColor: '#F4F2EB' },
   flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -250,7 +249,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 30,
     fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
+    color: '#7439E0',
     marginBottom: 8,
   },
   subheading: {
@@ -262,7 +261,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 6,
@@ -273,9 +272,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 4,
   },
+  sectionLabelOptional: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
   fieldSub: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#4A4A4A',
     lineHeight: 18,
     marginBottom: 10,
     marginTop: -2,
@@ -404,23 +408,28 @@ const styles = StyleSheet.create({
   },
   consentLink: { color: colors.primaryMid, fontWeight: '600' },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#D4D4D8',
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
     marginBottom: 24,
+  },
+  buttonActive: {
+    backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
-  buttonDisabled: { backgroundColor: colors.disabled },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#676767',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
+  },
+  primaryButtonTextActive: {
+    color: '#FFFFFF',
   },
   footer: {
     flexDirection: 'row',

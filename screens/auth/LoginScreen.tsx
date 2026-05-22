@@ -94,14 +94,14 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity
-            style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
+            style={[styles.primaryButton, isValid && styles.buttonActive]}
             onPress={handleSendOTP}
             activeOpacity={isValid ? 0.85 : 1}
             disabled={loading}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>Send Code</Text>
+              : <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>Send Code</Text>
             }
           </TouchableOpacity>
 
@@ -111,21 +111,21 @@ export default function LoginScreen({ navigation }: Props) {
               <Text style={styles.footerLink}>Create one</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.recoverLink}
-            onPress={() => navigation.navigate('Support')}
-          >
-            <Text style={styles.recoverText}>Can't access your number? Get help</Text>
-          </TouchableOpacity>
         </ScrollView>
+
+        <TouchableOpacity
+          style={styles.recoverLink}
+          onPress={() => navigation.navigate('Support')}
+        >
+          <Text style={styles.recoverText}>Can't access your number? Get help</Text>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: colors.background },
+  safe:  { flex: 1, backgroundColor: '#F4F2EB' },
   flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 30,
     fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
+    color: '#7439E0',
     marginBottom: 8,
   },
   subheading: {
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -210,29 +210,32 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: '#4A4A4A',
     lineHeight: 18,
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#D4D4D8',
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
     marginBottom: 24,
+  },
+  buttonActive: {
+    backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
-  buttonDisabled: {
-    backgroundColor: colors.disabled,
-  },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#676767',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
+  },
+  primaryButtonTextActive: {
+    color: '#FFFFFF',
   },
   footer: {
     flexDirection: 'row',
@@ -241,10 +244,10 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 14, color: colors.textSecondary },
   footerLink: { fontSize: 14, fontWeight: '700', color: colors.primaryMid },
-  recoverLink: { alignItems: 'center' },
+  recoverLink: { alignItems: 'center', paddingVertical: 16 },
   recoverText: {
     fontSize: 14,
-    color: colors.textMuted,
+    color: '#4A4A4A',
     textDecorationLine: 'underline',
   },
 })

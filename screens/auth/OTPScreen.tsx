@@ -29,11 +29,6 @@ type Props = {
 const OTP_LENGTH = 6
 const RESEND_COUNTDOWN = 60
 
-const modeLabels: Record<string, string> = {
-  login:    'Welcome back',
-  register: 'Verify your number',
-}
-
 export default function OTPScreen({ navigation, route }: Props) {
   const { phone, mode, registration } = route.params
   const { refreshProfile } = useAuth()
@@ -92,7 +87,6 @@ export default function OTPScreen({ navigation, route }: Props) {
     if (!userId) { setLoading(false); return }
 
     if (registration) {
-      // New registration: save profile data collected upfront, then show success screen
       const now = new Date().toISOString()
       await supabase.from('users').update({
         name: registration.name,
@@ -115,7 +109,6 @@ export default function OTPScreen({ navigation, route }: Props) {
       return
     }
 
-    // Login / recover: check if profile is complete
     const { data: profile } = await supabase
       .from('users')
       .select('profile_completed')
@@ -127,14 +120,14 @@ export default function OTPScreen({ navigation, route }: Props) {
     if (!profile?.profile_completed) {
       navigation.navigate('ProfileSetup')
     }
-    // If profile complete, AuthContext detects session and switches to MainNavigator
   }
 
-  const maskedPhone = phone.replace(/(\+267)(\d{2})(\d+)(\d{2})/, '$1 $2**** $4')
+  const maskedPhone = phone.replace(/(\+267)(\d{2})(\d+)(\d{2})/, '$1 $2****$4')
+  const timer = `${String(Math.floor(countdown / 60)).padStart(2, '0')}:${String(countdown % 60).padStart(2, '0')}`
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor="#F4F2EB" />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -146,7 +139,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.heading}>{modeLabels[mode]}</Text>
+            <Text style={styles.heading}>Verify your number</Text>
             <Text style={styles.subheading}>
               Enter the 6-digit code sent to{'\n'}
               <Text style={styles.phoneHighlight}>{maskedPhone}</Text>
@@ -159,7 +152,7 @@ export default function OTPScreen({ navigation, route }: Props) {
               <TextInput
                 key={i}
                 ref={ref => { inputRefs.current[i] = ref }}
-                style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
+                style={styles.otpBox}
                 value={digit}
                 onChangeText={v => handleDigit(v, i)}
                 onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
@@ -176,11 +169,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           <View style={styles.resendRow}>
             {countdown > 0 ? (
               <Text style={styles.resendCountdown}>
-                Resend in{' '}
-                <Text style={styles.resendTimer}>
-                  {String(Math.floor(countdown / 60)).padStart(2, '0')}:
-                  {String(countdown % 60).padStart(2, '0')}
-                </Text>
+                Resend in <Text style={styles.resendTimer}>{timer}</Text>
               </Text>
             ) : (
               <TouchableOpacity onPress={handleResend}>
@@ -190,20 +179,25 @@ export default function OTPScreen({ navigation, route }: Props) {
           </View>
 
           <TouchableOpacity
-            style={[styles.primaryButton, !isComplete && styles.buttonDisabled]}
+            style={[styles.primaryButton, isComplete && styles.buttonActive]}
             onPress={handleVerify}
             activeOpacity={isComplete ? 0.85 : 1}
             disabled={loading}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>Verify</Text>
+              : <Text style={[styles.primaryButtonText, isComplete && styles.primaryButtonTextActive]}>Verify</Text>
             }
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.changeLink} onPress={() => navigation.goBack()}>
-            <Text style={styles.changeLinkText}>Use a different number</Text>
-          </TouchableOpacity>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+            </Text>
+            <TouchableOpacity onPress={() => navigation.replace(mode === 'login' ? 'Register' : 'Login')}>
+              <Text style={styles.footerLink}>{mode === 'login' ? 'Create One' : 'Log in'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -211,8 +205,8 @@ export default function OTPScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:      { flex: 1, backgroundColor: colors.background },
-  flex:      { flex: 1 },
+  safe:  { flex: 1, backgroundColor: '#F4F2EB' },
+  flex:  { flex: 1 },
   container: {
     flex: 1,
     paddingHorizontal: 24,
@@ -234,18 +228,19 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 30,
     fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
+    color: '#7439E0',
     marginBottom: 10,
   },
   subheading: {
     fontSize: 15,
-    color: colors.textSecondary,
+    color: '#4A4A4A',
     lineHeight: 22,
   },
   phoneHighlight: {
     fontWeight: '700',
     color: colors.textPrimary,
   },
+
   otpRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -255,61 +250,65 @@ const styles = StyleSheet.create({
     width: 48,
     height: 58,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
     textAlign: 'center',
     fontSize: 22,
     fontWeight: '700',
     color: colors.textPrimary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  otpBoxFilled: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-    color: colors.primary,
-  },
+
   resendRow: {
     alignItems: 'center',
     marginBottom: 36,
   },
   resendCountdown: {
     fontSize: 13,
-    color: colors.textMuted,
+    color: '#4A4A4A',
   },
   resendTimer: {
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: colors.textPrimary,
   },
   resendLink: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.primaryMid,
+    color: '#7439E0',
   },
+
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#D4D4D8',
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
+  },
+  buttonActive: {
+    backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
-  buttonDisabled: {
-    backgroundColor: colors.disabled,
-  },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#676767',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
-  changeLink: { alignItems: 'center' },
-  changeLinkText: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textDecorationLine: 'underline',
+  primaryButtonTextActive: {
+    color: '#FFFFFF',
   },
+
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  footerText: { fontSize: 14, color: colors.textSecondary },
+  footerLink: { fontSize: 14, fontWeight: '700', color: '#7439E0' },
 })

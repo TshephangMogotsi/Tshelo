@@ -46,10 +46,6 @@ export default function BankPicker({ value, onChange }: Props) {
     setPickerOpen(false)
   }
 
-  function setAccountType(t: AccountType) {
-    onChange({ ...value, accountType: t })
-  }
-
   function setAccountNumber(n: string) {
     onChange({ ...value, accountNumber: n.replace(/\D/g, '') })
   }
@@ -87,12 +83,22 @@ export default function BankPicker({ value, onChange }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* ── Branch code (read-only, auto-filled) ───── */}
+      <View style={styles.field}>
+        <Text style={styles.label}>Branch Code</Text>
+        <View style={styles.input}>
+          <Text style={value.branchCode ? styles.branchCodeValue : styles.branchCodePlaceholder}>
+            {value.branchCode || '000000'}
+          </Text>
+        </View>
+      </View>
+
       {/* ── Account number ─────────────────────────── */}
       <View style={styles.field}>
         <Text style={styles.label}>Account Number</Text>
         <TextInput
           style={[styles.input, acctFocused && styles.inputFocused]}
-          placeholder="e.g. 62012345678"
+          placeholder="e.g. 628000000000"
           placeholderTextColor={colors.textMuted}
           keyboardType="number-pad"
           value={value.accountNumber}
@@ -103,41 +109,6 @@ export default function BankPicker({ value, onChange }: Props) {
           returnKeyType="done"
         />
       </View>
-
-      {/* ── Account type ───────────────────────────── */}
-      <View style={styles.field}>
-        <Text style={styles.label}>Account Type</Text>
-        <View style={styles.typeToggle}>
-          <TouchableOpacity
-            style={[styles.typeBtn, value.accountType === 'savings' && styles.typeBtnActive]}
-            onPress={() => setAccountType('savings')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.typeBtnText, value.accountType === 'savings' && styles.typeBtnTextActive]}>
-              Savings
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeBtn, value.accountType === 'current' && styles.typeBtnActive]}
-            onPress={() => setAccountType('current')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.typeBtnText, value.accountType === 'current' && styles.typeBtnTextActive]}>
-              Current
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── Branch code (read-only) ─────────────────── */}
-      {value.branchCode ? (
-        <View style={styles.branchRow}>
-          <Ionicons name="information-circle-outline" size={14} color={colors.textMuted} />
-          <Text style={styles.branchText}>
-            Branch code <Text style={styles.branchCode}>{value.branchCode}</Text> will be used for transfers
-          </Text>
-        </View>
-      ) : null}
 
       {/* ── Bank picker modal ──────────────────────── */}
       <Modal
@@ -221,7 +192,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 8,
@@ -300,54 +271,13 @@ const styles = StyleSheet.create({
     borderColor: colors.borderFocus,
   },
 
-  // ── Account type toggle
-  typeToggle: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 4,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+  branchCodeValue: {
+    fontSize: 16,
+    color: colors.textPrimary,
   },
-  typeBtn: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  typeBtnActive: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  typeBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
+  branchCodePlaceholder: {
+    fontSize: 16,
     color: colors.textMuted,
-  },
-  typeBtnTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // ── Branch code note
-  branchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: -8,
-    marginBottom: 4,
-  },
-  branchText: {
-    fontSize: 12,
-    color: colors.textMuted,
-    lineHeight: 18,
-  },
-  branchCode: {
-    fontWeight: '700',
-    color: colors.textSecondary,
   },
 
   // ── Modal
