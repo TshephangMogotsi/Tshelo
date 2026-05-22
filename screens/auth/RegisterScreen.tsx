@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   View,
   Text,
@@ -10,66 +10,84 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { RouteProp } from '@react-navigation/native'
 import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { fonts } from '../../theme/typography'
+import { supabase } from '../../lib/supabase'
+import BankPicker, { BankFormValue } from '../../components/BankPicker'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
-  route: RouteProp<AuthStackParamList, 'Register'>
 }
 
 type MobileMoneyProvider = 'orange_money' | 'myzaka' | 'smega'
 
-const PROVIDERS: { id: MobileMoneyProvider; label: string; color: string; description: string }[] = [
-  {
-    id: 'orange_money',
-    label: 'Orange Money',
-    color: '#FF6B00',
-    description: 'Send via your Orange number',
-  },
-  {
-    id: 'myzaka',
-    label: 'MyZaka',
-    color: '#009FE3',
-    description: 'Mascom mobile money',
-  },
-  {
-    id: 'smega',
-    label: 'Smega',
-    color: '#8B2FC9',
-    description: 'BTC Botswana mobile money',
-  },
-]
+type ProviderInfo = { id: MobileMoneyProvider; label: string; color: string; network: string }
 
-function ProviderInitial({ label, color }: { label: string; color: string }) {
-  return (
-    <View style={[styles.providerIcon, { backgroundColor: color + '1A' }]}>
-      <Text style={[styles.providerIconText, { color }]}>
-        {label.charAt(0)}
-      </Text>
-    </View>
-  )
+const PROVIDER_META: Record<MobileMoneyProvider, Omit<ProviderInfo, 'id'>> = {
+  orange_money: { label: 'Orange Money', color: '#EA6C0A', network: 'Orange Botswana' },
+  myzaka:       { label: 'MyZaka',       color: '#0070C0', network: 'Mascom' },
+  smega:        { label: 'Smega',        color: '#7C3AED', network: 'BTC Botswana' },
+}
+
+// Detect mobile money provider from the first two digits of an 8-digit BW number
+function detectProvider(digits: string): MobileMoneyProvider | null {
+  if (digits.length < 2) return null
+  const prefix = parseInt(digits.slice(0, 2), 10)
+  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
+  if ([74, 75].includes(prefix))         return 'myzaka'
+  if (prefix === 77)                     return 'smega'
+  return null
 }
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [displayName, setDisplayName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [provider, setProvider] = useState<MobileMoneyProvider | null>(null)
-  const [mobileMoneyNumber, setMobileMoneyNumber] = useState('')
-  const [consentGiven, setConsentGiven] = useState(false)
+  const [name, setName]               = useState('')
+  const [phone, setPhone]             = useState('')
+  const [bank, setBank]               = useState<BankFormValue>({
+    bankName: '', branchCode: '', accountNumber: '', accountType: 'savings',
+  })
+  const [consent, setConsent]         = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [nameFocused, setNameFocused] = useState(false)
+  const [phoneFocused, setPhoneFocused] = useState(false)
 
-  const cleanedPhone = phone.replace(/\D/g, '')
-  const cleanedMobileMoneyNumber = mobileMoneyNumber.replace(/\D/g, '')
+  const phoneRef = useRef<TextInput>(null)
+
+  const cleanPhone = phone.replace(/\D/g, '')
+  const provider   = detectProvider(cleanPhone)
 
   const isValid =
-    displayName.trim().length >= 2 &&
-    cleanedPhone.length === 8 &&
+    name.trim().length >= 2 &&
+    cleanPhone.length === 8 &&
     provider !== null &&
-    cleanedMobileMoneyNumber.length === 8 &&
-    consentGiven
+    bank.bankName.length > 0 &&
+    bank.accountNumber.length >= 8 &&
+    consent
+
+  async function handleSendOTP() {
+    if (!isValid) return
+    const fullPhone = `+267${cleanPhone}`
+    setLoading(true)
+    const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })
+    setLoading(false)
+    if (error) { Alert.alert('Error', error.message); return }
+    navigation.navigate('OTP', {
+      phone: fullPhone,
+      mode: 'register',
+      registration: {
+        name:     name.trim(),
+        provider: provider!,
+        bank,
+      },
+    })
+  }
+
+  const detectedMeta = provider ? PROVIDER_META[provider] : null
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -85,148 +103,121 @@ export default function RegisterScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
+            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.heading}>Create account</Text>
+            <Text style={styles.heading}>Create your account</Text>
             <Text style={styles.subheading}>
-              Set up your Tshelo profile to start managing community funds.
+              Tell us about yourself — we'll verify your number after.
             </Text>
           </View>
 
-          {/* ── Display Name ─────────────────────────── */}
+          {/* ── Full name ─────────────────────────────── */}
           <View style={styles.field}>
             <Text style={styles.label}>Full Name</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, nameFocused && styles.inputFocused]}
               placeholder="e.g. Kefilwe Moeti"
               placeholderTextColor={colors.textMuted}
-              value={displayName}
-              onChangeText={setDisplayName}
+              value={name}
+              onChangeText={setName}
+              onFocus={() => setNameFocused(true)}
+              onBlur={() => setNameFocused(false)}
               autoCapitalize="words"
               returnKeyType="next"
+              onSubmitEditing={() => phoneRef.current?.focus()}
             />
           </View>
 
-          {/* ── Phone Number ─────────────────────────── */}
+          {/* ── Phone number ──────────────────────────── */}
           <View style={styles.field}>
             <Text style={styles.label}>Phone Number</Text>
-            <View style={styles.phoneRow}>
+            <Text style={styles.fieldSub}>
+              Your mobile money provider will be detected automatically.
+            </Text>
+            <View style={[styles.phoneRow, phoneFocused && styles.rowFocused]}>
               <View style={styles.countryCode}>
-                <Text style={styles.countryFlag}>🇧🇼</Text>
+                <Text style={styles.flag}>🇧🇼</Text>
                 <Text style={styles.countryCodeText}>+267</Text>
               </View>
+              <View style={styles.divider} />
               <TextInput
+                ref={phoneRef}
                 style={styles.phoneInput}
                 placeholder="71 234 567"
                 placeholderTextColor={colors.textMuted}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
+                onFocus={() => setPhoneFocused(true)}
+                onBlur={() => setPhoneFocused(false)}
                 maxLength={9}
                 returnKeyType="next"
+                onSubmitEditing={() => bankRef.current?.focus()}
               />
             </View>
-            <Text style={styles.hint}>This becomes your login number.</Text>
-          </View>
 
-          {/* ── Mobile Money Provider ────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Mobile Money Provider</Text>
-            <Text style={styles.fieldSubtext}>
-              Used to record contributions to your funds.
-            </Text>
-            <View style={styles.providerList}>
-              {PROVIDERS.map(p => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[
-                    styles.providerCard,
-                    provider === p.id && styles.providerCardSelected,
-                  ]}
-                  onPress={() => setProvider(p.id)}
-                  activeOpacity={0.8}
-                >
-                  <ProviderInitial label={p.label} color={p.color} />
-                  <View style={styles.providerInfo}>
-                    <Text style={styles.providerLabel}>{p.label}</Text>
-                    <Text style={styles.providerDescription}>{p.description}</Text>
-                  </View>
-                  <View style={[
-                    styles.radioOuter,
-                    provider === p.id && styles.radioOuterSelected,
-                  ]}>
-                    {provider === p.id && <View style={styles.radioInner} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* ── Mobile Money Number ──────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Mobile Money Number</Text>
-            <Text style={styles.fieldSubtext}>
-              May differ from your phone number.
-            </Text>
-            <View style={styles.phoneRow}>
-              <View style={styles.countryCode}>
-                <Text style={styles.countryFlag}>🇧🇼</Text>
-                <Text style={styles.countryCodeText}>+267</Text>
+            {/* Provider pill — auto-detected */}
+            {detectedMeta ? (
+              <View style={[styles.providerPill, { backgroundColor: detectedMeta.color + '18' }]}>
+                <View style={[styles.providerDot, { backgroundColor: detectedMeta.color }]} />
+                <Text style={[styles.providerPillText, { color: detectedMeta.color }]}>
+                  {detectedMeta.label} · {detectedMeta.network}
+                </Text>
+                <Ionicons name="checkmark-circle" size={15} color={detectedMeta.color} />
               </View>
-              <TextInput
-                style={styles.phoneInput}
-                placeholder="71 234 567"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="phone-pad"
-                value={mobileMoneyNumber}
-                onChangeText={setMobileMoneyNumber}
-                maxLength={9}
-                returnKeyType="done"
-              />
-            </View>
+            ) : cleanPhone.length >= 2 ? (
+              <View style={styles.providerUnknown}>
+                <Ionicons name="alert-circle-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.providerUnknownText}>
+                  Number not recognised — mobile money may not be available
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* ── Consent ──────────────────────────────── */}
+          {/* ── Bank details ──────────────────────────── */}
+          <View style={styles.field}>
+            <Text style={styles.sectionLabel}>Bank Details</Text>
+          </View>
+          <BankPicker value={bank} onChange={setBank} />
+
+          {/* ── Consent ───────────────────────────────── */}
           <TouchableOpacity
             style={styles.consentRow}
-            onPress={() => setConsentGiven(v => !v)}
+            onPress={() => setConsent(v => !v)}
             activeOpacity={0.8}
           >
-            <View style={[styles.checkbox, consentGiven && styles.checkboxChecked]}>
-              {consentGiven && <Text style={styles.checkmark}>✓</Text>}
+            <View style={[styles.checkbox, consent && styles.checkboxChecked]}>
+              {consent && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
             <Text style={styles.consentText}>
-              I consent to Tshelo processing my personal data and mobile money information
-              in accordance with the{' '}
-              <Text style={styles.consentLink}>Privacy Policy</Text>
+              I agree to Tshelo's{' '}
+              <Text style={styles.consentLink}>Terms of Service</Text>
               {' '}and{' '}
-              <Text style={styles.consentLink}>Terms of Service</Text>.
+              <Text style={styles.consentLink}>Privacy Policy</Text>
+              , and consent to processing of my mobile money information.
             </Text>
           </TouchableOpacity>
 
-          {/* ── Submit ───────────────────────────────── */}
+          {/* ── Submit ────────────────────────────────── */}
           <TouchableOpacity
             style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
-            onPress={() =>
-              isValid &&
-              navigation.navigate('OTP', {
-                phone: `+267${cleanedPhone}`,
-                mode: 'register',
-              })
-            }
+            onPress={handleSendOTP}
             activeOpacity={isValid ? 0.85 : 1}
+            disabled={loading}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>
-              Continue
-            </Text>
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.primaryButtonText}>Send OTP</Text>
+            }
           </TouchableOpacity>
 
-          <View style={styles.loginRow}>
-            <Text style={styles.loginText}>Already have an account? </Text>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.replace('Login')}>
-              <Text style={styles.loginLink}>Log in</Text>
+              <Text style={styles.footerLink}>Log in</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -236,13 +227,8 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
+  safe:  { flex: 1, backgroundColor: colors.background },
+  flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 24,
@@ -256,20 +242,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: 36,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  header: {
-    marginBottom: 28,
-  },
+  header: { marginBottom: 32 },
   heading: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 30,
+    fontFamily: fonts.display.bold,
     color: colors.textPrimary,
     marginBottom: 8,
   },
@@ -278,20 +258,25 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
   },
-  field: {
-    marginBottom: 24,
-  },
+  field: { marginBottom: 24 },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 6,
+    color: colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  fieldSubtext: {
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  fieldSub: {
     fontSize: 12,
     color: colors.textMuted,
+    lineHeight: 18,
     marginBottom: 10,
     marginTop: -2,
   },
@@ -299,108 +284,91 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 15,
     fontSize: 16,
     color: colors.textPrimary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  inputFocused: {
+    borderColor: colors.borderFocus,
   },
   phoneRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: colors.surface,
     overflow: 'hidden',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  rowFocused: {
+    borderColor: colors.borderFocus,
   },
   countryCode: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 15,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
+    paddingVertical: 16,
     gap: 6,
-    backgroundColor: colors.background,
   },
-  countryFlag: {
-    fontSize: 18,
-  },
+  flag: { fontSize: 18 },
   countryCodeText: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.border,
   },
   phoneInput: {
     flex: 1,
     fontSize: 16,
     color: colors.textPrimary,
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingVertical: 16,
   },
-  hint: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 6,
-  },
-  providerList: {
-    gap: 10,
-  },
-  providerCard: {
+  providerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    padding: 14,
-    gap: 12,
+    alignSelf: 'flex-start',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 6,
   },
-  providerCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
+  providerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
-  providerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+  providerPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  providerUnknown: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
   },
-  providerIconText: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  providerInfo: {
-    flex: 1,
-  },
-  providerLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  providerDescription: {
+  providerUnknownText: {
     fontSize: 12,
-    color: colors.textSecondary,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterSelected: {
-    borderColor: colors.primary,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
+    color: colors.textMuted,
+    flex: 1,
+    lineHeight: 18,
   },
   consentRow: {
     flexDirection: 'row',
@@ -428,50 +396,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  checkmark: {
-    color: colors.surface,
-    fontSize: 13,
-    fontWeight: '800',
-  },
   consentText: {
     flex: 1,
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 20,
   },
-  consentLink: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
+  consentLink: { color: colors.primaryMid, fontWeight: '600' },
   primaryButton: {
     backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 28,
+    paddingVertical: 17,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  buttonDisabled: {
-    backgroundColor: colors.disabled,
-  },
+  buttonDisabled: { backgroundColor: colors.disabled },
   primaryButtonText: {
-    color: colors.surface,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  buttonTextDisabled: {
-    color: colors.disabledText,
-  },
-  loginRow: {
+  footer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  loginText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  loginLink: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+  footerText: { fontSize: 14, color: colors.textSecondary },
+  footerLink: { fontSize: 14, fontWeight: '700', color: colors.primaryMid },
 })

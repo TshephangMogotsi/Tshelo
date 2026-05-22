@@ -11,6 +11,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MainStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { fonts } from '../../theme/typography'
 import { useAuth } from '../../context/AuthContext'
 
 type Props = {
@@ -154,9 +155,8 @@ function EmptyFunds({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => 
 }
 
 export default function HomeScreen({ navigation }: Props) {
-  const { signOut } = useAuth()
-  const displayName = 'Kefilwe'   // replace with auth user
-  const tokenBalance = 3          // replace with user.token_balance
+  const { userName, tokenBalance } = useAuth()
+  const displayName = userName ? userName.split(' ')[0] : 'there'
 
   const activeFunds = MOCK_FUNDS.filter(f => f.status === 'active')
 
@@ -170,15 +170,10 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.greeting}>Hello, {displayName} 👋</Text>
           <Text style={styles.subGreeting}>Here are your active funds</Text>
         </View>
-        <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.logoutBtn} onPress={signOut} activeOpacity={0.8}>
-          <Text style={styles.logoutText}>↩ Log out</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.tokenBadge} activeOpacity={0.8} onPress={() => navigation.navigate('TokenPurchase')}>
           <Text style={styles.tokenEmoji}>🪙</Text>
           <Text style={styles.tokenCount}>{tokenBalance}</Text>
         </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView
@@ -229,12 +224,6 @@ export default function HomeScreen({ navigation }: Props) {
           )}
         </View>
 
-        {/* ── Sandbox notice ─────────────────────────── */}
-        <View style={styles.sandboxNotice}>
-          <Text style={styles.sandboxText}>
-            🏦 Running in Bank of Botswana Sandbox — fund cap BWP 10,000
-          </Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -256,28 +245,13 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 22,
     fontWeight: '800',
+    fontFamily: fonts.display.bold,
     color: colors.surface,
     marginBottom: 2,
   },
   subGreeting: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.65)',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoutBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  logoutText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
   },
   tokenBadge: {
     flexDirection: 'row',
@@ -364,6 +338,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '800',
+    fontFamily: fonts.display.bold,
     color: colors.textPrimary,
   },
   sectionCount: {

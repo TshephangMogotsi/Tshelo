@@ -1,29 +1,34 @@
 export const colors = {
-  primary: '#1B5E4A',
-  primaryLight: '#E8F5F0',
-  primaryMid: '#2D7A62',
+  // Brand — vivid purple, used for CTAs, active states, hero elements
+  primary:      '#7B2FFF',
+  primaryLight: '#F0E8FF',  // soft lavender bg — chips, selected states
+  primaryMid:   '#9B5FFF',  // lighter shade — links, secondary text accents
 
-  accent: '#F4A62A',
-  accentLight: '#FEF3DC',
+  // Warm accent
+  accent:      '#D97706',
+  accentLight: '#FEF3C7',
 
-  background: '#F9FAFB',
-  surface: '#FFFFFF',
+  // Backgrounds — clean, iOS-native feeling
+  background: '#F2F2F7',   // system grouped background
+  surface:    '#FFFFFF',   // cards, inputs
 
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textMuted: '#9CA3AF',
+  // Text
+  textPrimary:   '#0D0D0D',
+  textSecondary: '#52525B',
+  textMuted:     '#A1A1AA',
 
-  border: '#E5E7EB',
-  borderFocus: '#1B5E4A',
+  // Borders
+  border:      '#E4E4E7',
+  borderFocus: '#7B2FFF',
 
-  error: '#DC2626',
-  errorLight: '#FEF2F2',
+  // Status
+  error:        '#DC2626',
+  errorLight:   '#FEF2F2',
+  success:      '#059669',
+  successLight: '#D1FAE5',
 
-  success: '#16A34A',
-  successLight: '#F0FDF4',
+  disabled:     '#D4D4D8',
+  disabledText: '#A1A1AA',
 
-  disabled: '#D1D5DB',
-  disabledText: '#9CA3AF',
-
-  overlay: 'rgba(0,0,0,0.4)',
+  overlay: 'rgba(0,0,0,0.45)',
 }

@@ -13,9 +13,11 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
+import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 
 type Props = {
@@ -24,6 +26,7 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const [phone, setPhone] = useState('')
+  const [focused, setFocused] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const cleanedPhone = phone.replace(/\D/g, '')
@@ -35,10 +38,7 @@ export default function LoginScreen({ navigation }: Props) {
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })
     setLoading(false)
-    if (error) {
-      Alert.alert('Error', error.message)
-      return
-    }
+    if (error) { Alert.alert('Error', error.message); return }
     navigation.navigate('OTP', { phone: fullPhone, mode: 'login' })
   }
 
@@ -53,25 +53,27 @@ export default function LoginScreen({ navigation }: Props) {
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
+            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
 
           <View style={styles.header}>
             <Text style={styles.heading}>Welcome back</Text>
             <Text style={styles.subheading}>
-              Enter your Botswana phone number to log in.
+              Enter your Botswana number to continue.
             </Text>
           </View>
 
           <View style={styles.form}>
             <Text style={styles.label}>Phone Number</Text>
-            <View style={styles.phoneRow}>
+            <View style={[styles.phoneRow, focused && styles.phoneRowFocused]}>
               <View style={styles.countryCode}>
                 <Text style={styles.countryFlag}>🇧🇼</Text>
                 <Text style={styles.countryCodeText}>+267</Text>
               </View>
+              <View style={styles.divider} />
               <TextInput
                 style={styles.phoneInput}
                 placeholder="71 234 567"
@@ -79,8 +81,11 @@ export default function LoginScreen({ navigation }: Props) {
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
                 maxLength={9}
                 returnKeyType="done"
+                onSubmitEditing={handleSendOTP}
               />
             </View>
             <Text style={styles.hint}>
@@ -94,27 +99,24 @@ export default function LoginScreen({ navigation }: Props) {
             activeOpacity={isValid ? 0.85 : 1}
             disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color={colors.surface} />
-            ) : (
-              <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>
-                Send OTP
-              </Text>
-            )}
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.primaryButtonText}>Send Code</Text>
+            }
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.replace('Register', { phone: '' })}>
+            <TouchableOpacity onPress={() => navigation.replace('Register')}>
               <Text style={styles.footerLink}>Create one</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
             style={styles.recoverLink}
-            onPress={() => navigation.navigate('Recover')}
+            onPress={() => navigation.navigate('Support')}
           >
-            <Text style={styles.recoverText}>Trouble logging in?</Text>
+            <Text style={styles.recoverText}>Can't access your number? Get help</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -123,18 +125,13 @@ export default function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
+  safe:  { flex: 1, backgroundColor: colors.background },
+  flex:  { flex: 1 },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   backButton: {
     width: 40,
@@ -143,20 +140,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: 36,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  header: {
-    marginBottom: 36,
-  },
+  header: { marginBottom: 36 },
   heading: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 30,
+    fontFamily: fonts.display.bold,
     color: colors.textPrimary,
     marginBottom: 8,
   },
@@ -165,43 +156,50 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
   },
-  form: {
-    marginBottom: 32,
-  },
+  form: { marginBottom: 28 },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 8,
+    color: colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
   phoneRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: colors.surface,
     overflow: 'hidden',
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  phoneRowFocused: {
+    borderColor: colors.borderFocus,
   },
   countryCode: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 16,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
     gap: 6,
-    backgroundColor: colors.background,
   },
-  countryFlag: {
-    fontSize: 18,
-  },
+  countryFlag: { fontSize: 18 },
   countryCodeText: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.border,
   },
   phoneInput: {
     flex: 1,
@@ -213,43 +211,37 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 12,
     color: colors.textMuted,
-    marginTop: 4,
+    lineHeight: 18,
   },
   primaryButton: {
     backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 28,
+    paddingVertical: 17,
     alignItems: 'center',
     marginBottom: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   buttonDisabled: {
     backgroundColor: colors.disabled,
   },
   primaryButtonText: {
-    color: colors.surface,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  buttonTextDisabled: {
-    color: colors.disabledText,
+    letterSpacing: 0.2,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  footerText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  footerLink: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  recoverLink: {
-    alignItems: 'center',
-  },
+  footerText: { fontSize: 14, color: colors.textSecondary },
+  footerLink: { fontSize: 14, fontWeight: '700', color: colors.primaryMid },
+  recoverLink: { alignItems: 'center' },
   recoverText: {
     fontSize: 14,
     color: colors.textMuted,
