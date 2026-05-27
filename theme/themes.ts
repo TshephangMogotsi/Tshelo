@@ -6,9 +6,10 @@ export const lightColors = {
   accent:      '#D97706',
   accentLight: '#FEF3C7',
 
-  background: '#F2F2F7',
+  background: '#F4F2EB',
   surface:    '#FFFFFF',
 
+  heading:       '#9D86FF',
   textPrimary:   '#0D0D0D',
   textSecondary: '#52525B',
   textMuted:     '#A1A1AA',
@@ -22,7 +23,7 @@ export const lightColors = {
   successLight: '#D1FAE5',
 
   disabled:     '#D4D4D8',
-  disabledText: '#A1A1AA',
+  disabledText: '#676767',
 
   overlay: 'rgba(0,0,0,0.45)',
 }
@@ -35,14 +36,15 @@ export const darkColors = {
   accent:      '#F59E0B',
   accentLight: '#3D2E00',
 
-  background: '#0D0D0D',
-  surface:    '#1C1C1E',
+  background: '#1A1C24',
+  surface:    '#2D2E41',
 
+  heading:       '#9D86FF',
   textPrimary:   '#F2F2F7',
   textSecondary: '#AEAEB2',
-  textMuted:     '#636366',
+  textMuted:     '#8A8A9A',
 
-  border:      '#3A3A3C',
+  border:      '#3A3A5C',
   borderFocus: '#9B5FFF',
 
   error:        '#FF453A',
@@ -50,8 +52,8 @@ export const darkColors = {
   success:      '#32D74B',
   successLight: '#0A2D16',
 
-  disabled:     '#3A3A3C',
-  disabledText: '#636366',
+  disabled:     '#3A3A5C',
+  disabledText: '#8A8A9A',
 
   overlay: 'rgba(0,0,0,0.6)',
 }

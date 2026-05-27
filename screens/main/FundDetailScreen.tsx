@@ -7,14 +7,14 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
-  FlatList,
   Share,
   Alert,
 } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
+import { useTheme } from '../../context/ThemeContext'
+import type { AppColors } from '../../theme/themes'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'FundDetail'>
@@ -30,7 +30,7 @@ type MemberRole          = 'organiser' | 'member'
 type Contribution = {
   id: string
   contributor_name: string
-  amount: number         // thebe
+  amount: number
   source: ContributionSource
   provider: MobileMoneyProvider | null
   confirmed_at: string
@@ -42,7 +42,7 @@ type Expense = {
   id: string
   vendor: string
   category: string | null
-  amount: number         // thebe
+  amount: number
   expense_date: string
   notes: string | null
   is_disputed: boolean
@@ -56,18 +56,16 @@ type Member = {
   joined_at: string
 }
 
-// ── Mock data (replace with Supabase queries keyed on fundId) ──
 const MOCK_FUND = {
   id: '1',
   title: "Kgosi's Funeral Fund",
-  fund_type: 'funeral' as const,
   status: 'active' as const,
   goal_amount: 500000,
   total_contributions: 320000,
   total_expenses: 25000,
   balance: 295000,
   member_count: 12,
-  organiser_id: 'current-user',   // matches mock "current user" → shows organiser controls
+  organiser_id: 'current-user',
   invite_code: 'A3F9B1C2D4E56789',
 }
 
@@ -80,7 +78,7 @@ const MOCK_CONTRIBUTIONS: Contribution[] = [
 ]
 
 const MOCK_EXPENSES: Expense[] = [
-  { id: 'e1', vendor: 'Mmoloki Funeral Home', category: 'Funeral Services', amount: 15000, expense_date: '2026-05-11', notes: 'Deposit payment',   is_disputed: false },
+  { id: 'e1', vendor: 'Mmoloki Funeral Home', category: 'Funeral Services', amount: 15000, expense_date: '2026-05-11', notes: 'Deposit payment',    is_disputed: false },
   { id: 'e2', vendor: 'Choppies Supermarket',  category: 'Catering',         amount: 10000, expense_date: '2026-05-10', notes: 'Food for the family', is_disputed: false },
 ]
 
@@ -104,14 +102,8 @@ const PROVIDER_COLORS: Record<MobileMoneyProvider, string> = {
   smega:        '#8B2FC9',
 }
 
-const FUND_TYPE_META: Record<string, { emoji: string; color: string }> = {
-  funeral:    { emoji: '🕊️', color: '#6B7280' },
-  wedding:    { emoji: '💍', color: '#EC4899' },
-  graduation: { emoji: '🎓', color: '#8B5CF6' },
-  birthday:   { emoji: '🎂', color: '#F59E0B' },
-  party:      { emoji: '🎉', color: '#10B981' },
-  other:      { emoji: '📁', color: '#6B7280' },
-}
+
+type Styles = ReturnType<typeof makeStyles>
 
 function thebeToBWP(thebe: number): string {
   return `BWP ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
@@ -123,7 +115,7 @@ function formatDate(iso: string): string {
   })
 }
 
-function ProgressBar({ value, max }: { value: number; max: number }) {
+function ProgressBar({ value, max, styles }: { value: number; max: number; styles: Styles }) {
   const pct = Math.min(value / max, 1)
   return (
     <View style={styles.progressTrack}>
@@ -133,7 +125,7 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 }
 
 // ── Contribution row ───────────────────────────────────────────
-function ContributionRow({ item }: { item: Contribution }) {
+function ContributionRow({ item, styles, colors }: { item: Contribution; styles: Styles; colors: AppColors }) {
   const providerColor = item.provider ? PROVIDER_COLORS[item.provider] : colors.textMuted
 
   return (
@@ -171,7 +163,7 @@ function ContributionRow({ item }: { item: Contribution }) {
 }
 
 // ── Expense row ────────────────────────────────────────────────
-function ExpenseRow({ item }: { item: Expense }) {
+function ExpenseRow({ item, styles, colors }: { item: Expense; styles: Styles; colors: AppColors }) {
   return (
     <View style={styles.listRow}>
       <View style={[styles.providerDot, { backgroundColor: colors.errorLight }]}>
@@ -205,7 +197,7 @@ function ExpenseRow({ item }: { item: Expense }) {
 }
 
 // ── Member row ─────────────────────────────────────────────────
-function MemberRow({ item }: { item: Member }) {
+function MemberRow({ item, styles }: { item: Member; styles: Styles }) {
   const initials = item.display_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
@@ -230,11 +222,13 @@ function MemberRow({ item }: { item: Member }) {
 
 export default function FundDetailScreen({ navigation, route }: Props) {
   const { fundId } = route.params
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
+
   const [activeTab, setActiveTab] = useState<Tab>('contributions')
 
-  const fund        = MOCK_FUND          // replace: query by fundId
-  const isOrganiser = true               // replace: fund.organiser_id === currentUser.id
-  const meta        = FUND_TYPE_META[fund.fund_type]
+  const fund        = MOCK_FUND
+  const isOrganiser = true
   const pct         = Math.round((fund.total_contributions / fund.goal_amount) * 100)
 
   async function handleShareInvite() {
@@ -245,7 +239,6 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
   function handleCopyCode() {
     Alert.alert('Invite Code', fund.invite_code, [{ text: 'OK' }])
-    // replace with Clipboard.setStringAsync(fund.invite_code) once expo-clipboard is added
   }
 
   const TABS: { id: Tab; label: string; count: number }[] = [
@@ -256,7 +249,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* ── Header ─────────────────────────────────── */}
       <View style={styles.header}>
@@ -290,10 +283,6 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        <View style={styles.fundTypeChip}>
-          <Text style={styles.fundTypeEmoji}>{meta.emoji}</Text>
-          <Text style={styles.fundTypeLabel}>{fund.fund_type.charAt(0).toUpperCase() + fund.fund_type.slice(1)}</Text>
-        </View>
         <Text style={styles.fundTitle}>{fund.title}</Text>
 
         {/* ── Stats row ──────────────────────────── */}
@@ -316,7 +305,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
         {/* ── Progress ───────────────────────────── */}
         <View style={styles.progressRow}>
-          <ProgressBar value={fund.total_contributions} max={fund.goal_amount} />
+          <ProgressBar value={fund.total_contributions} max={fund.goal_amount} styles={styles} />
           <Text style={styles.progressPct}>{pct}%</Text>
         </View>
 
@@ -369,7 +358,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
                 {MOCK_CONTRIBUTIONS.length} contribution{MOCK_CONTRIBUTIONS.length !== 1 ? 's' : ''}
               </Text>
             </View>
-            {MOCK_CONTRIBUTIONS.map(c => <ContributionRow key={c.id} item={c} />)}
+            {MOCK_CONTRIBUTIONS.map(c => (
+              <ContributionRow key={c.id} item={c} styles={styles} colors={colors} />
+            ))}
           </>
         )}
 
@@ -389,7 +380,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
                 <Text style={styles.emptyTabText}>No expenses recorded yet.</Text>
               </View>
             ) : (
-              MOCK_EXPENSES.map(e => <ExpenseRow key={e.id} item={e} />)
+              MOCK_EXPENSES.map(e => (
+                <ExpenseRow key={e.id} item={e} styles={styles} colors={colors} />
+              ))
             )}
           </>
         )}
@@ -401,7 +394,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
                 {MOCK_MEMBERS.length} of 20 member slots used
               </Text>
             </View>
-            {MOCK_MEMBERS.map(m => <MemberRow key={m.id} item={m} />)}
+            {MOCK_MEMBERS.map(m => (
+              <MemberRow key={m.id} item={m} styles={styles} />
+            ))}
           </>
         )}
       </ScrollView>
@@ -409,381 +404,375 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
 
-  // ── Header ───────────────────────────────────────
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 20,
-    color: colors.surface,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  recordBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  recordBtnExpense: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  recordBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.surface,
-  },
-  fundTypeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  fundTypeEmoji: {
-    fontSize: 14,
-  },
-  fundTypeLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  fundTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.surface,
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-  },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.surface,
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
-  },
-  progressTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-  },
-  progressPct: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.accent,
-    width: 36,
-    textAlign: 'right',
-  },
-  inviteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  inviteCode: {
-    flex: 1,
-  },
-  inviteLabel: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.55)',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  inviteCodeText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.surface,
-    letterSpacing: 1.5,
-  },
-  inviteAction: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  inviteActionText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.surface,
-  },
+    // ── Header ───────────────────────────────────────
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 16,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    backButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 11,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    backIcon: {
+      fontSize: 20,
+      color: colors.textPrimary,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    recordBtn: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    recordBtnExpense: {},
+    recordBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    fundTitle: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 16,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    stat: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    statLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+    statDivider: {
+      width: 1,
+      height: 28,
+      backgroundColor: colors.border,
+    },
+    progressRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 14,
+    },
+    progressTrack: {
+      flex: 1,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 3,
+      backgroundColor: colors.primary,
+    },
+    progressPct: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      width: 36,
+      textAlign: 'right',
+    },
+    inviteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    inviteCode: {
+      flex: 1,
+    },
+    inviteLabel: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginBottom: 2,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    inviteCodeText: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      letterSpacing: 1.5,
+    },
+    inviteAction: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    inviteActionText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+    },
 
-  // ── Tabs ─────────────────────────────────────────
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 0,
-    gap: 4,
-  },
-  tabItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabItemActive: {
-    borderBottomColor: colors.primary,
-  },
-  tabLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  tabLabelActive: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  tabCount: {
-    backgroundColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  tabCountActive: {
-    backgroundColor: colors.primaryLight,
-  },
-  tabCountText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textMuted,
-  },
-  tabCountTextActive: {
-    color: colors.primary,
-  },
+    // ── Tabs ─────────────────────────────────────────
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 0,
+      gap: 4,
+    },
+    tabItem: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingBottom: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabItemActive: {
+      borderBottomColor: colors.primary,
+    },
+    tabLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textMuted,
+    },
+    tabLabelActive: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    tabCount: {
+      backgroundColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      minWidth: 20,
+      alignItems: 'center',
+    },
+    tabCountActive: {
+      backgroundColor: colors.primaryLight,
+    },
+    tabCountText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textMuted,
+    },
+    tabCountTextActive: {
+      color: colors.primary,
+    },
 
-  // ── Content ──────────────────────────────────────
-  content: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  contentInner: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 48,
-  },
-  summaryStrip: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    marginBottom: 4,
-  },
-  summaryText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  summaryValue: {
-    fontWeight: '700',
-    color: colors.primary,
-  },
+    // ── Content ──────────────────────────────────────
+    content: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    contentInner: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 48,
+    },
+    summaryStrip: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      marginBottom: 4,
+    },
+    summaryText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    summaryValue: {
+      fontWeight: '700',
+      color: colors.primary,
+    },
 
-  // ── List rows ────────────────────────────────────
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  providerDot: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  providerDotText: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  listRowBody: {
-    flex: 1,
-  },
-  listRowTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  listRowName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    flex: 1,
-    marginRight: 8,
-  },
-  listRowAmount: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  listRowBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  listRowDate: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  listRowNote: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  smsBadge: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  smsBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  disputedBadge: {
-    backgroundColor: colors.errorLight,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  disputedBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.error,
-  },
-  categoryChip: {
-    backgroundColor: colors.background,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryChipText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
+    // ── List rows ────────────────────────────────────
+    listRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 10,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    providerDot: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    providerDotText: {
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    listRowBody: {
+      flex: 1,
+    },
+    listRowTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    listRowName: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      flex: 1,
+      marginRight: 8,
+    },
+    listRowAmount: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    listRowBottom: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      flexWrap: 'wrap',
+    },
+    listRowDate: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    listRowNote: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 4,
+      fontStyle: 'italic',
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    smsBadge: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    smsBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    disputedBadge: {
+      backgroundColor: colors.errorLight,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    disputedBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.error,
+    },
+    categoryChip: {
+      backgroundColor: colors.background,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryChipText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
 
-  // ── Member avatar ────────────────────────────────
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  organiserBadge: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  organiserBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+    // ── Member avatar ────────────────────────────────
+    avatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    avatarText: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    organiserBadge: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    organiserBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.primary,
+    },
 
-  // ── Empty tab ────────────────────────────────────
-  emptyTab: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyTabEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  emptyTabText: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-})
+    // ── Empty tab ────────────────────────────────────
+    emptyTab: {
+      alignItems: 'center',
+      paddingVertical: 48,
+    },
+    emptyTabEmoji: {
+      fontSize: 40,
+      marginBottom: 12,
+    },
+    emptyTabText: {
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+  })
+}

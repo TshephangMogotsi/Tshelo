@@ -12,27 +12,31 @@ import {
 } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MainStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
+import { useTheme } from '../../context/ThemeContext'
+import type { AppColors } from '../../theme/themes'
+import { fonts } from '../../theme/typography'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'JoinFund'>
 }
 
 export default function JoinFundScreen({ navigation }: Props) {
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
+
   const [code, setCode] = useState('')
 
   const cleanedCode = code.trim().toLowerCase()
-  const isValid = cleanedCode.length === 16  // invite_code = 8 random bytes → 16 hex chars
+  const isValid = cleanedCode.length === 16
 
   function handleCodeChange(text: string) {
-    // allow hex characters only, auto-uppercase for display
     const cleaned = text.replace(/[^a-fA-F0-9]/g, '').slice(0, 16)
     setCode(cleaned.toUpperCase())
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -101,14 +105,14 @@ export default function JoinFundScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity
-            style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
+            style={[styles.primaryButton, isValid && styles.buttonActive]}
             activeOpacity={isValid ? 0.85 : 1}
             onPress={() => {
               if (!isValid) return
               // TODO: Supabase lookup by invite_code + insert fund_member
             }}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>
+            <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
               Join Fund
             </Text>
           </TouchableOpacity>
@@ -118,143 +122,151 @@ export default function JoinFundScreen({ navigation }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  iconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  icon: {
-    fontSize: 32,
-  },
-  header: {
-    marginBottom: 28,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  subheading: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  field: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  codeInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    letterSpacing: 2,
-  },
-  codeInputValid: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  hint: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 6,
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginBottom: 24,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  segmentText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 2,
-    minWidth: 52,
-    textAlign: 'center',
-  },
-  segmentDash: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-  infoCard: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 32,
-  },
-  infoText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    backgroundColor: colors.disabled,
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  buttonTextDisabled: {
-    color: colors.disabledText,
-  },
-})
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    flex: {
+      flex: 1,
+    },
+    container: {
+      flex: 1,
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 40,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 28,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    backIcon: {
+      fontSize: 20,
+      color: colors.textPrimary,
+    },
+    iconWrap: {
+      width: 68,
+      height: 68,
+      borderRadius: 20,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+    },
+    icon: {
+      fontSize: 32,
+    },
+    header: {
+      marginBottom: 28,
+    },
+    heading: {
+      fontSize: 30,
+      fontFamily: fonts.display.bold,
+      color: colors.heading,
+      marginBottom: 8,
+    },
+    subheading: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
+    field: {
+      marginBottom: 16,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    codeInput: {
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      letterSpacing: 2,
+    },
+    codeInputValid: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    hint: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 6,
+    },
+    segmentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginBottom: 24,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    segmentText: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.primary,
+      letterSpacing: 2,
+      minWidth: 52,
+      textAlign: 'center',
+    },
+    segmentDash: {
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    infoCard: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 32,
+    },
+    infoText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    primaryButton: {
+      backgroundColor: colors.disabled,
+      borderRadius: 28,
+      paddingVertical: 17,
+      alignItems: 'center',
+    },
+    buttonActive: {
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    primaryButtonText: {
+      color: colors.disabledText,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
+    primaryButtonTextActive: {
+      color: '#FFFFFF',
+    },
+  })
+}

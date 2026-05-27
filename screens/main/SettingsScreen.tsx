@@ -82,7 +82,7 @@ export default function SettingsScreen() {
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[s.pageTitle, { color: colors.textPrimary }]}>Settings</Text>
+        <Text style={[s.pageTitle, { color: colors.heading }]}>Settings</Text>
 
         {/* Profile card */}
         <View style={[s.profileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -167,8 +167,7 @@ const s = StyleSheet.create({
     paddingBottom: 48,
   },
   pageTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 30,
     fontFamily: fonts.display.bold,
     marginBottom: 20,
   },

@@ -6,52 +6,39 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
-  FlatList,
 } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MainStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import type { AppColors } from '../../theme/themes'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'Home'>
 }
 
-type FundType = 'funeral' | 'wedding' | 'graduation' | 'birthday' | 'party' | 'other'
 type FundStatus = 'active' | 'closed' | 'suspended'
 type MemberRole = 'organiser' | 'member'
 
 type Fund = {
   id: string
   title: string
-  fund_type: FundType
   status: FundStatus
-  goal_amount: number       // thebe
-  total_contributions: number  // thebe
-  balance: number           // thebe
+  goal_amount: number
+  total_contributions: number
+  balance: number
   member_count: number
   contribution_count: number
   role: MemberRole
 }
 
-const FUND_META: Record<FundType, { emoji: string; label: string; color: string }> = {
-  funeral:    { emoji: '🕊️', label: 'Funeral',    color: '#6B7280' },
-  wedding:    { emoji: '💍', label: 'Wedding',    color: '#EC4899' },
-  graduation: { emoji: '🎓', label: 'Graduation', color: '#8B5CF6' },
-  birthday:   { emoji: '🎂', label: 'Birthday',   color: '#F59E0B' },
-  party:      { emoji: '🎉', label: 'Party',      color: '#10B981' },
-  other:      { emoji: '📁', label: 'Other',      color: '#6B7280' },
-}
-
-// ── Placeholder data (replace with Supabase query) ────────────
 const MOCK_FUNDS: Fund[] = [
   {
     id: '1',
     title: "Kgosi's Funeral Fund",
-    fund_type: 'funeral',
     status: 'active',
-    goal_amount: 500000,       // BWP 5,000
+    goal_amount: 500000,
     total_contributions: 320000,
     balance: 295000,
     member_count: 12,
@@ -61,7 +48,6 @@ const MOCK_FUNDS: Fund[] = [
   {
     id: '2',
     title: 'Mpho & Tebogo Wedding',
-    fund_type: 'wedding',
     status: 'active',
     goal_amount: 800000,
     total_contributions: 140000,
@@ -72,11 +58,13 @@ const MOCK_FUNDS: Fund[] = [
   },
 ]
 
+type Styles = ReturnType<typeof makeStyles>
+
 function thebeToBWP(thebe: number): string {
   return `BWP ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
 }
 
-function ProgressBar({ value, max }: { value: number; max: number }) {
+function ProgressBar({ value, max, styles }: { value: number; max: number; styles: Styles }) {
   const pct = Math.min(value / max, 1)
   return (
     <View style={styles.progressTrack}>
@@ -85,17 +73,12 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   )
 }
 
-function FundCard({ fund, onPress }: { fund: Fund; onPress: () => void }) {
-  const meta = FUND_META[fund.fund_type]
+function FundCard({ fund, onPress, styles }: { fund: Fund; onPress: () => void; styles: Styles }) {
   const pct = Math.round((fund.total_contributions / fund.goal_amount) * 100)
 
   return (
     <TouchableOpacity style={styles.fundCard} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.fundCardHeader}>
-        <View style={[styles.fundTypeChip, { backgroundColor: meta.color + '18' }]}>
-          <Text style={styles.fundTypeEmoji}>{meta.emoji}</Text>
-          <Text style={[styles.fundTypeLabel, { color: meta.color }]}>{meta.label}</Text>
-        </View>
         <View style={[
           styles.roleBadge,
           fund.role === 'organiser' ? styles.roleBadgeOrganiser : styles.roleBadgeMember,
@@ -112,7 +95,7 @@ function FundCard({ fund, onPress }: { fund: Fund; onPress: () => void }) {
       <Text style={styles.fundTitle} numberOfLines={1}>{fund.title}</Text>
 
       <View style={styles.progressRow}>
-        <ProgressBar value={fund.total_contributions} max={fund.goal_amount} />
+        <ProgressBar value={fund.total_contributions} max={fund.goal_amount} styles={styles} />
         <Text style={styles.progressPct}>{pct}%</Text>
       </View>
 
@@ -136,7 +119,7 @@ function FundCard({ fund, onPress }: { fund: Fund; onPress: () => void }) {
   )
 }
 
-function EmptyFunds({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void }) {
+function EmptyFunds({ onCreate, onJoin, styles }: { onCreate: () => void; onJoin: () => void; styles: Styles }) {
   return (
     <View style={styles.emptyState}>
       <Text style={styles.emptyEmoji}>🪣</Text>
@@ -156,13 +139,15 @@ function EmptyFunds({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => 
 
 export default function HomeScreen({ navigation }: Props) {
   const { userName, tokenBalance } = useAuth()
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
   const displayName = userName ? userName.split(' ')[0] : 'there'
 
   const activeFunds = MOCK_FUNDS.filter(f => f.status === 'active')
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* ── Header ─────────────────────────────────── */}
       <View style={styles.header}>
@@ -212,12 +197,14 @@ export default function HomeScreen({ navigation }: Props) {
             <EmptyFunds
               onCreate={() => navigation.navigate('CreateFund')}
               onJoin={() => navigation.navigate('JoinFund')}
+              styles={styles}
             />
           ) : (
             activeFunds.map(fund => (
               <FundCard
                 key={fund.id}
                 fund={fund}
+                styles={styles}
                 onPress={() => navigation.navigate('FundDetail', { fundId: fund.id })}
               />
             ))
@@ -229,277 +216,266 @@ export default function HomeScreen({ navigation }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  greeting: {
-    fontSize: 22,
-    fontWeight: '800',
-    fontFamily: fonts.display.bold,
-    color: colors.surface,
-    marginBottom: 2,
-  },
-  subGreeting: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.65)',
-  },
-  tokenBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    gap: 6,
-  },
-  tokenEmoji: {
-    fontSize: 16,
-  },
-  tokenCount: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.surface,
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 48,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
-  },
-  primaryAction: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    gap: 8,
-  },
-  primaryActionIcon: {
-    fontSize: 18,
-    color: colors.surface,
-    fontWeight: '700',
-  },
-  primaryActionText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.surface,
-  },
-  secondaryAction: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    paddingVertical: 14,
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  secondaryActionIcon: {
-    fontSize: 16,
-  },
-  secondaryActionText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
-  },
-  sectionCount: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontWeight: '600',
-  },
-  fundCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  fundCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  fundTypeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    gap: 5,
-  },
-  fundTypeEmoji: {
-    fontSize: 13,
-  },
-  fundTypeLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  roleBadge: {
-    borderRadius: 20,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-  },
-  roleBadgeOrganiser: {
-    backgroundColor: colors.primaryLight,
-  },
-  roleBadgeMember: {
-    backgroundColor: colors.background,
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  roleBadgeTextOrganiser: {
-    color: colors.primary,
-  },
-  roleBadgeTextMember: {
-    color: colors.textSecondary,
-  },
-  fundTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
-  },
-  progressTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.border,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: colors.primary,
-  },
-  progressPct: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primary,
-    width: 36,
-    textAlign: 'right',
-  },
-  fundStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  fundStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  fundStatDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.border,
-  },
-  fundStatValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  fundStatLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 16,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyHeading: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  emptyBody: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 24,
-  },
-  emptyCreateBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    marginBottom: 14,
-  },
-  emptyCreateBtnText: {
-    color: colors.surface,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptyJoinLink: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  sandboxNotice: {
-    backgroundColor: colors.accentLight,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-  },
-  sandboxText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-})
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 24,
+    },
+    greeting: {
+      fontSize: 22,
+      fontWeight: '800',
+      fontFamily: fonts.display.bold,
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    subGreeting: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    tokenBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    tokenEmoji: {
+      fontSize: 16,
+    },
+    tokenCount: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    scroll: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 24,
+      paddingBottom: 48,
+    },
+    quickActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 28,
+    },
+    primaryAction: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      paddingVertical: 14,
+      gap: 8,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    primaryActionIcon: {
+      fontSize: 18,
+      color: colors.textPrimary,
+      fontWeight: '700',
+    },
+    primaryActionText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    secondaryAction: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      paddingVertical: 14,
+      gap: 8,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    secondaryActionIcon: {
+      fontSize: 16,
+    },
+    secondaryActionText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: '800',
+      fontFamily: fonts.display.bold,
+      color: colors.textPrimary,
+    },
+    sectionCount: {
+      fontSize: 13,
+      color: colors.textMuted,
+      fontWeight: '600',
+    },
+    fundCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      padding: 18,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    fundCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    roleBadge: {
+      borderRadius: 20,
+      paddingVertical: 3,
+      paddingHorizontal: 10,
+    },
+    roleBadgeOrganiser: {
+      backgroundColor: colors.primaryLight,
+    },
+    roleBadgeMember: {
+      backgroundColor: colors.background,
+    },
+    roleBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    roleBadgeTextOrganiser: {
+      color: colors.primary,
+    },
+    roleBadgeTextMember: {
+      color: colors.textSecondary,
+    },
+    fundTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 12,
+    },
+    progressRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 14,
+    },
+    progressTrack: {
+      flex: 1,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 3,
+      backgroundColor: colors.primary,
+    },
+    progressPct: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+      width: 36,
+      textAlign: 'right',
+    },
+    fundStats: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    fundStat: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    fundStatDivider: {
+      width: 1,
+      height: 28,
+      backgroundColor: colors.border,
+    },
+    fundStatValue: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    fundStatLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 40,
+      paddingHorizontal: 16,
+    },
+    emptyEmoji: {
+      fontSize: 48,
+      marginBottom: 16,
+    },
+    emptyHeading: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 8,
+    },
+    emptyBody: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 21,
+      marginBottom: 24,
+    },
+    emptyCreateBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 14,
+      paddingVertical: 14,
+      paddingHorizontal: 32,
+      marginBottom: 14,
+    },
+    emptyCreateBtnText: {
+      color: colors.surface,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    emptyJoinLink: {
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+    },
+    sandboxNotice: {
+      backgroundColor: colors.accentLight,
+      borderRadius: 12,
+      padding: 14,
+      alignItems: 'center',
+    },
+    sandboxText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+  })
+}

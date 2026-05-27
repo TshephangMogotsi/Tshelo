@@ -16,9 +16,9 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation } from '@react-navigation/native'
-import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
+import type { AppColors } from '../../theme/themes'
 
 type Category = {
   id: string
@@ -27,21 +27,17 @@ type Category = {
 }
 
 const CATEGORIES: Category[] = [
-  { id: 'login',    label: "Can't log in",    icon: 'lock-closed-outline'   },
-  { id: 'payment',  label: 'Payment issue',   icon: 'card-outline'           },
-  { id: 'account',  label: 'Account',         icon: 'person-outline'         },
-  { id: 'technical',label: 'Technical',       icon: 'bug-outline'            },
-  { id: 'other',    label: 'Other',           icon: 'ellipsis-horizontal'    },
+  { id: 'login',     label: "Can't log in",   icon: 'lock-closed-outline'  },
+  { id: 'payment',   label: 'Payment issue',  icon: 'card-outline'          },
+  { id: 'account',   label: 'Account',        icon: 'person-outline'        },
+  { id: 'technical', label: 'Technical',      icon: 'bug-outline'           },
+  { id: 'other',     label: 'Other',          icon: 'ellipsis-horizontal'   },
 ]
 
 export default function SupportScreen() {
   const navigation = useNavigation()
-  const { isDark } = useTheme()
-  const bg        = isDark ? '#1A1C24' : colors.background
-  const inputBg   = isDark ? '#2D2E41' : colors.surface
-  const textCol   = isDark ? '#F2F2F7' : colors.textPrimary
-  const mutedCol  = isDark ? '#8A8A9A' : colors.textMuted
-  const borderCol = isDark ? '#3A3A5C' : colors.border
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
 
   const [category, setCategory] = useState<string | null>(null)
   const [name,     setName]     = useState('')
@@ -94,9 +90,7 @@ export default function SupportScreen() {
 
     try {
       const canOpen = await Linking.canOpenURL(mailto)
-      if (canOpen) {
-        await Linking.openURL(mailto)
-      }
+      if (canOpen) await Linking.openURL(mailto)
     } catch (_) {
       // silently fail — still show success so user isn't blocked
     }
@@ -108,26 +102,26 @@ export default function SupportScreen() {
   // ── Success state ─────────────────────────────────────────────
   if (submitted) {
     return (
-      <SafeAreaView style={styles.successSafe}>
+      <SafeAreaView style={s.successSafe}>
         <StatusBar barStyle="light-content" backgroundColor="#7439E0" />
-        <View style={styles.successContainer}>
-          <View style={styles.successCircleWrapper}>
-            <Animated.View style={[styles.successOuterRing, { transform: [{ scale: pulseAnim }] }]} />
-            <View style={styles.successInnerCircle}>
+        <View style={s.successContainer}>
+          <View style={s.successCircleWrapper}>
+            <Animated.View style={[s.successOuterRing, { transform: [{ scale: pulseAnim }] }]} />
+            <View style={s.successInnerCircle}>
               <Ionicons name="checkmark" size={38} color="#2D2040" />
             </View>
           </View>
-          <Text style={styles.successHeading}>Ticket Submitted</Text>
-          <Text style={styles.successBody}>
+          <Text style={s.successHeading}>Ticket Submitted</Text>
+          <Text style={s.successBody}>
             We've received your message and will get back to you within 24 hours.
             Check your email for updates.
           </Text>
           <TouchableOpacity
-            style={styles.successButton}
+            style={s.successButton}
             onPress={() => navigation.goBack()}
             activeOpacity={0.85}
           >
-            <Text style={styles.successButtonText}>Done</Text>
+            <Text style={s.successButtonText}>Done</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -136,8 +130,8 @@ export default function SupportScreen() {
 
   // ── Form ──────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -149,33 +143,33 @@ export default function SupportScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Back */}
-          <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={textCol} />
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.heading, { color: '#9D86FF' }]}>Get Help</Text>
-            <Text style={[styles.subheading, { color: mutedCol }]}>
+            <Text style={styles.heading}>Get Help</Text>
+            <Text style={styles.subheading}>
               Tell us what's going on and we'll get back to you as soon as possible.
             </Text>
           </View>
 
           {/* Category */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: textCol }]}>Category</Text>
+            <Text style={styles.label}>Category</Text>
             <View style={styles.categoryGrid}>
               {CATEGORIES.map(cat => {
                 const active = category === cat.id
                 return (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.categoryChip, { backgroundColor: inputBg, borderColor: active ? colors.primary : borderCol }, active && styles.categoryChipActive]}
+                    style={[styles.categoryChip, active && styles.categoryChipActive]}
                     onPress={() => setCategory(cat.id)}
                     activeOpacity={0.75}
                   >
-                    <Ionicons name={cat.icon} size={15} color={active ? colors.primary : mutedCol} />
-                    <Text style={[styles.categoryChipText, { color: active ? colors.primary : mutedCol }, active && styles.categoryChipTextActive]}>
+                    <Ionicons name={cat.icon} size={15} color={active ? colors.primary : colors.textMuted} />
+                    <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
                       {cat.label}
                     </Text>
                   </TouchableOpacity>
@@ -186,11 +180,11 @@ export default function SupportScreen() {
 
           {/* Name */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: textCol }]}>Your Name</Text>
+            <Text style={styles.label}>Your Name</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: inputBg, borderColor: nameFocused ? colors.primary : borderCol, color: textCol }]}
+              style={[styles.input, nameFocused && styles.inputFocused]}
               placeholder="e.g. Kefilwe Moeti"
-              placeholderTextColor={mutedCol}
+              placeholderTextColor={colors.textMuted}
               value={name}
               onChangeText={setName}
               onFocus={() => setNameFocused(true)}
@@ -202,17 +196,17 @@ export default function SupportScreen() {
 
           {/* Phone */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: textCol }]}>Phone Number <Text style={[styles.optional, { color: mutedCol }]}>(optional)</Text></Text>
-            <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: phoneFocused ? colors.primary : borderCol }]}>
+            <Text style={styles.label}>Phone Number <Text style={styles.optional}>(optional)</Text></Text>
+            <View style={[styles.phoneRow, phoneFocused && styles.phoneRowFocused]}>
               <View style={styles.countryCode}>
                 <Text style={styles.flag}>🇧🇼</Text>
-                <Text style={[styles.countryCodeText, { color: textCol }]}>+267</Text>
+                <Text style={styles.countryCodeText}>+267</Text>
               </View>
-              <View style={[styles.divider, { backgroundColor: borderCol }]} />
+              <View style={styles.divider} />
               <TextInput
-                style={[styles.phoneInput, { color: textCol }]}
+                style={styles.phoneInput}
                 placeholder="71 234 567"
-                placeholderTextColor={mutedCol}
+                placeholderTextColor={colors.textMuted}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -226,11 +220,11 @@ export default function SupportScreen() {
 
           {/* Message */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: textCol }]}>Message</Text>
+            <Text style={styles.label}>Message</Text>
             <TextInput
-              style={[styles.textarea, { backgroundColor: inputBg, borderColor: messageFocused ? colors.primary : borderCol, color: textCol }]}
+              style={[styles.textarea, messageFocused && styles.inputFocused]}
               placeholder="Describe your issue in as much detail as possible…"
-              placeholderTextColor={mutedCol}
+              placeholderTextColor={colors.textMuted}
               value={message}
               onChangeText={setMessage}
               onFocus={() => setMessageFocused(true)}
@@ -240,7 +234,7 @@ export default function SupportScreen() {
               textAlignVertical="top"
               returnKeyType="default"
             />
-            <Text style={[styles.charCount, { color: mutedCol }]}>{message.trim().length} / 500</Text>
+            <Text style={styles.charCount}>{message.trim().length} / 500</Text>
           </View>
 
           {/* Submit */}
@@ -254,14 +248,14 @@ export default function SupportScreen() {
               ? <ActivityIndicator color="#fff" />
               : (
                 <View style={styles.submitInner}>
-                  <Ionicons name="send-outline" size={16} color={isValid ? '#fff' : '#676767'} />
+                  <Ionicons name="send-outline" size={16} color={isValid ? '#fff' : colors.disabledText} />
                   <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>Send message</Text>
                 </View>
               )
             }
           </TouchableOpacity>
 
-          <Text style={[styles.footerNote, { color: mutedCol }]}>
+          <Text style={styles.footerNote}>
             We typically respond within 24 hours on business days.
           </Text>
         </ScrollView>
@@ -270,214 +264,218 @@ export default function SupportScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: colors.background },
-  flex:  { flex: 1 },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 48,
-  },
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe:  { flex: 1, backgroundColor: colors.background },
+    flex:  { flex: 1 },
+    scroll: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 48,
+    },
 
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 36,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 36,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  header: { marginBottom: 32 },
-  heading: {
-    fontSize: 30,
-    fontFamily: fonts.display.bold,
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  subheading: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
+    header: { marginBottom: 32 },
+    heading: {
+      fontSize: 30,
+      fontFamily: fonts.display.bold,
+      color: colors.heading,
+      marginBottom: 8,
+    },
+    subheading: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
 
-  field: { marginBottom: 24 },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-  },
-  optional: {
-    fontSize: 11,
-    fontWeight: '400',
-    textTransform: 'none',
-    letterSpacing: 0,
-    color: colors.textMuted,
-  },
+    field: { marginBottom: 24 },
+    label: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: 10,
+    },
+    optional: {
+      fontSize: 11,
+      fontWeight: '400',
+      textTransform: 'none',
+      letterSpacing: 0,
+      color: colors.textMuted,
+    },
 
-  // Category chips
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  categoryChipActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
-  },
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  categoryChipTextActive: {
-    color: colors.primary,
-  },
+    // Category chips
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    categoryChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    categoryChipActive: {
+      backgroundColor: colors.primaryLight,
+      borderColor: colors.primary,
+    },
+    categoryChipText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    categoryChipTextActive: {
+      color: colors.primary,
+    },
 
-  // Inputs
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    fontSize: 16,
-    color: colors.textPrimary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  inputFocused: {
-    borderColor: colors.borderFocus,
-  },
-  textarea: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingTop: 15,
-    paddingBottom: 15,
-    fontSize: 15,
-    color: colors.textPrimary,
-    minHeight: 130,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  charCount: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textAlign: 'right',
-    marginTop: 6,
-  },
+    // Inputs
+    input: {
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      fontSize: 16,
+      color: colors.textPrimary,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    inputFocused: {
+      borderColor: colors.borderFocus,
+    },
+    textarea: {
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingTop: 15,
+      paddingBottom: 15,
+      fontSize: 15,
+      color: colors.textPrimary,
+      minHeight: 130,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    charCount: {
+      fontSize: 11,
+      color: colors.textMuted,
+      textAlign: 'right',
+      marginTop: 6,
+    },
 
-  // Phone row
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  phoneRowFocused: {
-    borderColor: colors.borderFocus,
-  },
-  countryCode: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 16,
-    gap: 6,
-  },
-  flag: { fontSize: 18 },
-  countryCodeText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
-  },
-  phoneInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
+    // Phone row
+    phoneRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    phoneRowFocused: {
+      borderColor: colors.borderFocus,
+    },
+    countryCode: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 16,
+      gap: 6,
+    },
+    flag: { fontSize: 18 },
+    countryCodeText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    divider: {
+      width: 1,
+      height: 24,
+      backgroundColor: colors.border,
+    },
+    phoneInput: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.textPrimary,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
 
-  // Button
-  primaryButton: {
-    backgroundColor: '#D4D4D8',
-    borderRadius: 28,
-    paddingVertical: 17,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  buttonActive: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  submitInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  primaryButtonText: {
-    color: '#676767',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  primaryButtonTextActive: {
-    color: '#FFFFFF',
-  },
+    // Button
+    primaryButton: {
+      backgroundColor: colors.disabled,
+      borderRadius: 28,
+      paddingVertical: 17,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    buttonActive: {
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    submitInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    primaryButtonText: {
+      color: colors.disabledText,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
+    primaryButtonTextActive: {
+      color: '#FFFFFF',
+    },
 
-  footerNote: {
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+    footerNote: {
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+  })
+}
 
-  // Success state
+// Success screen styles are always purple regardless of theme
+const s = StyleSheet.create({
   successSafe: {
     flex: 1,
     backgroundColor: '#7439E0',

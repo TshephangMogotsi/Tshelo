@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
 import { MainStackParamList, MainTabParamList } from './types'
-import { colors } from '../theme/colors'
+import { useTheme } from '../context/ThemeContext'
 
 // Screens
 import HomeScreen               from '../screens/main/HomeScreen'
@@ -15,7 +15,7 @@ import FundDetailScreen         from '../screens/main/FundDetailScreen'
 import RecordContributionScreen from '../screens/main/RecordContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
 import TokenPurchaseScreen      from '../screens/main/TokenPurchaseScreen'
-import SupportScreen           from '../screens/support/SupportScreen'
+import SupportScreen            from '../screens/support/SupportScreen'
 
 // ── Tab config ────────────────────────────────────────────────
 type TabConfig = {
@@ -32,8 +32,13 @@ const TABS: TabConfig[] = [
 
 // ── Custom tab bar ────────────────────────────────────────────
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { colors } = useTheme()
+
   return (
-    <View style={tabStyles.container}>
+    <View style={[
+      tabStyles.container,
+      { backgroundColor: colors.surface, borderTopColor: colors.border },
+    ]}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key]
         const isFocused = state.index === index
@@ -60,14 +65,21 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={options.tabBarAccessibilityLabel}
           >
-            <View style={[tabStyles.iconWrap, isFocused && tabStyles.iconWrapActive]}>
+            <View style={[
+              tabStyles.iconWrap,
+              isFocused && { backgroundColor: colors.primaryLight },
+            ]}>
               <Ionicons
                 name={isFocused ? tab.iconActive : tab.icon}
                 size={22}
                 color={isFocused ? colors.primary : colors.textMuted}
               />
             </View>
-            <Text style={[tabStyles.label, isFocused && tabStyles.labelActive]}>
+            <Text style={[
+              tabStyles.label,
+              { color: isFocused ? colors.primary : colors.textMuted },
+              isFocused && tabStyles.labelActive,
+            ]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -80,9 +92,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 const tabStyles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     paddingTop: 10,
     paddingHorizontal: 16,
@@ -104,16 +114,12 @@ const tabStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconWrapActive: {
-    backgroundColor: colors.primaryLight,
-  },
   label: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.textMuted,
   },
   labelActive: {
-    color: colors.primary,
+    fontWeight: '700',
   },
 })
 

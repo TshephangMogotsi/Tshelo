@@ -11,7 +11,9 @@ import {
 } from 'react-native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MainStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
+import { useTheme } from '../../context/ThemeContext'
+import type { AppColors } from '../../theme/themes'
+import { fonts } from '../../theme/typography'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'TokenPurchase'>
@@ -69,19 +71,23 @@ const PACKS: Pack[] = [
 ]
 
 const TOKEN_USES = [
-  { icon: '📁', action: 'Create a fund',         cost: 1 },
+  { icon: '📁', action: 'Create a fund',          cost: 1 },
   { icon: '📄', action: 'Generate interim report', cost: 1 },
   { icon: '🔒', action: 'Close a fund (report)',   cost: 0, note: 'Free' },
 ]
+
+type Styles = ReturnType<typeof makeStyles>
 
 function PackCard({
   pack,
   selected,
   onSelect,
+  styles,
 }: {
   pack: Pack
   selected: boolean
   onSelect: () => void
+  styles: Styles
 }) {
   return (
     <TouchableOpacity
@@ -118,8 +124,11 @@ function PackCard({
 }
 
 export default function TokenPurchaseScreen({ navigation }: Props) {
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
+
   const [selectedPack, setSelectedPack] = useState<TokenPack>('popular')
-  const currentBalance = 3  // replace with user.token_balance
+  const currentBalance = 3
 
   const pack = PACKS.find(p => p.id === selectedPack)!
 
@@ -129,12 +138,11 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
       `You're about to purchase ${pack.tokens} tokens for BWP ${pack.priceBWP}.\n\nPayment gateway coming soon.`,
       [{ text: 'OK' }]
     )
-    // TODO: integrate payment gateway (DPO Pay / Orange Money checkout)
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -181,6 +189,7 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
               pack={p}
               selected={selectedPack === p.id}
               onSelect={() => setSelectedPack(p.id)}
+              styles={styles}
             />
           ))}
         </View>
@@ -228,270 +237,278 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scroll: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 48,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  balanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.accentLight,
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    gap: 6,
-  },
-  balanceEmoji: {
-    fontSize: 15,
-  },
-  balanceText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginBottom: 6,
-  },
-  subheading: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scroll: {
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 48,
+    },
+    topRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    backIcon: {
+      fontSize: 20,
+      color: colors.textPrimary,
+    },
+    balanceBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.accentLight,
+      borderRadius: 20,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      gap: 6,
+    },
+    balanceEmoji: {
+      fontSize: 15,
+    },
+    balanceText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    header: {
+      marginBottom: 24,
+    },
+    heading: {
+      fontSize: 30,
+      fontFamily: fonts.display.bold,
+      color: colors.heading,
+      marginBottom: 6,
+    },
+    subheading: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
 
-  // ── Uses card ──────────────────────────────────
-  usesCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 12,
-  },
-  usesTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  useRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  useIcon: {
-    fontSize: 18,
-    width: 28,
-  },
-  useAction: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
-  useCost: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+    // ── Uses card ──────────────────────────────────
+    usesCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 28,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 12,
+    },
+    usesTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    useRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    useIcon: {
+      fontSize: 18,
+      width: 28,
+    },
+    useAction: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.textPrimary,
+      fontWeight: '500',
+    },
+    useCost: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.primary,
+    },
 
-  // ── Pack selector ──────────────────────────────
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  packGrid: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  packCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  packCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  popularBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 10,
-  },
-  popularBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.surface,
-  },
-  packTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  packLabel: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  packPerToken: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioInner: {
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: colors.primary,
-  },
-  packMiddle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  packTokenCount: {
-    fontSize: 15,
-    color: colors.textSecondary,
-  },
-  packTokenNumber: {
-    fontWeight: '800',
-    color: colors.textPrimary,
-    fontSize: 18,
-  },
-  packPrice: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  packDescription: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
+    // ── Pack selector ──────────────────────────────
+    sectionLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 12,
+    },
+    packGrid: {
+      gap: 12,
+      marginBottom: 24,
+    },
+    packCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    packCardSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    popularBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.accent,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      marginBottom: 10,
+    },
+    popularBadgeText: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.surface,
+    },
+    packTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 10,
+    },
+    packLabel: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    packPerToken: {
+      fontSize: 12,
+      color: colors.textMuted,
+      fontWeight: '500',
+    },
+    radioOuter: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radioInner: {
+      width: 11,
+      height: 11,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    },
+    packMiddle: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    packTokenCount: {
+      fontSize: 15,
+      color: colors.textSecondary,
+    },
+    packTokenNumber: {
+      fontWeight: '800',
+      color: colors.textPrimary,
+      fontSize: 18,
+    },
+    packPrice: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    packDescription: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
 
-  // ── Summary ────────────────────────────────────
-  summaryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 10,
-  },
-  summaryTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 4,
-  },
-  summaryLabelBold: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  summaryValueBold: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.primary,
-  },
+    // ── Summary ────────────────────────────────────
+    summaryCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 10,
+    },
+    summaryTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    summaryLabel: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    summaryValue: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    summaryDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 4,
+    },
+    summaryLabelBold: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    summaryValueBold: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.primary,
+    },
 
-  // ── Payment notice ─────────────────────────────
-  paymentNotice: {
-    backgroundColor: colors.accentLight,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 24,
-  },
-  paymentNoticeText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 19,
-  },
+    // ── Payment notice ─────────────────────────────
+    paymentNotice: {
+      backgroundColor: colors.accentLight,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 24,
+    },
+    paymentNoticeText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      lineHeight: 19,
+    },
 
-  // ── CTA ────────────────────────────────────────
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-})
+    // ── CTA ────────────────────────────────────────
+    primaryButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 28,
+      paddingVertical: 17,
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    primaryButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
+  })
+}

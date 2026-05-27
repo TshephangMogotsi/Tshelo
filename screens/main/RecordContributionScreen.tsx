@@ -14,7 +14,9 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
+import { useTheme } from '../../context/ThemeContext'
+import type { AppColors } from '../../theme/themes'
+import { fonts } from '../../theme/typography'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'RecordContribution'>
@@ -33,14 +35,17 @@ const PROVIDERS: { id: MobileMoneyProvider; label: string; color: string }[] = [
 const MAX_CONTRIBUTION_BWP = 10000
 
 export default function RecordContributionScreen({ navigation, route }: Props) {
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
+
   const { fundId, fundTitle } = route.params
 
-  const [source, setSource]               = useState<ContributionSource>('manual')
+  const [source, setSource]                   = useState<ContributionSource>('manual')
   const [contributorName, setContributorName] = useState('')
-  const [amountBWP, setAmountBWP]         = useState('')
-  const [provider, setProvider]           = useState<MobileMoneyProvider | null>(null)
-  const [notes, setNotes]                 = useState('')
-  const [smsSnippet, setSmsSnippet]       = useState('')
+  const [amountBWP, setAmountBWP]             = useState('')
+  const [provider, setProvider]               = useState<MobileMoneyProvider | null>(null)
+  const [notes, setNotes]                     = useState('')
+  const [smsSnippet, setSmsSnippet]           = useState('')
 
   const parsedAmount = parseFloat(amountBWP.replace(/,/g, ''))
   const amountValid  = !isNaN(parsedAmount) && parsedAmount > 0 && parsedAmount <= MAX_CONTRIBUTION_BWP
@@ -57,7 +62,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -245,15 +250,14 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
 
           {/* ── Submit ─────────────────────────────── */}
           <TouchableOpacity
-            style={[styles.primaryButton, !isValid && styles.buttonDisabled]}
+            style={[styles.primaryButton, isValid && styles.buttonActive]}
             activeOpacity={isValid ? 0.85 : 1}
             onPress={() => {
               if (!isValid) return
-              // TODO: Supabase insert into contributions
               navigation.goBack()
             }}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>
+            <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
               Save Contribution
             </Text>
           </TouchableOpacity>
@@ -263,220 +267,228 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 48,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  header: {
-    marginBottom: 28,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  subheading: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  field: {
-    marginBottom: 22,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  optional: {
-    fontSize: 12,
-    color: colors.textMuted,
-    textTransform: 'none',
-    fontWeight: '400',
-    letterSpacing: 0,
-  },
-  sourceToggle: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  sourceOption: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    gap: 4,
-  },
-  sourceOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  sourceOptionEmoji: {
-    fontSize: 22,
-    marginBottom: 4,
-  },
-  sourceOptionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  sourceOptionTextActive: {
-    color: colors.primary,
-  },
-  sourceOptionHint: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  textArea: {
-    minHeight: 88,
-    paddingTop: 14,
-  },
-  currencyRow: {
-    flexDirection: 'row',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-  },
-  currencyPrefix: {
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-  },
-  currencySymbol: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  currencyInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-  },
-  errorText: {
-    fontSize: 12,
-    color: colors.error,
-    marginTop: 4,
-  },
-  providerRow: {
-    gap: 10,
-  },
-  providerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: colors.surface,
-    gap: 10,
-  },
-  providerDot: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  providerDotText: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  providerChipLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  providerCheck: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  hint: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 6,
-  },
-  charCount: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  auditCard: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 24,
-  },
-  auditText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    backgroundColor: colors.disabled,
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  buttonTextDisabled: {
-    color: colors.disabledText,
-  },
-})
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    flex: {
+      flex: 1,
+    },
+    scroll: {
+      flexGrow: 1,
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 48,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 28,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    backIcon: {
+      fontSize: 20,
+      color: colors.textPrimary,
+    },
+    header: {
+      marginBottom: 28,
+    },
+    heading: {
+      fontSize: 30,
+      fontFamily: fonts.display.bold,
+      color: colors.heading,
+      marginBottom: 4,
+    },
+    subheading: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    field: {
+      marginBottom: 22,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 10,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    optional: {
+      fontSize: 12,
+      color: colors.textMuted,
+      textTransform: 'none',
+      fontWeight: '400',
+      letterSpacing: 0,
+    },
+    sourceToggle: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    sourceOption: {
+      flex: 1,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 14,
+      padding: 14,
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      gap: 4,
+    },
+    sourceOptionActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    sourceOptionEmoji: {
+      fontSize: 22,
+      marginBottom: 4,
+    },
+    sourceOptionText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    sourceOptionTextActive: {
+      color: colors.primary,
+    },
+    sourceOptionHint: {
+      fontSize: 11,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    input: {
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      fontSize: 16,
+      color: colors.textPrimary,
+    },
+    textArea: {
+      minHeight: 88,
+      paddingTop: 14,
+    },
+    currencyRow: {
+      flexDirection: 'row',
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+    },
+    currencyPrefix: {
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+    },
+    currencySymbol: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    currencyInput: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.textPrimary,
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+    },
+    errorText: {
+      fontSize: 12,
+      color: colors.error,
+      marginTop: 4,
+    },
+    providerRow: {
+      gap: 10,
+    },
+    providerChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: colors.surface,
+      gap: 10,
+    },
+    providerDot: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    providerDotText: {
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    providerChipLabel: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    providerCheck: {
+      fontSize: 16,
+      fontWeight: '800',
+    },
+    hint: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 6,
+    },
+    charCount: {
+      fontSize: 11,
+      color: colors.textMuted,
+      textAlign: 'right',
+      marginTop: 4,
+    },
+    auditCard: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 24,
+    },
+    auditText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    primaryButton: {
+      backgroundColor: colors.disabled,
+      borderRadius: 28,
+      paddingVertical: 17,
+      alignItems: 'center',
+    },
+    buttonActive: {
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    primaryButtonText: {
+      color: colors.disabledText,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
+    primaryButtonTextActive: {
+      color: '#FFFFFF',
+    },
+  })
+}

@@ -1,6 +1,7 @@
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
@@ -28,7 +29,11 @@ export default function WelcomeScreen({ navigation }: Props) {
 
         {/* Logo */}
         <View style={styles.logoArea}>
-          <Text style={styles.logo}>T</Text>
+          <Image
+            source={require('../../assets/Tshelo icon.png')}
+            style={styles.logo}
+            resizeMode="cover"
+          />
         </View>
 
         {/* Bottom content */}
@@ -75,9 +80,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    fontSize: 80,
-    fontFamily: fonts.display.bold,
-    color: '#FFFFFF',
+    width: 130,
+    height: 130,
+    borderRadius: 29,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 12,
   },
 
   bottom: {
