@@ -10,6 +10,7 @@ import {
   Animated,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -22,23 +23,26 @@ const BUTTON_BG      = '#EAE4FB'
 const DOT_INACTIVE   = 8
 const DOT_ACTIVE     = 28
 
-type Slide = { id: string; title: string; body: string }
+type Slide = { id: string; title: string; body: string; image: ReturnType<typeof require> }
 
 const SLIDES: Slide[] = [
   {
-    id: '1',
+    id:    '1',
     title: 'Save together\nBuild together',
     body:  'Pool contributions for funerals, weddings, graduations and more, all in one transparent place',
+    image: require('../../assets/image 1.png'),
   },
   {
-    id: '2',
+    id:    '2',
     title: 'Every thebe,\naccounted for',
     body:  'See who contributed what, in real time. No spreadsheets, no confusion, no chasing',
+    image: require('../../assets/image 2.png'),
   },
   {
-    id: '3',
+    id:    '3',
     title: 'Safe, private\nand yours',
     body:  'Phone verification only, bank-level security. Your community data stays under your control',
+    image: require('../../assets/image 3.png'),
   },
 ]
 
@@ -46,11 +50,13 @@ type Props = { onDone: () => void }
 
 export default function OnboardingScreen({ onDone }: Props) {
   const { isDark } = useTheme()
+  const insets = useSafeAreaInsets()
   const cardBg      = isDark ? '#1A1C24' : '#FFFFFF'
   const headingColor = isDark ? '#FFFFFF' : '#0D0D0D'
   const bodyColor    = isDark ? 'rgba(255,255,255,0.65)' : '#52525B'
 
   const [index, setIndex] = useState(0)
+  const [illustrationH, setIllustrationH] = useState(0)
   const flatRef  = useRef<FlatList<Slide>>(null)
   const scrollX  = useRef(new Animated.Value(0)).current
   const dotWidths = useRef(
@@ -126,49 +132,73 @@ export default function OnboardingScreen({ onDone }: Props) {
         getItemLayout={(_, i) => ({ length: W, offset: W * i, index: i })}
       />
 
-      {/* Bottom card */}
-      <View style={[styles.card, { backgroundColor: cardBg }]}>
-        {/* All slide texts stacked — each fades/slides with scroll */}
-        <View style={styles.textBlock}>
-          {SLIDES.map((slide, i) => (
-            <Animated.View
-              key={slide.id}
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  transform: [{ translateX: slideAnims[i].translateX }],
-                  opacity: slideAnims[i].opacity,
-                },
-              ]}
-            >
-              <Text style={[styles.heading, { color: headingColor }]}>{slide.title}</Text>
-              <Text style={[styles.body, { color: bodyColor }]}>{slide.body}</Text>
-            </Animated.View>
-          ))}
-        </View>
+      {/* Illustration area */}
+      <View style={styles.illustrationArea} pointerEvents="none" onLayout={e => setIllustrationH(e.nativeEvent.layout.height)}>
+        {SLIDES.map((slide, i) => (
+          <Animated.Image
+            key={slide.id}
+            source={slide.image}
+            style={[
+              styles.illustration,
+              i === SLIDES.length - 1 && { width: W * 0.85, height: (W * 1.1 - 20) * 0.85 },
+              {
+                top: i === SLIDES.length - 1 && illustrationH > 0
+                  ? (illustrationH - (W * 1.1 - 20) * 0.85) / 2 + 30
+                  : insets.top + 12,
+                transform: [{ translateX: slideAnims[i].translateX }],
+                opacity: slideAnims[i].opacity,
+              },
+            ]}
+            resizeMode="contain"
+          />
+        ))}
+      </View>
 
-        {/* Dots */}
-        <View style={styles.dotsRow}>
-          {SLIDES.map((_, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => navigateTo(i)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
+      {/* Bottom area — flex:1 extends bg colour to screen edge */}
+      <View style={[styles.cardWrap, { backgroundColor: cardBg }]}>
+        <View style={[styles.card, { paddingBottom: insets.bottom + 24 }]}>
+          {/* All slide texts stacked — each fades/slides with scroll */}
+          <View style={styles.textBlock}>
+            {SLIDES.map((slide, i) => (
               <Animated.View
-                style={[styles.dot, {
-                  width: dotWidths[i],
-                  backgroundColor: i === index ? PURPLE : '#C4C4C4',
-                }]}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
+                key={slide.id}
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    transform: [{ translateX: slideAnims[i].translateX }],
+                    opacity: slideAnims[i].opacity,
+                  },
+                ]}
+              >
+                <Text style={[styles.heading, { color: headingColor }]}>{slide.title}</Text>
+                <Text style={[styles.body, { color: bodyColor }]}>{slide.body}</Text>
+              </Animated.View>
+            ))}
+          </View>
 
-        {/* CTA */}
-        <TouchableOpacity style={styles.button} onPress={goNext} activeOpacity={0.8}>
-          <Text style={styles.buttonText}>{isLast ? 'Get started' : 'Next'}</Text>
-        </TouchableOpacity>
+          {/* Dots */}
+          <View style={styles.dotsRow}>
+            {SLIDES.map((_, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => navigateTo(i)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Animated.View
+                  style={[styles.dot, {
+                    width: dotWidths[i],
+                    backgroundColor: i === index ? PURPLE : '#C4C4C4',
+                  }]}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* CTA */}
+          <TouchableOpacity style={styles.button} onPress={goNext} activeOpacity={0.8}>
+            <Text style={styles.buttonText}>{isLast ? 'Get started' : 'Next'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   )
@@ -177,15 +207,27 @@ export default function OnboardingScreen({ onDone }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
 
-  card: {
+  illustrationArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  illustration: {
+    position: 'absolute',
+    width: W,
+    height: W * 1.1 - 20,
+  },
+
+  cardWrap: {
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
+    overflow: 'hidden',
+  },
+  card: {
     paddingHorizontal: 28,
     paddingTop: 32,
-    paddingBottom: 100,
   },
 
   textBlock: {
