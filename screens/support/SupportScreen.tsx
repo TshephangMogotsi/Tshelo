@@ -27,7 +27,6 @@ type Category = {
 }
 
 const CATEGORIES: Category[] = [
-  { id: 'login',     label: "Can't log in",   icon: 'lock-closed-outline'  },
   { id: 'payment',   label: 'Payment issue',  icon: 'card-outline'          },
   { id: 'account',   label: 'Account',        icon: 'person-outline'        },
   { id: 'technical', label: 'Technical',      icon: 'bug-outline'           },
@@ -39,16 +38,18 @@ export default function SupportScreen() {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
-  const [category, setCategory] = useState<string | null>(null)
-  const [name,     setName]     = useState('')
-  const [phone,    setPhone]    = useState('')
-  const [message,  setMessage]  = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [submitted,setSubmitted]= useState(false)
+  const [category,    setCategory]    = useState<string | null>(null)
+  const [otherDetail, setOtherDetail] = useState('')
+  const [name,        setName]        = useState('')
+  const [phone,       setPhone]       = useState('')
+  const [message,     setMessage]     = useState('')
+  const [loading,     setLoading]     = useState(false)
+  const [submitted,   setSubmitted]   = useState(false)
 
-  const [nameFocused,   setNameFocused]   = useState(false)
-  const [phoneFocused,  setPhoneFocused]  = useState(false)
-  const [messageFocused,setMessageFocused]= useState(false)
+  const [nameFocused,        setNameFocused]        = useState(false)
+  const [phoneFocused,       setPhoneFocused]        = useState(false)
+  const [messageFocused,     setMessageFocused]      = useState(false)
+  const [otherDetailFocused, setOtherDetailFocused]  = useState(false)
 
   const pulseAnim = useRef(new Animated.Value(1)).current
 
@@ -66,6 +67,7 @@ export default function SupportScreen() {
 
   const isValid =
     category !== null &&
+    (category !== 'other' || otherDetail.trim().length >= 2) &&
     name.trim().length >= 2 &&
     message.trim().length >= 10
 
@@ -79,7 +81,7 @@ export default function SupportScreen() {
       `[Support] ${selectedCategory?.label ?? 'General'} — ${name.trim()}`
     )
     const body = encodeURIComponent(
-      `Category: ${selectedCategory?.label ?? '—'}\n` +
+      `Category: ${selectedCategory?.label ?? '—'}${category === 'other' && otherDetail.trim() ? ` — ${otherDetail.trim()}` : ''}\n` +
       `Name: ${name.trim()}\n` +
       `Phone: ${phone.trim() || '—'}\n\n` +
       `Message:\n${message.trim()}\n\n` +
@@ -177,6 +179,24 @@ export default function SupportScreen() {
               })}
             </View>
           </View>
+
+          {/* Other detail (conditional) */}
+          {category === 'other' && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Please specify</Text>
+              <TextInput
+                style={[styles.input, otherDetailFocused && styles.inputFocused]}
+                placeholder="e.g. Wrong fund balance shown"
+                placeholderTextColor={colors.textMuted}
+                value={otherDetail}
+                onChangeText={setOtherDetail}
+                onFocus={() => setOtherDetailFocused(true)}
+                onBlur={() => setOtherDetailFocused(false)}
+                autoCapitalize="sentences"
+                returnKeyType="next"
+              />
+            </View>
+          )}
 
           {/* Name */}
           <View style={styles.field}>

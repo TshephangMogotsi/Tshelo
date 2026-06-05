@@ -1,0 +1,221 @@
+schemaname,tablename,policyname,permissive,roles,cmd,using_expression,check_expression
+public,account_recovery_attempts,account_recovery_blocked,PERMISSIVE,{public},SELECT,false,null
+public,api_keys,api_keys_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,api_usage_logs,api_usage_logs_select,PERMISSIVE,{public},SELECT,"(api_key_id IN ( SELECT api_keys.id
+   FROM api_keys
+  WHERE (api_keys.user_id = auth.uid())))",null
+public,app_config,app_config_select,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,audit_log,audit_log_select,PERMISSIVE,{public},SELECT,"((user_id = auth.uid()) OR ((fund_id IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM fund_members
+  WHERE ((fund_members.fund_id = audit_log.fund_id) AND (fund_members.user_id = auth.uid()) AND (fund_members.status = 'joined'::member_status))))))",null
+public,blocked_users,blocked_users_blocked,PERMISSIVE,{public},SELECT,false,null
+public,campaigns,campaigns_blocked,PERMISSIVE,{public},SELECT,false,null
+public,consent_log,consent_log_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,consent_log,consent_log_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,contribution_edits,contribution_edits_select,PERMISSIVE,{public},SELECT,"(contribution_id IN ( SELECT contributions.id
+   FROM contributions
+  WHERE (contributions.fund_id IN ( SELECT fund_members.fund_id
+           FROM fund_members
+          WHERE (fund_members.user_id = auth.uid())))))",null
+public,contribution_reminders,contribution_reminders_insert,PERMISSIVE,{public},INSERT,null,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))"
+public,contribution_reminders,contribution_reminders_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,contributions,contributions_insert,PERMISSIVE,{public},INSERT,null,"(EXISTS ( SELECT 1
+   FROM funds f
+  WHERE ((f.id = contributions.fund_id) AND ((f.owner_id = auth.uid()) OR (EXISTS ( SELECT 1
+           FROM fund_members fm
+          WHERE ((fm.fund_id = f.id) AND (fm.user_id = auth.uid()) AND (fm.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))))))"
+public,contributions,contributions_select,PERMISSIVE,{public},SELECT,"((user_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM fund_members
+  WHERE ((fund_members.fund_id = contributions.fund_id) AND (fund_members.user_id = auth.uid()) AND (fund_members.status = 'joined'::member_status)))))",null
+public,countries,countries_select,PERMISSIVE,{public},SELECT,true,null
+public,country_waitlist,country_waitlist_insert,PERMISSIVE,{public},INSERT,null,true
+public,country_waitlist,country_waitlist_select,PERMISSIVE,{public},SELECT,(signed_up_user_id = auth.uid()),null
+public,data_export_requests,data_export_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,data_export_requests,data_export_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,disputes,disputes_insert,PERMISSIVE,{public},INSERT,null,"((raised_by = auth.uid()) AND (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid()))))"
+public,disputes,disputes_select,PERMISSIVE,{public},SELECT,"((raised_by = auth.uid()) OR (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role]))))))",null
+public,event_budgets,event_budgets_organiser,PERMISSIVE,{public},ALL,"(event_id IN ( SELECT events.id
+   FROM events
+  WHERE (events.creator_id = auth.uid())
+UNION
+ SELECT event_organisers.event_id
+   FROM event_organisers
+  WHERE ((event_organisers.user_id = auth.uid()) AND ((event_organisers.status)::text = 'active'::text))))",null
+public,event_fund_links,event_fund_links_view,PERMISSIVE,{public},SELECT,"((linked_by = auth.uid()) OR (event_id IN ( SELECT event_organisers.event_id
+   FROM event_organisers
+  WHERE (event_organisers.user_id = auth.uid()))) OR (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid()))))",null
+public,event_guests,event_guests_organiser,PERMISSIVE,{public},ALL,"(event_id IN ( SELECT events.id
+   FROM events
+  WHERE (events.creator_id = auth.uid())
+UNION
+ SELECT event_organisers.event_id
+   FROM event_organisers
+  WHERE ((event_organisers.user_id = auth.uid()) AND ((event_organisers.status)::text = 'active'::text))))",null
+public,event_guests,event_guests_self,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,event_guests,event_guests_self_update,PERMISSIVE,{public},UPDATE,(user_id = auth.uid()),(user_id = auth.uid())
+public,event_organisers,event_organisers_manage,PERMISSIVE,{public},ALL,"((event_id IN ( SELECT events.id
+   FROM events
+  WHERE (events.creator_id = auth.uid()))) OR (user_id = auth.uid()))",null
+public,event_type_config,event_type_config_read,PERMISSIVE,{public},SELECT,true,null
+public,events,events_guest_select,PERMISSIVE,{public},SELECT,"(id IN ( SELECT event_guests.event_id
+   FROM event_guests
+  WHERE (event_guests.user_id = auth.uid())))",null
+public,events,events_organiser_all,PERMISSIVE,{public},ALL,"((creator_id = auth.uid()) OR (id IN ( SELECT event_organisers.event_id
+   FROM event_organisers
+  WHERE ((event_organisers.user_id = auth.uid()) AND ((event_organisers.status)::text = 'active'::text)))))",null
+public,exchange_rates,exchange_rates_select,PERMISSIVE,{public},SELECT,true,null
+public,expense_edits,expense_edits_select,PERMISSIVE,{public},SELECT,"(expense_id IN ( SELECT expenses.id
+   FROM expenses
+  WHERE (expenses.fund_id IN ( SELECT fund_members.fund_id
+           FROM fund_members
+          WHERE (fund_members.user_id = auth.uid())))))",null
+public,expense_queries,expense_queries_insert,PERMISSIVE,{public},INSERT,null,"((asked_by = auth.uid()) AND (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid()))))"
+public,expense_queries,expense_queries_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,expenses,expenses_delete,PERMISSIVE,{public},DELETE,"(EXISTS ( SELECT 1
+   FROM funds f
+  WHERE ((f.id = expenses.fund_id) AND (f.owner_id = auth.uid()))))",null
+public,expenses,expenses_insert,PERMISSIVE,{public},INSERT,null,"(EXISTS ( SELECT 1
+   FROM funds f
+  WHERE ((f.id = expenses.fund_id) AND ((f.owner_id = auth.uid()) OR (EXISTS ( SELECT 1
+           FROM fund_members fm
+          WHERE ((fm.fund_id = f.id) AND (fm.user_id = auth.uid()) AND (fm.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))))))"
+public,expenses,expenses_select,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
+   FROM fund_members
+  WHERE ((fund_members.fund_id = expenses.fund_id) AND (fund_members.user_id = auth.uid()) AND (fund_members.status = 'joined'::member_status))))",null
+public,failed_login_attempts,failed_login_blocked,PERMISSIVE,{public},SELECT,false,null
+public,fraud_signals,fraud_signals_blocked,PERMISSIVE,{public},SELECT,false,null
+public,fund_allowances,fund_allowances_insert,PERMISSIVE,{public},INSERT,null,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))"
+public,fund_allowances,fund_allowances_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_allowances,fund_allowances_update,PERMISSIVE,{public},UPDATE,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))",null
+public,fund_announcements,fund_announcements_insert,PERMISSIVE,{public},INSERT,null,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))"
+public,fund_announcements,fund_announcements_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_announcements,fund_announcements_update,PERMISSIVE,{public},UPDATE,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))",null
+public,fund_benchmarks,fund_benchmarks_select,PERMISSIVE,{public},SELECT,true,null
+public,fund_exports,fund_exports_insert,PERMISSIVE,{public},INSERT,null,"((exported_by = auth.uid()) AND (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid()))))"
+public,fund_exports,fund_exports_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_limits,fund_limits_select,PERMISSIVE,{public},SELECT,true,null
+public,fund_members,fund_members_insert,PERMISSIVE,{public},INSERT,null,"(EXISTS ( SELECT 1
+   FROM funds f
+  WHERE ((f.id = fund_members.fund_id) AND ((f.owner_id = auth.uid()) OR (EXISTS ( SELECT 1
+           FROM fund_members fm
+          WHERE ((fm.fund_id = f.id) AND (fm.user_id = auth.uid()) AND (fm.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role])))))))))"
+public,fund_members,fund_members_select,PERMISSIVE,{public},SELECT,"((user_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM fund_members fm
+  WHERE ((fm.fund_id = fund_members.fund_id) AND (fm.user_id = auth.uid()) AND (fm.status = 'joined'::member_status)))))",null
+public,fund_milestones,fund_milestones_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_ownership_history,ownership_history_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_reports,fund_reports_insert,PERMISSIVE,{public},INSERT,null,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))"
+public,fund_reports,fund_reports_select,PERMISSIVE,{public},SELECT,"((fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = ANY (ARRAY['owner'::member_role, 'admin'::member_role]))))) OR (reported_by = auth.uid()))",null
+public,fund_shares,fund_shares_insert,PERMISSIVE,{public},INSERT,null,"((shared_by = auth.uid()) AND (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid()))))"
+public,fund_shares,fund_shares_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_succession_requests,succession_requests_insert,PERMISSIVE,{public},INSERT,null,"((requester_user_id = auth.uid()) AND (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE ((fund_members.user_id = auth.uid()) AND (fund_members.role = 'owner'::member_role)))))"
+public,fund_succession_requests,succession_requests_select,PERMISSIVE,{public},SELECT,"(fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid())))",null
+public,fund_succession_votes,succession_votes_insert,PERMISSIVE,{public},INSERT,null,(voter_user_id = auth.uid())
+public,fund_succession_votes,succession_votes_select,PERMISSIVE,{public},SELECT,"((voter_user_id = auth.uid()) OR (request_id IN ( SELECT fund_succession_requests.id
+   FROM fund_succession_requests
+  WHERE (fund_succession_requests.fund_id IN ( SELECT fund_members.fund_id
+           FROM fund_members
+          WHERE (fund_members.user_id = auth.uid()))))))",null
+public,fund_templates,fund_templates_select,PERMISSIVE,{public},SELECT,(is_active = true),null
+public,fund_type_config,fund_type_config_select,PERMISSIVE,{public},SELECT,true,null
+public,funds,funds_delete_own,PERMISSIVE,{public},DELETE,(owner_id = auth.uid()),null
+public,funds,funds_insert_own,PERMISSIVE,{public},INSERT,null,(owner_id = auth.uid())
+public,funds,funds_select_member,PERMISSIVE,{public},SELECT,"((owner_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM fund_members
+  WHERE ((fund_members.fund_id = funds.id) AND (fund_members.user_id = auth.uid()) AND (fund_members.status = 'joined'::member_status)))))",null
+public,funds,funds_update_own,PERMISSIVE,{public},UPDATE,(owner_id = auth.uid()),null
+public,high_value_fund_requests,high_value_requests_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,high_value_fund_requests,high_value_requests_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,ip_blocklist,ip_blocklist_blocked,PERMISSIVE,{public},SELECT,false,null
+public,lead_qualification_data,lead_qualification_blocked,PERMISSIVE,{public},SELECT,false,null
+public,login_notifications,login_notifications_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,member_vouches,vouches_insert,PERMISSIVE,{public},INSERT,null,(voucher_user_id = auth.uid())
+public,member_vouches,vouches_select,PERMISSIVE,{public},SELECT,"((voucher_user_id = auth.uid()) OR (vouched_for_user_id = auth.uid()) OR (fund_id IN ( SELECT fund_members.fund_id
+   FROM fund_members
+  WHERE (fund_members.user_id = auth.uid()))))",null
+public,mobile_money_verifications,mmv_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,mobile_money_verifications,mmv_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,notification_templates,notification_templates_select,PERMISSIVE,{public},SELECT,(auth.uid() IS NOT NULL),null
+public,notifications,notifications_select_own,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,notifications,notifications_update_own,PERMISSIVE,{public},UPDATE,(user_id = auth.uid()),null
+public,offline_queue,offline_queue_delete,PERMISSIVE,{public},DELETE,(user_id = auth.uid()),null
+public,offline_queue,offline_queue_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,offline_queue,offline_queue_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,organization_members,org_members_select,PERMISSIVE,{public},SELECT,"(organization_id IN ( SELECT organization_members_1.organization_id
+   FROM organization_members organization_members_1
+  WHERE (organization_members_1.user_id = auth.uid())))",null
+public,organization_payouts,org_payouts_select,PERMISSIVE,{public},SELECT,"(organization_id IN ( SELECT organization_members.organization_id
+   FROM organization_members
+  WHERE (organization_members.user_id = auth.uid())))",null
+public,organizations,organizations_insert,PERMISSIVE,{public},INSERT,null,(auth.uid() IS NOT NULL)
+public,organizations,organizations_select,PERMISSIVE,{public},SELECT,"(id IN ( SELECT organization_members.organization_id
+   FROM organization_members
+  WHERE (organization_members.user_id = auth.uid())))",null
+public,partner_leads,partner_leads_blocked,PERMISSIVE,{public},SELECT,false,null
+public,payment_aggregators,payment_aggregators_select,PERMISSIVE,{public},SELECT,(is_active = true),null
+public,payments,payments_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,payments,payments_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,payouts,payouts_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,promo_code_uses,promo_code_uses_insert,PERMISSIVE,{public},INSERT,null,(user_id = auth.uid())
+public,promo_code_uses,promo_code_uses_select,PERMISSIVE,{public},SELECT,(user_id = auth.uid()),null
+public,promo_codes,promo_codes_select,PERMISSIVE,{public},SELECT,((is_active = true) AND (valid_from <= now()) AND ((valid_until IS NULL) OR (valid_until >= now()))),null
+public,recurring_group_members,recurring_group_members_insert,PERMISSIVE,{public},INSERT,null,"(group_id IN ( SELECT recurring_groups.id
+   FROM recurring_groups
+  WHERE (recurring_groups.owner_id = auth.uid())))"
+public,recurring_group_members,recurring_group_members_select,PERMISSIVE,{public},SELECT,"(group_id IN ( SELECT recurring_group_members_1.group_id
+   FROM recurring_group_members recurring_group_members_1
+  WHERE (recurring_group_members_1.user_id = auth.uid())))",null
+public,recurring_groups,recurring_groups_insert,PERMISSIVE,{public},INSERT,null,(owner_id = auth.uid())
+public,recurring_groups,recurring_groups_select,PERMISSIVE,{public},SELECT,"(id IN ( SELECT recurring_group_members.group_id
+   FROM recurring_group_members
+  WHERE (recurring_group_members.user_id = auth.uid())))",null
+public,recurring_groups,recurring_groups_update,PERMISSIVE,{public},UPDATE,(owner_id = auth.uid()),null
+public,recurring_rounds,recurring_rounds_select,PERMISSIVE,{public},SELECT,"(group_id IN ( SELECT recurring_group_members.group_id
+   FROM recurring_group_members
+  WHERE (recurring_group_members.user_id = auth.uid())))",null

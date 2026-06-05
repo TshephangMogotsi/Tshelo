@@ -6,85 +6,67 @@ import { Ionicons } from '@expo/vector-icons'
 import { MainStackParamList, MainTabParamList } from './types'
 import { useTheme } from '../context/ThemeContext'
 
-// Screens
-import HomeScreen               from '../screens/main/HomeScreen'
-import SettingsScreen           from '../screens/main/SettingsScreen'
+// Tab screens
+import HomeScreen     from '../screens/main/HomeScreen'
+import FundsScreen    from '../screens/main/FundsScreen'
+import ActivityScreen from '../screens/main/ActivityScreen'
+import ReportsScreen  from '../screens/main/ReportsScreen'
+import ProfileScreen  from '../screens/main/ProfileScreen'
+
+// Stack screens
 import CreateFundScreen         from '../screens/main/CreateFundScreen'
 import JoinFundScreen           from '../screens/main/JoinFundScreen'
 import FundDetailScreen         from '../screens/main/FundDetailScreen'
+import EventDetailScreen        from '../screens/main/EventDetailScreen'
+import GuestListScreen          from '../screens/main/GuestListScreen'
+import EventBudgetScreen        from '../screens/main/EventBudgetScreen'
 import RecordContributionScreen from '../screens/main/RecordContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
 import TokenPurchaseScreen      from '../screens/main/TokenPurchaseScreen'
+import SettingsScreen           from '../screens/main/SettingsScreen'
 import SupportScreen            from '../screens/support/SupportScreen'
-
-// ── Tab config ────────────────────────────────────────────────
-type TabConfig = {
-  name: keyof MainTabParamList
-  label: string
-  icon: keyof typeof Ionicons.glyphMap
-  iconActive: keyof typeof Ionicons.glyphMap
-}
-
-const TABS: TabConfig[] = [
-  { name: 'Home',     label: 'Home',     icon: 'home-outline',     iconActive: 'home'     },
-  { name: 'Settings', label: 'Settings', icon: 'settings-outline', iconActive: 'settings' },
-]
+import FundCreatedScreen        from '../screens/main/FundCreatedScreen'
 
 // ── Custom tab bar ────────────────────────────────────────────
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors } = useTheme()
+  const activeRoute = state.routes[state.index]?.name
+
+  function pressTab(name: keyof MainTabParamList) {
+    const route = state.routes.find(r => r.name === name)!
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
+    if (activeRoute !== name && !event.defaultPrevented) navigation.navigate(name as any)
+  }
+
+  function renderTab(name: keyof MainTabParamList, label: string, icon: keyof typeof Ionicons.glyphMap, on: keyof typeof Ionicons.glyphMap) {
+    const focused = activeRoute === name
+    return (
+      <TouchableOpacity key={name} style={tabStyles.tab} onPress={() => pressTab(name)} activeOpacity={0.7}>
+        <View style={[tabStyles.iconWrap, focused && { backgroundColor: colors.primaryLight }]}>
+          <Ionicons name={focused ? on : icon} size={22} color={focused ? colors.primary : colors.textMuted} />
+        </View>
+        <Text style={[tabStyles.label, { color: focused ? colors.primary : colors.textMuted }, focused && tabStyles.labelActive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    )
+  }
 
   return (
-    <View style={[
-      tabStyles.container,
-      { backgroundColor: colors.surface, borderTopColor: colors.border },
-    ]}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key]
-        const isFocused = state.index === index
-        const tab = TABS.find(t => t.name === route.name)!
+    <View style={[tabStyles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      {renderTab('Home',  'Home',  'home-outline',   'home'  )}
+      {renderTab('Funds', 'Funds', 'wallet-outline', 'wallet')}
 
-        function onPress() {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          })
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name)
-          }
-        }
+      {/* Create FAB */}
+      <TouchableOpacity style={tabStyles.tab} onPress={() => (navigation as any).navigate('CreateFund')} activeOpacity={0.85}>
+        <View style={[tabStyles.createFab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
+          <Ionicons name="add" size={26} color="#FFFFFF" />
+        </View>
+        <Text style={[tabStyles.label, { color: colors.textMuted }]}>Create</Text>
+      </TouchableOpacity>
 
-        return (
-          <TouchableOpacity
-            key={route.key}
-            style={tabStyles.tab}
-            onPress={onPress}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
-          >
-            <View style={[
-              tabStyles.iconWrap,
-              isFocused && { backgroundColor: colors.primaryLight },
-            ]}>
-              <Ionicons
-                name={isFocused ? tab.iconActive : tab.icon}
-                size={22}
-                color={isFocused ? colors.primary : colors.textMuted}
-              />
-            </View>
-            <Text style={[
-              tabStyles.label,
-              { color: isFocused ? colors.primary : colors.textMuted },
-              isFocused && tabStyles.labelActive,
-            ]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        )
-      })}
+      {renderTab('Activity', 'Events', 'calendar-outline', 'calendar')}
+      {renderTab('Reports', 'Reports', 'bar-chart-outline', 'bar-chart')}
     </View>
   )
 }
@@ -95,7 +77,7 @@ const tabStyles = StyleSheet.create({
     borderTopWidth: 1,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     paddingTop: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.06,
@@ -121,6 +103,18 @@ const tabStyles = StyleSheet.create({
   labelActive: {
     fontWeight: '700',
   },
+  createFab: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
 })
 
 // ── Tab navigator ─────────────────────────────────────────────
@@ -132,8 +126,11 @@ function TabNavigator() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home"     component={HomeScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Home"     component={HomeScreen}     />
+      <Tab.Screen name="Funds"    component={FundsScreen}    />
+      <Tab.Screen name="Activity" component={ActivityScreen} />
+      <Tab.Screen name="Reports"  component={ReportsScreen}  />
+      <Tab.Screen name="Profile"  component={ProfileScreen}  />
     </Tab.Navigator>
   )
 }
@@ -144,14 +141,19 @@ const Stack = createNativeStackNavigator<MainStackParamList>()
 export default function MainNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Tabs"                component={TabNavigator} />
-      <Stack.Screen name="CreateFund"          component={CreateFundScreen} />
-      <Stack.Screen name="JoinFund"            component={JoinFundScreen} />
-      <Stack.Screen name="FundDetail"          component={FundDetailScreen} />
-      <Stack.Screen name="RecordContribution"  component={RecordContributionScreen} />
-      <Stack.Screen name="RecordExpense"       component={RecordExpenseScreen} />
-      <Stack.Screen name="TokenPurchase"       component={TokenPurchaseScreen} />
-      <Stack.Screen name="Support"             component={SupportScreen} />
+      <Stack.Screen name="Tabs"               component={TabNavigator}            />
+      <Stack.Screen name="CreateFund"         component={CreateFundScreen}        />
+      <Stack.Screen name="JoinFund"           component={JoinFundScreen}          />
+      <Stack.Screen name="FundDetail"         component={FundDetailScreen}        />
+      <Stack.Screen name="EventDetail"        component={EventDetailScreen}       />
+      <Stack.Screen name="GuestList"          component={GuestListScreen}         />
+      <Stack.Screen name="EventBudget"        component={EventBudgetScreen}       />
+      <Stack.Screen name="RecordContribution" component={RecordContributionScreen}/>
+      <Stack.Screen name="RecordExpense"      component={RecordExpenseScreen}     />
+      <Stack.Screen name="TokenPurchase"      component={TokenPurchaseScreen}     />
+      <Stack.Screen name="Settings"           component={SettingsScreen}          />
+      <Stack.Screen name="Support"            component={SupportScreen}           />
+      <Stack.Screen name="FundCreated"        component={FundCreatedScreen}       />
     </Stack.Navigator>
   )
 }

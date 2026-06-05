@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   View,
   Text,
@@ -6,211 +7,272 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
+  Modal,
 } from 'react-native'
-import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { MainStackParamList } from '../../navigation/types'
+import { LinearGradient } from 'expo-linear-gradient'
+
+// persists for the current app session; resets on app restart (= "show every login")
+let _welcomeDismissed = false
+import { Ionicons } from '@expo/vector-icons'
 import { fonts } from '../../theme/typography'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 
-type Props = {
-  navigation: NativeStackNavigationProp<MainStackParamList, 'Home'>
-}
-
 type FundStatus = 'active' | 'closed' | 'suspended'
 type MemberRole = 'organiser' | 'member'
 
 type Fund = {
-  id: string
-  title: string
-  status: FundStatus
-  goal_amount: number
+  id:                  string
+  title:               string
+  status:              FundStatus
+  goal_amount:         number
   total_contributions: number
-  balance: number
-  member_count: number
-  contribution_count: number
-  role: MemberRole
+  balance:             number
+  member_count:        number
+  role:                MemberRole
+  next_payout:         string
+  category:            string
+  emoji:               string
+}
+
+type SmsItem = {
+  id:       string
+  amount:   number
+  phone:    string
+  provider: string
+  timeAgo:  string
+}
+
+function thebeToBWP(thebe: number) {
+  return `P ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
+}
+
+function thebeToWholeBWP(thebe: number) {
+  return `P ${(thebe / 100).toLocaleString('en-BW', { maximumFractionDigits: 0 })}`
+}
+
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
 const MOCK_FUNDS: Fund[] = [
   {
-    id: '1',
-    title: "Kgosi's Funeral Fund",
-    status: 'active',
-    goal_amount: 500000,
-    total_contributions: 320000,
-    balance: 295000,
-    member_count: 12,
-    contribution_count: 18,
-    role: 'organiser',
+    id: '1', title: "Kgosi's Funeral Fund", status: 'active',
+    goal_amount: 1000000, total_contributions: 875000, balance: 875000,
+    member_count: 12, role: 'organiser', next_payout: '15 Jun 2025',
+    category: 'Funeral', emoji: '🕯️',
   },
   {
-    id: '2',
-    title: 'Mpho & Tebogo Wedding',
-    status: 'active',
-    goal_amount: 800000,
-    total_contributions: 140000,
-    balance: 140000,
-    member_count: 7,
-    contribution_count: 9,
-    role: 'member',
+    id: '2', title: 'Kago & Lesedi Wedding', status: 'active',
+    goal_amount: 1500000, total_contributions: 1200000, balance: 1200000,
+    member_count: 47, role: 'organiser', next_payout: '15 Nov 2025',
+    category: 'Event', emoji: '🏠',
   },
 ]
 
-type Styles = ReturnType<typeof makeStyles>
+const MOCK_SMS: SmsItem[] = [
+  { id: 's1', amount: 50000,  phone: '72 345 678', provider: 'Orange Money', timeAgo: '10 min ago'  },
+  { id: 's2', amount: 100000, phone: '74 123 456', provider: 'MyZaka',       timeAgo: '1 hour ago'  },
+]
 
-function thebeToBWP(thebe: number): string {
-  return `BWP ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
-}
-
-function ProgressBar({ value, max, styles }: { value: number; max: number; styles: Styles }) {
-  const pct = Math.min(value / max, 1)
-  return (
-    <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${pct * 100}%` as any }]} />
-    </View>
-  )
-}
-
-function FundCard({ fund, onPress, styles }: { fund: Fund; onPress: () => void; styles: Styles }) {
-  const pct = Math.round((fund.total_contributions / fund.goal_amount) * 100)
-
-  return (
-    <TouchableOpacity style={styles.fundCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.fundCardHeader}>
-        <View style={[
-          styles.roleBadge,
-          fund.role === 'organiser' ? styles.roleBadgeOrganiser : styles.roleBadgeMember,
-        ]}>
-          <Text style={[
-            styles.roleBadgeText,
-            fund.role === 'organiser' ? styles.roleBadgeTextOrganiser : styles.roleBadgeTextMember,
-          ]}>
-            {fund.role === 'organiser' ? 'Organiser' : 'Member'}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.fundTitle} numberOfLines={1}>{fund.title}</Text>
-
-      <View style={styles.progressRow}>
-        <ProgressBar value={fund.total_contributions} max={fund.goal_amount} styles={styles} />
-        <Text style={styles.progressPct}>{pct}%</Text>
-      </View>
-
-      <View style={styles.fundStats}>
-        <View style={styles.fundStat}>
-          <Text style={styles.fundStatValue}>{thebeToBWP(fund.balance)}</Text>
-          <Text style={styles.fundStatLabel}>Balance</Text>
-        </View>
-        <View style={styles.fundStatDivider} />
-        <View style={styles.fundStat}>
-          <Text style={styles.fundStatValue}>{thebeToBWP(fund.goal_amount)}</Text>
-          <Text style={styles.fundStatLabel}>Goal</Text>
-        </View>
-        <View style={styles.fundStatDivider} />
-        <View style={styles.fundStat}>
-          <Text style={styles.fundStatValue}>{fund.member_count}</Text>
-          <Text style={styles.fundStatLabel}>Members</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  )
-}
-
-function EmptyFunds({ onCreate, onJoin, styles }: { onCreate: () => void; onJoin: () => void; styles: Styles }) {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyEmoji}>🪣</Text>
-      <Text style={styles.emptyHeading}>No funds yet</Text>
-      <Text style={styles.emptyBody}>
-        Create a fund to start collecting contributions, or join one with an invite code.
-      </Text>
-      <TouchableOpacity style={styles.emptyCreateBtn} onPress={onCreate} activeOpacity={0.85}>
-        <Text style={styles.emptyCreateBtnText}>Create a Fund</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onJoin}>
-        <Text style={styles.emptyJoinLink}>Join with invite code</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-export default function HomeScreen({ navigation }: Props) {
-  const { userName, tokenBalance } = useAuth()
+export default function HomeScreen({ navigation }: { navigation: any }) {
+  const { userName } = useAuth()
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
-  const displayName = userName ? userName.split(' ')[0] : 'there'
 
-  const activeFunds = MOCK_FUNDS.filter(f => f.status === 'active')
+  const [smsItems,    setSmsItems]    = useState<SmsItem[]>(MOCK_SMS)
+  const [showWelcome, setShowWelcome] = useState(false)
+
+  function dismissWelcome() {
+    _welcomeDismissed = true
+    setShowWelcome(false)
+  }
+
+  const firstName    = userName ? userName.split(' ')[0] : 'there'
+  const userInitials = userName ? initials(userName) : '?'
+  const today = new Date().toLocaleDateString('en-BW', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
+
+  const activeFunds       = MOCK_FUNDS.filter(f => f.status === 'active')
+  const totalBalance      = activeFunds.reduce((s, f) => s + f.balance, 0)
+  const totalMembers      = activeFunds.reduce((s, f) => s + f.member_count, 0)
+  const thisMonthContribs = 125000
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
-      {/* ── Header ─────────────────────────────────── */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {displayName} 👋</Text>
-          <Text style={styles.subGreeting}>Here are your active funds</Text>
-        </View>
-        <TouchableOpacity style={styles.tokenBadge} activeOpacity={0.8} onPress={() => navigation.navigate('TokenPurchase')}>
-          <Text style={styles.tokenEmoji}>🪙</Text>
-          <Text style={styles.tokenCount}>{tokenBalance}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      {/* ── Welcome overlay ───────────────────────── */}
+      <Modal
+        visible={showWelcome}
+        animationType="slide"
+        onRequestClose={dismissWelcome}
+        statusBarTranslucent
       >
-        {/* ── Quick actions ──────────────────────────── */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.primaryAction}
-            onPress={() => navigation.navigate('CreateFund')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryActionIcon}>＋</Text>
-            <Text style={styles.primaryActionText}>Create Fund</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryAction}
-            onPress={() => navigation.navigate('JoinFund')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.secondaryActionIcon}>🔗</Text>
-            <Text style={styles.secondaryActionText}>Join Fund</Text>
-          </TouchableOpacity>
-        </View>
+        <SafeAreaView style={[styles.safe, { backgroundColor: styles.safe.backgroundColor }]}>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+          <ScrollView contentContainerStyle={styles.welcomeScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.welcomeCircle}>
+              <Text style={styles.welcomeEmoji}>🎉</Text>
+            </View>
 
-        {/* ── Fund list ──────────────────────────────── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Funds</Text>
-            <Text style={styles.sectionCount}>{activeFunds.length} active</Text>
+            <Text style={styles.welcomeHeading}>Welcome to Tshelo!</Text>
+            <Text style={styles.welcomeSub}>
+              Create your first fund and start collecting contributions with full transparency.
+            </Text>
+
+            <View style={styles.featuresCard}>
+              <Text style={styles.featuresCardTitle}>Your first fund is FREE</Text>
+              {[
+                'SMS payment detection',
+                'Full transparency for all members',
+                'Receipt scanning',
+                'Export PDF reports',
+              ].map(feature => (
+                <View key={feature} style={styles.featureRow}>
+                  <View style={styles.featureCheck}>
+                    <Ionicons name="checkmark" size={13} color="#059669" />
+                  </View>
+                  <Text style={styles.featureText}>{feature}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.welcomeButton}
+              onPress={() => {
+                dismissWelcome()
+                navigation.navigate('CreateFund', { isFirst: true })
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.welcomeButtonText}>Create Your First Fund</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.welcomeNote}>No credit card required</Text>
+
+            <TouchableOpacity onPress={dismissWelcome} activeOpacity={0.7} style={styles.welcomeSkipBtn}>
+              <Text style={styles.welcomeSkipText}>I'll do this later</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Normal homescreen content ─────────────── */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.homeHeader}>
+          <View style={styles.homeTitleBlock}>
+            <Text style={styles.homeGreeting}>Hey {firstName}</Text>
+            <Text style={styles.homeSubtitle}>Here's your overview</Text>
           </View>
 
-          {activeFunds.length === 0 ? (
-            <EmptyFunds
-              onCreate={() => navigation.navigate('CreateFund')}
-              onJoin={() => navigation.navigate('JoinFund')}
-              styles={styles}
-            />
-          ) : (
-            activeFunds.map(fund => (
-              <FundCard
-                key={fund.id}
-                fund={fund}
-                styles={styles}
-                onPress={() => navigation.navigate('FundDetail', { fundId: fund.id })}
-              />
-            ))
-          )}
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.tokenPill} onPress={() => navigation.navigate('TokenPurchase')} activeOpacity={0.85}>
+              <View style={styles.tokenIcon}>
+                <View style={styles.tokenIconDot} />
+              </View>
+              <View style={styles.tokenTextBlock}>
+                <Text style={styles.tokenCount}>25</Text>
+                <Text style={styles.tokenLabel}>tokens</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.avatarWrap}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{userInitials}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
+        <Text style={styles.homeSectionTitle}>YOUR FUNDS</Text>
+
+        <View style={styles.fundsList}>
+          {activeFunds.map(fund => {
+            const pct = Math.round((fund.total_contributions / fund.goal_amount) * 100)
+            const isEvent = fund.category === 'Event'
+            return (
+              <TouchableOpacity
+                key={fund.id}
+                style={styles.overviewCard}
+                onPress={() => isEvent
+                  ? navigation.navigate('EventDetail', { eventId: fund.id })
+                  : navigation.navigate('FundDetail', { fundId: fund.id })}
+                activeOpacity={0.85}
+              >
+                <View style={styles.overviewTop}>
+                  <View style={[styles.fundLetterIcon, isEvent && styles.eventLetterIcon]}>
+                    <Text style={styles.fundLetterText}>{isEvent ? 'W' : 'F'}</Text>
+                  </View>
+                  <View style={styles.overviewInfo}>
+                    <Text style={styles.overviewTitle} numberOfLines={1}>{fund.title}</Text>
+                    <View style={[styles.overviewTag, isEvent && styles.eventTag]}>
+                      <Text style={[styles.overviewTagText, isEvent && styles.eventTagText]}>{fund.category}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.progressTrack}>
+                  <LinearGradient
+                    colors={[colors.primary, '#55CFC6']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` as any }]}
+                  />
+                </View>
+
+                <View style={styles.overviewBottom}>
+                  <Text style={styles.overviewMeta}>
+                    {isEvent
+                      ? `${fund.member_count} confirmed · budget ${thebeToWholeBWP(fund.goal_amount)}`
+                      : `${thebeToWholeBWP(fund.balance)} of ${thebeToWholeBWP(fund.goal_amount)} · ${fund.member_count} members`}
+                  </Text>
+                  <Text style={[styles.overviewAction, isEvent && styles.eventAction]}>
+                    {isEvent ? 'RSVP' : `${pct}%`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+
+        <Text style={styles.homeSectionTitle}>QUICK ACTIONS</Text>
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('RecordContribution', { fundId: activeFunds[0].id, fundTitle: activeFunds[0].title })}
+          >
+            <View style={styles.quickIcon}>
+              <Ionicons name="add" size={28} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.quickTitle}>Record</Text>
+              <Text style={styles.quickSubtitle}>Contribution</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('FundDetail', { fundId: activeFunds[0].id })}
+          >
+            <View style={styles.quickIcon}>
+              <Ionicons name="person-add" size={26} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.quickTitle}>Add</Text>
+              <Text style={styles.quickSubtitle}>Members</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -218,17 +280,336 @@ export default function HomeScreen({ navigation }: Props) {
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    safe: {
-      flex: 1,
-      backgroundColor: colors.background,
+    safe: { flex: 1, backgroundColor: colors.background },
+
+    // ── Welcome state ──────────────────────────────────────────
+    welcomeScroll: {
+      flexGrow: 1,
+      paddingHorizontal: 28,
+      paddingTop: 32,
+      paddingBottom: 48,
+      alignItems: 'center',
     },
+    welcomeCircle: {
+      width: 160,
+      height: 160,
+      borderRadius: 80,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 32,
+    },
+    welcomeEmoji:   { fontSize: 72 },
+    welcomeHeading: {
+      fontSize: 26,
+      fontFamily: fonts.display.bold,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    welcomeSub: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 32,
+    },
+    featuresCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      width: '100%',
+      marginBottom: 24,
+      gap: 14,
+    },
+    featuresCardTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    featureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    featureCheck: {
+      width: 26,
+      height: 26,
+      borderRadius: 6,
+      backgroundColor: '#D1FAE5',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    featureText: {
+      fontSize: 14,
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    welcomeButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 28,
+      paddingVertical: 17,
+      paddingHorizontal: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      width: '100%',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 6,
+      marginBottom: 12,
+    },
+    welcomeButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
+    welcomeNote: {
+      fontSize: 13,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    welcomeSkipBtn: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 20,
+    },
+    welcomeSkipText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textMuted,
+    },
+
+    // ── Home overview ──────────────────────────────────────────
+    homeHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      marginBottom: 26,
+      gap: 12,
+    },
+    homeTitleBlock: {
+      flex: 1,
+      paddingTop: 2,
+    },
+    homeGreeting: {
+      fontSize: 30,
+      lineHeight: 36,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    homeSubtitle: {
+      fontSize: 17,
+      lineHeight: 23,
+      color: colors.textMuted,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    tokenPill: {
+      minWidth: 108,
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 9,
+      backgroundColor: colors.accentLight,
+      borderWidth: 2,
+      borderColor: '#F59E0B',
+      borderRadius: 28,
+      paddingHorizontal: 14,
+    },
+    tokenIcon: {
+      width: 25,
+      height: 25,
+      borderRadius: 13,
+      borderWidth: 3,
+      borderColor: '#F59E0B',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tokenIconDot: {
+      width: 11,
+      height: 11,
+      borderRadius: 6,
+      backgroundColor: '#F59E0B',
+    },
+    tokenTextBlock: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 42,
+    },
+    tokenCount: {
+      fontSize: 18,
+      lineHeight: 20,
+      fontWeight: '900',
+      color: '#92400E',
+      textAlign: 'center',
+    },
+    tokenLabel: {
+      fontSize: 12,
+      lineHeight: 14,
+      fontWeight: '800',
+      color: '#D97706',
+      textAlign: 'center',
+    },
+    homeSectionTitle: {
+      fontSize: 17,
+      lineHeight: 22,
+      fontWeight: '900',
+      letterSpacing: 2,
+      color: colors.textMuted,
+      marginBottom: 12,
+    },
+    fundsList: {
+      gap: 20,
+      marginBottom: 12,
+    },
+    overviewCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.04,
+      shadowRadius: 14,
+      elevation: 2,
+    },
+    overviewTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 14,
+    },
+    fundLetterIcon: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    eventLetterIcon: {
+      backgroundColor: '#55CFC6',
+    },
+    fundLetterText: {
+      fontSize: 19,
+      fontWeight: '900',
+      color: '#FFFFFF',
+    },
+    overviewInfo: {
+      flex: 1,
+      gap: 9,
+    },
+    overviewTitle: {
+      fontSize: 20,
+      lineHeight: 24,
+      fontWeight: '900',
+      color: colors.textPrimary,
+    },
+    overviewTag: {
+      alignSelf: 'flex-start',
+      minWidth: 95,
+      alignItems: 'center',
+      backgroundColor: colors.primaryLight,
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+    },
+    overviewTagText: {
+      fontSize: 15,
+      fontWeight: '900',
+      color: colors.primary,
+    },
+    eventTag: {
+      backgroundColor: '#CFF5EF',
+    },
+    eventTagText: {
+      color: '#0F9F8D',
+    },
+    overviewBottom: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    overviewMeta: {
+      flex: 1,
+      fontSize: 16,
+      lineHeight: 21,
+      fontWeight: '500',
+      color: colors.textSecondary,
+    },
+    overviewAction: {
+      fontSize: 16,
+      fontWeight: '900',
+      color: colors.primary,
+    },
+    eventAction: {
+      color: '#059669',
+    },
+    quickActions: {
+      flexDirection: 'row',
+      gap: 20,
+    },
+    quickActionCard: {
+      flex: 1,
+      minHeight: 88,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 18,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.04,
+      shadowRadius: 14,
+      elevation: 2,
+    },
+    quickIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickTitle: {
+      fontSize: 18,
+      lineHeight: 22,
+      fontWeight: '900',
+      color: colors.textPrimary,
+    },
+    quickSubtitle: {
+      fontSize: 15,
+      lineHeight: 20,
+      color: colors.textMuted,
+    },
+
+    // ── Header ─────────────────────────────────────────────────
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 24,
       paddingTop: 16,
-      paddingBottom: 24,
+      paddingBottom: 16,
     },
     greeting: {
       fontSize: 22,
@@ -237,93 +618,156 @@ function makeStyles(colors: AppColors) {
       color: colors.textPrimary,
       marginBottom: 2,
     },
-    subGreeting: {
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    tokenBadge: {
-      flexDirection: 'row',
+    date: { fontSize: 13, color: colors.textMuted },
+    avatarWrap: { position: 'relative' },
+    avatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.primary,
       alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: { fontSize: 17, fontWeight: '900', color: '#FFFFFF' },
+    notifDot: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      width: 11,
+      height: 11,
+      borderRadius: 6,
+      backgroundColor: '#EF4444',
+      borderWidth: 2,
+      borderColor: colors.background,
+    },
+
+    scrollContent: { paddingHorizontal: 20, paddingTop: 30, paddingBottom: 48 },
+
+    // ── Summary card ───────────────────────────────────────────
+    summaryCard: {
       backgroundColor: colors.surface,
-      borderRadius: 20,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      gap: 6,
+      borderRadius: 18,
+      padding: 20,
       borderWidth: 1,
       borderColor: colors.border,
+      marginBottom: 16,
     },
-    tokenEmoji: {
-      fontSize: 16,
-    },
-    tokenCount: {
-      fontSize: 15,
-      fontWeight: '800',
+    summaryLabel:     { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
+    summaryTotal: {
+      fontSize: 34,
+      fontFamily: fonts.display.bold,
+      fontWeight: '900',
       color: colors.textPrimary,
+      marginBottom: 18,
     },
-    scroll: {
-      flex: 1,
-      backgroundColor: colors.background,
+    summaryStats:     { flexDirection: 'row', alignItems: 'center' },
+    summaryStat:      { flex: 1, alignItems: 'center' },
+    summarySep:       { width: 1, height: 28, backgroundColor: colors.border },
+    summaryStatValue: { fontSize: 14, fontWeight: '800', color: colors.textPrimary, marginBottom: 2 },
+    summaryStatLabel: { fontSize: 11, color: colors.textMuted },
+
+    // ── SMS banner ─────────────────────────────────────────────
+    smsBanner: {
+      backgroundColor: '#FEECA4',
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: '#F59E0B',
+      padding: 14,
+      marginBottom: 16,
+      gap: 10,
     },
-    scrollContent: {
-      paddingHorizontal: 20,
-      paddingTop: 24,
-      paddingBottom: 48,
-    },
-    quickActions: {
-      flexDirection: 'row',
-      gap: 12,
-      marginBottom: 28,
-    },
-    primaryAction: {
-      flex: 1,
+    smsBannerHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      paddingVertical: 14,
-      gap: 8,
-      borderWidth: 1.5,
-      borderColor: colors.border,
+      gap: 10,
     },
-    primaryActionIcon: {
-      fontSize: 18,
-      color: colors.textPrimary,
-      fontWeight: '700',
-    },
-    primaryActionText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    secondaryAction: {
-      flex: 1,
-      flexDirection: 'row',
+    smsBannerIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: '#F59E0B',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      paddingVertical: 14,
-      gap: 8,
-      borderWidth: 1.5,
-      borderColor: colors.border,
     },
-    secondaryActionIcon: {
-      fontSize: 16,
+    smsBannerTitleWrap: { flex: 1 },
+    smsBannerTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#92400E',
     },
-    secondaryActionText: {
-      fontSize: 15,
+    smsBannerSub: {
+      fontSize: 12,
+      color: '#D97706',
+      marginTop: 1,
+    },
+    smsItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#FFF9E4',
+      borderRadius: 12,
+      padding: 12,
+      gap: 10,
+    },
+    smsItemInfo:   { flex: 1 },
+    smsItemAmount: {
+      fontSize: 14,
       fontWeight: '700',
       color: colors.textPrimary,
+      marginBottom: 2,
     },
-    section: {
+    smsItemMeta:   { fontSize: 12, color: colors.textMuted },
+    smsConfirmBtn: {
+      backgroundColor: '#F59E0B',
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    smsConfirmText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+
+    // ── Achievement card ───────────────────────────────────────
+    achievementCard: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 16,
+      padding: 16,
       marginBottom: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
     },
+    achievementIconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    achievementIconEmoji: { fontSize: 20 },
+    achievementBody:      { flex: 1 },
+    achievementTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.primary,
+      marginBottom: 2,
+    },
+    achievementSub: {
+      fontSize: 12,
+      color: colors.primary,
+      opacity: 0.75,
+    },
+    achievementDecor: { fontSize: 32 },
+
+    // ── Section header ─────────────────────────────────────────
+    section:       { marginBottom: 28 },
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 14,
+      marginBottom: 12,
     },
     sectionTitle: {
       fontSize: 17,
@@ -331,151 +775,86 @@ function makeStyles(colors: AppColors) {
       fontFamily: fonts.display.bold,
       color: colors.textPrimary,
     },
-    sectionCount: {
-      fontSize: 13,
-      color: colors.textMuted,
-      fontWeight: '600',
-    },
+    seeAll: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+
+    // ── Fund card ──────────────────────────────────────────────
     fundCard: {
       backgroundColor: colors.surface,
-      borderRadius: 18,
-      padding: 18,
-      marginBottom: 14,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 12,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    fundCardHeader: {
+    fundCardMain: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    },
+    fundIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fundEmoji:    { fontSize: 22 },
+    fundInfo:     { flex: 1 },
+    fundTitleRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 10,
-    },
-    roleBadge: {
-      borderRadius: 20,
-      paddingVertical: 3,
-      paddingHorizontal: 10,
-    },
-    roleBadgeOrganiser: {
-      backgroundColor: colors.primaryLight,
-    },
-    roleBadgeMember: {
-      backgroundColor: colors.background,
-    },
-    roleBadgeText: {
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    roleBadgeTextOrganiser: {
-      color: colors.primary,
-    },
-    roleBadgeTextMember: {
-      color: colors.textSecondary,
+      marginBottom: 6,
     },
     fundTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 12,
-    },
-    progressRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 14,
-    },
-    progressTrack: {
-      flex: 1,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.border,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      borderRadius: 3,
-      backgroundColor: colors.primary,
-    },
-    progressPct: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.primary,
-      width: 36,
-      textAlign: 'right',
-    },
-    fundStats: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    fundStat: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    fundStatDivider: {
-      width: 1,
-      height: 28,
-      backgroundColor: colors.border,
-    },
-    fundStatValue: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 2,
-    },
-    fundStatLabel: {
-      fontSize: 11,
-      color: colors.textMuted,
-    },
-    emptyState: {
-      alignItems: 'center',
-      paddingVertical: 40,
-      paddingHorizontal: 16,
-    },
-    emptyEmoji: {
-      fontSize: 48,
-      marginBottom: 16,
-    },
-    emptyHeading: {
-      fontSize: 18,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginBottom: 8,
-    },
-    emptyBody: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 21,
-      marginBottom: 24,
-    },
-    emptyCreateBtn: {
-      backgroundColor: colors.primary,
-      borderRadius: 14,
-      paddingVertical: 14,
-      paddingHorizontal: 32,
-      marginBottom: 14,
-    },
-    emptyCreateBtnText: {
-      color: colors.surface,
       fontSize: 15,
       fontWeight: '700',
+      color: colors.textPrimary,
+      flex: 1,
     },
-    emptyJoinLink: {
-      fontSize: 14,
+    fundPct: {
+      fontSize: 13,
+      fontWeight: '700',
       color: colors.primary,
-      fontWeight: '600',
-      textDecorationLine: 'underline',
+      marginLeft: 8,
     },
-    sandboxNotice: {
-      backgroundColor: colors.accentLight,
-      borderRadius: 12,
-      padding: 14,
+    fundTagRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    categoryTag: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    categoryTagText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    memberRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    memberText: { fontSize: 11, color: colors.textMuted },
+
+    progressTrack: {
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+      marginBottom: 6,
+    },
+    progressFill: { height: '100%', borderRadius: 6, backgroundColor: colors.primary },
+
+    fundCardBottom: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
     },
-    sandboxText: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 18,
-    },
+    fundBalance:  { fontSize: 12, color: colors.textSecondary },
+    payoutRow:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    payoutText:   { fontSize: 11, color: colors.textMuted },
   })
 }

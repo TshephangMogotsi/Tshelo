@@ -15,7 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
-import { AuthStackParamList } from '../../navigation/types'
+import { AuthStackParamList, MobileMoneyNumber } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
@@ -30,8 +30,18 @@ type Props = {
 const OTP_LENGTH = 6
 const RESEND_COUNTDOWN = 60
 
+function detectProvider(phone: string): MobileMoneyNumber['provider'] {
+  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
+  if (digits.length < 2) return 'unknown'
+  const prefix = parseInt(digits.slice(0, 2), 10)
+  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
+  if ([74, 75].includes(prefix))         return 'myzaka'
+  if (prefix === 77)                     return 'smega'
+  return 'unknown'
+}
+
 export default function OTPScreen({ navigation, route }: Props) {
-  const { phone, mode, registration } = route.params
+  const { phone, mode, registration, mobileMoneyReturn } = route.params
   const { refreshProfile } = useAuth()
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [countdown, setCountdown] = useState(RESEND_COUNTDOWN)
@@ -65,6 +75,13 @@ export default function OTPScreen({ navigation, route }: Props) {
   }
 
   async function handleResend() {
+    if (mode === 'mobile_money') {
+      setCountdown(RESEND_COUNTDOWN)
+      setDigits(Array(OTP_LENGTH).fill(''))
+      inputRefs.current[0]?.focus()
+      return
+    }
+
     const { error } = await supabase.auth.signInWithOtp({ phone })
     if (error) { Alert.alert('Error', error.message); return }
     setCountdown(RESEND_COUNTDOWN)
@@ -75,6 +92,24 @@ export default function OTPScreen({ navigation, route }: Props) {
   async function handleVerify() {
     if (!isComplete) return
     setLoading(true)
+
+    if (mode === 'mobile_money' && mobileMoneyReturn) {
+      setLoading(false)
+      const mobileMoneyNumbers = [
+        ...mobileMoneyReturn.mobileMoneyNumbers,
+        mobileMoneyReturn.pendingNumber,
+      ]
+      navigation.navigate('BankDetails', {
+        name: mobileMoneyReturn.name,
+        registeredPhone: mobileMoneyReturn.registeredPhone,
+        bankName: mobileMoneyReturn.bankName,
+        branchCode: mobileMoneyReturn.branchCode,
+        accountNumber: mobileMoneyReturn.accountNumber,
+        bankAccounts: mobileMoneyReturn.bankAccounts,
+        mobileMoneyNumbers,
+      })
+      return
+    }
 
     const { data, error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
 
@@ -106,7 +141,15 @@ export default function OTPScreen({ navigation, route }: Props) {
         data_processing_consent_at: now,
       }).eq('id', userId)
       setLoading(false)
-      navigation.navigate('RegistrationSuccess')
+      navigation.navigate('BankDetails', {
+        name: registration.name,
+        registeredPhone: phone,
+        mobileMoneyNumbers: [{
+          id: 'registered',
+          phone,
+          provider: detectProvider(phone),
+        }],
+      })
       return
     }
 
@@ -147,7 +190,9 @@ export default function OTPScreen({ navigation, route }: Props) {
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.heading}>Verify your number</Text>
+            <Text style={styles.heading}>
+              {mode === 'mobile_money' ? 'Verify mobile money' : 'Verify your number'}
+            </Text>
             <Text style={[styles.subheading, { color: mutedCol }]}>
               Enter the 6-digit code sent to{'\n'}
               <Text style={[styles.phoneHighlight, { color: textCol }]}>{maskedPhone}</Text>
@@ -198,14 +243,16 @@ export default function OTPScreen({ navigation, route }: Props) {
             }
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={[styles.footerText, { color: textCol }]}>
-              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-            </Text>
-            <TouchableOpacity onPress={() => navigation.replace(mode === 'login' ? 'Register' : 'Login')}>
-              <Text style={styles.footerLink}>{mode === 'login' ? 'Create One' : 'Log in'}</Text>
-            </TouchableOpacity>
-          </View>
+          {mode !== 'mobile_money' && (
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, { color: textCol }]}>
+                {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+              </Text>
+              <TouchableOpacity onPress={() => navigation.replace(mode === 'login' ? 'Register' : 'Login')}>
+                <Text style={styles.footerLink}>{mode === 'login' ? 'Create One' : 'Log in'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

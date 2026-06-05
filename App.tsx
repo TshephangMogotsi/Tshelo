@@ -11,9 +11,9 @@ import OnboardingScreen from './screens/onboarding/OnboardingScreen'
 
 const ONBOARDING_KEY = 'tshelo_onboarded_v1'
 
-function RootNavigator() {
+function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'CountrySelect' | 'Login' }) {
   const { isAuthenticated, profileCompleted } = useAuth()
-  if (!isAuthenticated || !profileCompleted) return <AuthNavigator />
+  if (!isAuthenticated || !profileCompleted) return <AuthNavigator initialRouteName={initialAuthRoute} />
   return <MainNavigator />
 }
 
@@ -25,7 +25,8 @@ export default function App() {
   })
 
   // DEV: always show onboarding — remove __DEV__ check before release
-  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(__DEV__ ? false : null)
+  const [hasOnboarded,    setHasOnboarded]    = useState<boolean | null>(__DEV__ ? false : null)
+  const [initialAuthRoute, setInitialAuthRoute] = useState<'Welcome' | 'CountrySelect' | 'Login'>('Welcome')
 
   useEffect(() => {
     if (__DEV__) return
@@ -37,7 +38,8 @@ export default function App() {
   // Wait for both fonts and AsyncStorage
   if (!fontsLoaded || hasOnboarded === null) return null
 
-  async function completeOnboarding() {
+  async function completeOnboarding(dest?: 'CountrySelect' | 'Login') {
+    if (dest) setInitialAuthRoute(dest)
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true')
     setHasOnboarded(true)
   }
@@ -57,7 +59,7 @@ export default function App() {
       <SafeAreaProvider>
         <AuthProvider>
           <NavigationContainer>
-            <RootNavigator />
+            <RootNavigator initialAuthRoute={initialAuthRoute} />
           </NavigationContainer>
         </AuthProvider>
       </SafeAreaProvider>

@@ -29,11 +29,13 @@ export default function WelcomeScreen({ navigation }: Props) {
 
         {/* Logo */}
         <View style={styles.logoArea}>
-          <Image
-            source={require('../../assets/Tshelo icon.png')}
-            style={styles.logo}
-            resizeMode="cover"
-          />
+          <View style={styles.logoRing}>
+            <Image
+              source={require('../../assets/Tshelo icon.png')}
+              style={styles.logo}
+              resizeMode="cover"
+            />
+          </View>
         </View>
 
         {/* Bottom content */}
@@ -54,7 +56,7 @@ export default function WelcomeScreen({ navigation }: Props) {
 
           <TouchableOpacity
             style={styles.registerButton}
-            onPress={() => navigation.navigate('Register')}
+            onPress={() => navigation.navigate('CountrySelect')}
             activeOpacity={0.8}
           >
             <Text style={styles.registerText}>Create an Account</Text>
@@ -79,15 +81,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  logoRing: {
+    width: 162,
+    height: 162,
+    borderRadius: 81,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 12,
+  },
   logo: {
     width: 130,
     height: 130,
     borderRadius: 29,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 12,
   },
 
   bottom: {

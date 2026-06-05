@@ -115,7 +115,7 @@ function PackCard({
         <Text style={styles.packTokenCount}>
           🪙 <Text style={styles.packTokenNumber}>{pack.tokens}</Text> tokens
         </Text>
-        <Text style={styles.packPrice}>BWP {pack.priceBWP}</Text>
+        <Text style={styles.packPrice}>P{pack.priceBWP}</Text>
       </View>
 
       <Text style={styles.packDescription}>{pack.description}</Text>
@@ -135,7 +135,7 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
   function handlePurchase() {
     Alert.alert(
       'Purchase Tokens',
-      `You're about to purchase ${pack.tokens} tokens for BWP ${pack.priceBWP}.\n\nPayment gateway coming soon.`,
+      `You're about to purchase ${pack.tokens} tokens for P${pack.priceBWP}.\n\nPayment gateway coming soon.`,
       [{ text: 'OK' }]
     )
   }
@@ -203,7 +203,7 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Price</Text>
-            <Text style={styles.summaryValue}>BWP {pack.priceBWP}.00</Text>
+            <Text style={styles.summaryValue}>P{pack.priceBWP}.00</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
@@ -229,7 +229,7 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
           activeOpacity={0.85}
         >
           <Text style={styles.primaryButtonText}>
-            Purchase — BWP {pack.priceBWP}
+            Purchase — P{pack.priceBWP}
           </Text>
         </TouchableOpacity>
       </ScrollView>

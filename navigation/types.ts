@@ -5,6 +5,19 @@ export type BankDetails = {
   accountType:   'savings' | 'current'
 }
 
+export type MobileMoneyNumber = {
+  id:       string
+  phone:    string
+  provider: 'orange_money' | 'myzaka' | 'smega' | 'unknown'
+}
+
+export type BankAccount = {
+  id:            string
+  bankName:      string
+  branchCode:    string
+  accountNumber: string
+}
+
 export type RegistrationData = {
   name:     string
   provider: 'orange_money' | 'myzaka' | 'smega'
@@ -12,27 +25,67 @@ export type RegistrationData = {
 }
 
 export type AuthStackParamList = {
-  Welcome: undefined
-  Login: undefined
-  Register: undefined
-  OTP: { phone: string; mode: 'login' | 'register'; registration?: RegistrationData }
+  Welcome:       undefined
+  CountrySelect: undefined
+  Login:         undefined
+  Register:      { countryCode?: string; countryName?: string; currency?: string; flag?: string; dialCode?: string } | undefined
+  OTP: {
+    phone: string
+    mode: 'login' | 'register' | 'mobile_money'
+    registration?: RegistrationData
+    mobileMoneyReturn?: {
+      name?: string
+      registeredPhone?: string
+      bankName: string
+      branchCode: string
+      accountNumber: string
+      bankAccounts: BankAccount[]
+      mobileMoneyNumbers: MobileMoneyNumber[]
+      pendingNumber: MobileMoneyNumber
+    }
+  }
+  BankDetails:  {
+    name?: string
+    registeredPhone?: string
+    bankName?: string
+    branchCode?: string
+    accountNumber?: string
+    bankAccounts?: BankAccount[]
+    mobileMoneyNumbers?: MobileMoneyNumber[]
+  }
+  ReceiveMoney: {
+    name?: string
+    registeredPhone?: string
+    bankName?: string
+    accountNumber?: string
+    bankAccounts?: BankAccount[]
+    mobileMoneyNumbers: MobileMoneyNumber[]
+  }
   ProfileSetup: undefined
   RegistrationSuccess: undefined
   Support: undefined
 }
 
 export type MainTabParamList = {
-  Home: undefined
-  Settings: undefined
+  Home:     undefined
+  Funds:    undefined
+  Activity: undefined
+  Reports:  undefined
+  Profile:  undefined
 }
 
 export type MainStackParamList = {
-  Tabs: undefined
-  CreateFund: undefined
-  JoinFund: undefined
-  FundDetail: { fundId: string }
-  RecordContribution: { fundId: string; fundTitle: string }
-  RecordExpense: { fundId: string; fundTitle: string }
-  TokenPurchase: undefined
-  Support: undefined
+  Tabs:                undefined
+  CreateFund:          { isFirst?: boolean } | undefined
+  JoinFund:            undefined
+  FundDetail:          { fundId: string }
+  EventDetail:         { eventId: string }
+  GuestList:           { eventId: string }
+  EventBudget:         { eventId: string }
+  RecordContribution:  { fundId: string; fundTitle: string }
+  RecordExpense:       { fundId: string; fundTitle: string }
+  TokenPurchase:       undefined
+  Support:             undefined
+  Settings:            undefined
+  FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; targetDate?: string }
 }

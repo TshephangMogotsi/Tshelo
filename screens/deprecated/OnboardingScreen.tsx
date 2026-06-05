@@ -23,41 +23,30 @@ const BUTTON_BG      = '#EAE4FB'
 const DOT_INACTIVE   = 8
 const DOT_ACTIVE     = 28
 
-type Slide = {
-  id:     string
-  title:  string
-  body:   string
-  image?: ReturnType<typeof require>
-}
+type Slide = { id: string; title: string; body: string; image: ReturnType<typeof require> }
 
 const SLIDES: Slide[] = [
   {
     id:    '1',
-    title: 'Community contributions,\nmade transparent',
-    body:  'Track motshelo, stokvels, and family funds with complete visibility for everyone.',
+    title: 'Save together\nBuild together',
+    body:  'Pool contributions for funerals, weddings, graduations and more, all in one transparent place',
     image: require('../../assets/image 1.png'),
   },
   {
     id:    '2',
-    title: 'Track every\ncontribution',
-    body:  'See who contributed, how much, and when. No more spreadsheets or confusion.',
+    title: 'Every thebe,\naccounted for',
+    body:  'See who contributed what, in real time. No spreadsheets, no confusion, no chasing',
     image: require('../../assets/image 2.png'),
   },
   {
     id:    '3',
-    title: 'Full audit trail',
-    body:  'Every action is recorded. Everyone can see the complete history. No secrets.',
-    image: require('../../assets/image 3 new.png'),
-  },
-  {
-    id:    '4',
-    title: 'We never touch\nyour money',
-    body:  'Tshelo is a tracking layer only. Payments happen your way — cash, mobile money, or bank transfer.',
-    image: require('../../assets/image 4.png'),
+    title: 'Safe, private\nand yours',
+    body:  'Phone verification only, bank-level security. Your community data stays under your control',
+    image: require('../../assets/image 3.png'),
   },
 ]
 
-type Props = { onDone: (dest?: 'CountrySelect' | 'Login') => void }
+type Props = { onDone: () => void }
 
 export default function OnboardingScreen({ onDone }: Props) {
   const { isDark } = useTheme()
@@ -67,8 +56,9 @@ export default function OnboardingScreen({ onDone }: Props) {
   const bodyColor    = isDark ? 'rgba(255,255,255,0.65)' : '#52525B'
 
   const [index, setIndex] = useState(0)
-  const flatRef   = useRef<FlatList<Slide>>(null)
-  const scrollX   = useRef(new Animated.Value(0)).current
+  const [illustrationH, setIllustrationH] = useState(0)
+  const flatRef  = useRef<FlatList<Slide>>(null)
+  const scrollX  = useRef(new Animated.Value(0)).current
   const dotWidths = useRef(
     SLIDES.map((_, i) => new Animated.Value(i === 0 ? DOT_ACTIVE : DOT_INACTIVE))
   ).current
@@ -94,17 +84,11 @@ export default function OnboardingScreen({ onDone }: Props) {
     navigateTo(index + 1)
   }
 
-  const slideAnims = SLIDES.map((_, i) => {
-    const imageOffset = i === 2 ? -40 : 0
-    return {
+  // Each slide's text is always rendered, driven directly by scrollX
+  const slideAnims = SLIDES.map((_, i) => ({
     translateX: scrollX.interpolate({
       inputRange: [(i - 1) * W, i * W, (i + 1) * W],
       outputRange: [W * 0.6, 0, -W * 0.6],
-      extrapolate: 'clamp',
-    }),
-    imageTranslateX: scrollX.interpolate({
-      inputRange: [(i - 1) * W, i * W, (i + 1) * W],
-      outputRange: [W * 0.6 + imageOffset, imageOffset, -W * 0.6 + imageOffset],
       extrapolate: 'clamp',
     }),
     opacity: scrollX.interpolate({
@@ -112,22 +96,18 @@ export default function OnboardingScreen({ onDone }: Props) {
       outputRange: [0, 1, 0],
       extrapolate: 'clamp',
     }),
-  }
-  })
-
-  const buttonLabel = isLast ? 'Get Started' : 'Next'
+  }))
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Purple gradient — base background for slides 1-3 */}
       <LinearGradient
         colors={[GRADIENT_START, GRADIENT_END]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Invisible pager — drives scrollX */}
+      {/* Invisible pager — drives scrollX in real time */}
       <Animated.FlatList
         ref={flatRef as any}
         data={SLIDES}
@@ -153,35 +133,31 @@ export default function OnboardingScreen({ onDone }: Props) {
       />
 
       {/* Illustration area */}
-      <View style={styles.illustrationArea} pointerEvents="none">
-        {/* All 4 slides parallax images */}
+      <View style={styles.illustrationArea} pointerEvents="none" onLayout={e => setIllustrationH(e.nativeEvent.layout.height)}>
         {SLIDES.map((slide, i) => (
           <Animated.Image
             key={slide.id}
-            source={slide.image!}
+            source={slide.image}
             style={[
               styles.illustration,
-              i === 2 && { width: W * 0.8625, height: (W * 1.1 - 20) * 0.8625 },
-              i === 3 && { width: W * 0.6624, height: (W * 1.1 - 20) * 0.6624 },
+              i === SLIDES.length - 1 && { width: W * 0.85, height: (W * 1.1 - 20) * 0.85 },
               {
-                top: insets.top + 12 + (i === 3 ? 80 : 0),
-                transform: [
-                  { translateX: slideAnims[i].imageTranslateX },
-                ],
+                top: i === SLIDES.length - 1 && illustrationH > 0
+                  ? (illustrationH - (W * 1.1 - 20) * 0.85) / 2 + 30
+                  : insets.top + 12,
+                transform: [{ translateX: slideAnims[i].translateX }],
                 opacity: slideAnims[i].opacity,
               },
             ]}
             resizeMode="contain"
           />
         ))}
-
       </View>
 
-      {/* Card */}
+      {/* Bottom area — flex:1 extends bg colour to screen edge */}
       <View style={[styles.cardWrap, { backgroundColor: cardBg }]}>
-        <View style={[styles.card, { paddingBottom: insets.bottom + 20 }]}>
-
-          {/* Slide text — all 4 slides use the same animation */}
+        <View style={[styles.card, { paddingBottom: insets.bottom + 24 }]}>
+          {/* All slide texts stacked — each fades/slides with scroll */}
           <View style={styles.textBlock}>
             {SLIDES.map((slide, i) => (
               <Animated.View
@@ -220,9 +196,8 @@ export default function OnboardingScreen({ onDone }: Props) {
 
           {/* CTA */}
           <TouchableOpacity style={styles.button} onPress={goNext} activeOpacity={0.8}>
-            <Text style={styles.buttonText}>{buttonLabel}</Text>
+            <Text style={styles.buttonText}>{isLast ? 'Get started' : 'Next'}</Text>
           </TouchableOpacity>
-
         </View>
       </View>
     </View>
@@ -230,7 +205,9 @@ export default function OnboardingScreen({ onDone }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: {
+    flex: 1,
+  },
 
   illustrationArea: {
     flex: 1,
@@ -254,14 +231,14 @@ const styles = StyleSheet.create({
   },
 
   textBlock: {
-    height: 175,
-    marginBottom: 16,
+    height: 160,
+    marginBottom: 20,
   },
   heading: {
-    fontSize: 30,
+    fontSize: 32,
     fontFamily: fonts.display.bold,
-    lineHeight: 38,
-    marginBottom: 12,
+    lineHeight: 40,
+    marginBottom: 14,
   },
   body: {
     fontSize: 15,
@@ -272,7 +249,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   dot: {
     height: 8,
@@ -285,7 +262,6 @@ const styles = StyleSheet.create({
     backgroundColor: BUTTON_BG,
     borderRadius: 28,
     paddingVertical: 17,
-    marginBottom: 12,
   },
   buttonText: {
     color: PURPLE,
@@ -293,5 +269,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.2,
   },
-
 })

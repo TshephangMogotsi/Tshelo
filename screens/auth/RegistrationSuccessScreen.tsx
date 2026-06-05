@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   View,
   Text,
@@ -6,17 +7,26 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native'
-import { useState } from 'react'
+import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'RegistrationSuccess'>
 }
+
+const FEATURES = [
+  'SMS payment detection',
+  'Full transparency for members',
+  'Receipt scanning',
+  'Export PDF reports',
+]
 
 export default function RegistrationSuccessScreen({ navigation }: Props) {
   const { refreshProfile } = useAuth()
@@ -24,8 +34,25 @@ export default function RegistrationSuccessScreen({ navigation }: Props) {
 
   async function handleGetStarted() {
     setLoading(true)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      setLoading(false)
+      Alert.alert('Session expired', 'Please log in again.')
+      return
+    }
+
+    const { error } = await supabase.from('users').update({
+      profile_completed: true,
+      onboarding_completed: true,
+    }).eq('id', user.id)
+
+    if (error) {
+      setLoading(false)
+      Alert.alert('Error', error.message)
+      return
+    }
+
     await refreshProfile()
-    // AuthContext switches to MainNavigator automatically
   }
 
   return (
@@ -33,35 +60,42 @@ export default function RegistrationSuccessScreen({ navigation }: Props) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       <View style={styles.container}>
-        {/* ── Glow rings ─────────────────────────────── */}
-        <View style={styles.glowOuter} />
-        <View style={styles.glowInner} />
-
-        {/* ── Illustration ───────────────────────────── */}
-        <View style={styles.illustration}>
-          <Text style={styles.emoji}>🎉</Text>
+        <View style={styles.celebrationWrap}>
+          <Text style={styles.confetti}>🎉</Text>
+          <View style={styles.celebrationCircle}>
+            <Ionicons name="checkmark" size={42} color="#16A34A" />
+          </View>
+          <Text style={styles.sparkle}>✨</Text>
         </View>
 
-        {/* ── Copy ───────────────────────────────────── */}
         <Text style={styles.heading}>You're all set!</Text>
         <Text style={styles.body}>
-          Welcome to Tshelo. Start creating or joining funds with your community.
+          Your account is ready. Let's create your first fund or event.
         </Text>
 
-        {/* ── Actions ────────────────────────────────── */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleGetStarted}
-            activeOpacity={0.85}
-            disabled={loading}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>Get started</Text>
-            }
-          </TouchableOpacity>
+        <View style={styles.freeCard}>
+          <Text style={styles.freeTitle}>Your first fund is FREE</Text>
+          <View style={styles.featureList}>
+            {FEATURES.map(feature => (
+              <View key={feature} style={styles.featureRow}>
+                <Ionicons name="checkmark" size={17} color="#22C55E" />
+                <Text style={styles.featureText}>{feature}</Text>
+              </View>
+            ))}
+          </View>
         </View>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleGetStarted}
+          activeOpacity={0.85}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.primaryButtonText}>Let's Go!</Text>
+          }
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
@@ -74,52 +108,43 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
+    paddingTop: 40,
     paddingBottom: 48,
+    alignItems: 'center',
   },
-
-  // ── Glow rings (decorative)
-  glowOuter: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.5,
-  },
-  glowInner: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.7,
-  },
-
-  // ── Illustration
-  illustration: {
+  celebrationWrap: {
     width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: colors.surface,
+    height: 124,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 36,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 8,
+    marginBottom: 32,
   },
-  emoji: {
-    fontSize: 60,
+  celebrationCircle: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    backgroundColor: '#D2F8E4',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  // ── Copy
+  confetti: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    fontSize: 22,
+    zIndex: 1,
+  },
+  sparkle: {
+    position: 'absolute',
+    right: 2,
+    top: 38,
+    fontSize: 22,
+    zIndex: 1,
+  },
   heading: {
-    fontSize: 32,
+    fontSize: 28,
+    lineHeight: 35,
     fontFamily: fonts.display.bold,
     color: colors.textPrimary,
     textAlign: 'center',
@@ -127,22 +152,51 @@ const styles = StyleSheet.create({
   },
   body: {
     fontSize: 15,
-    color: colors.textSecondary,
+    color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 23,
-    marginBottom: 48,
+    marginBottom: 32,
+    maxWidth: 300,
   },
-
-  // ── Actions
-  actions: {
+  freeCard: {
     width: '100%',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
+    marginBottom: 32,
+  },
+  freeTitle: {
+    fontSize: 17,
+    lineHeight: 23,
+    color: colors.textPrimary,
+    fontWeight: '800',
+    marginBottom: 22,
+  },
+  featureList: {
     gap: 12,
   },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  featureText: {
+    flex: 1,
+    color: '#737373',
+    fontSize: 15,
+    lineHeight: 22,
+  },
   primaryButton: {
-    backgroundColor: colors.primary,
+    width: '100%',
     borderRadius: 28,
     paddingVertical: 17,
+    backgroundColor: colors.primary,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,

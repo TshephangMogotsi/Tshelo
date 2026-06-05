@@ -167,7 +167,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
 
           {/* ── Amount ─────────────────────────────── */}
           <View style={styles.field}>
-            <Text style={styles.label}>Amount (BWP)</Text>
+            <Text style={styles.label}>Amount (P)</Text>
             <View style={styles.currencyRow}>
               <View style={styles.currencyPrefix}>
                 <Text style={styles.currencySymbol}>P</Text>
@@ -185,7 +185,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
             {amountBWP !== '' && !amountValid && (
               <Text style={styles.errorText}>
                 {parsedAmount > MAX_CONTRIBUTION_BWP
-                  ? `Exceeds sandbox cap of BWP ${MAX_CONTRIBUTION_BWP.toLocaleString()}`
+                  ? `Exceeds sandbox cap of P ${MAX_CONTRIBUTION_BWP.toLocaleString()}`
                   : 'Enter a valid amount'}
               </Text>
             )}

@@ -15,64 +15,60 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { RouteProp } from '@react-navigation/native'
 import { AuthStackParamList } from '../../navigation/types'
-import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
-import BankPicker, { BankFormValue } from '../../components/BankPicker'
 import { useTheme } from '../../context/ThemeContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
+  route:      RouteProp<AuthStackParamList, 'Register'>
 }
 
-type MobileMoneyProvider = 'orange_money' | 'myzaka' | 'smega'
-
-type ProviderInfo = { id: MobileMoneyProvider; label: string; color: string; network: string }
-
-const PROVIDER_META: Record<MobileMoneyProvider, Omit<ProviderInfo, 'id'>> = {
-  orange_money: { label: 'Orange Money', color: '#EA6C0A', network: 'Orange Botswana' },
-  myzaka:       { label: 'MyZaka',       color: '#0070C0', network: 'Mascom' },
-  smega:        { label: 'Smega',        color: '#7C3AED', network: 'BTC Botswana' },
+const PHONE_CONFIG: Record<string, { placeholder: string; digits: number }> = {
+  BW: { placeholder: '71 234 567',   digits: 8 },
+  ZA: { placeholder: '82 123 4567',  digits: 9 },
+  ZW: { placeholder: '77 123 4567',  digits: 9 },
+  ZM: { placeholder: '97 123 4567',  digits: 9 },
+  KE: { placeholder: '71 234 5678',  digits: 9 },
+  GH: { placeholder: '24 123 4567',  digits: 9 },
 }
 
-// Detect mobile money provider from the first two digits of an 8-digit BW number
-function detectProvider(digits: string): MobileMoneyProvider | null {
-  if (digits.length < 2) return null
-  const prefix = parseInt(digits.slice(0, 2), 10)
-  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
-  if ([74, 75].includes(prefix))         return 'myzaka'
-  if (prefix === 77)                     return 'smega'
-  return null
-}
+export default function RegisterScreen({ navigation, route }: Props) {
+  const countryCode  = route.params?.countryCode  ?? 'BW'
+  const countryName  = route.params?.countryName  ?? 'Botswana'
+  const currency     = route.params?.currency     ?? 'BWP'
+  const dialCode     = route.params?.dialCode     ?? '+267'
 
-export default function RegisterScreen({ navigation }: Props) {
-  const [name, setName]               = useState('')
-  const [phone, setPhone]             = useState('')
-  const [bank, setBank]               = useState<BankFormValue>({
-    bankName: '', branchCode: '', accountNumber: '', accountType: 'savings',
-  })
-  const [consent, setConsent]         = useState(false)
-  const [loading, setLoading]         = useState(false)
-  const [nameFocused, setNameFocused] = useState(false)
+  const phoneConfig  = PHONE_CONFIG[countryCode] ?? PHONE_CONFIG['BW']
+
+  const { isDark } = useTheme()
+  const inputBg   = isDark ? '#2D2E41' : '#FFFFFF'
+  const textCol   = isDark ? '#F2F2F7' : '#1A1A2E'
+  const mutedCol  = isDark ? '#8A8A9A' : '#9A9A9A'
+  const borderCol = isDark ? '#3A3A5C' : '#E5E7EB'
+  const bg        = isDark ? '#1A1C24' : '#F4F2EB'
+
+  const [name,         setName]         = useState('')
+  const [phone,        setPhone]        = useState('')
+  const [consent,      setConsent]      = useState(false)
+  const [loading,      setLoading]      = useState(false)
+  const [nameFocused,  setNameFocused]  = useState(false)
   const [phoneFocused, setPhoneFocused] = useState(false)
 
   const phoneRef = useRef<TextInput>(null)
 
   const cleanPhone = phone.replace(/\D/g, '')
-  const provider   = detectProvider(cleanPhone)
 
   const isValid =
     name.trim().length >= 2 &&
-    cleanPhone.length === 8 &&
-    provider !== null &&
-    bank.bankName.length > 0 &&
-    bank.accountNumber.length >= 8 &&
+    cleanPhone.length >= phoneConfig.digits &&
     consent
 
-  async function handleSendOTP() {
+  async function handleContinue() {
     if (!isValid) return
-    const fullPhone = `+267${cleanPhone}`
+    const fullPhone = `${dialCode}${cleanPhone}`
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })
     setLoading(false)
@@ -82,50 +78,49 @@ export default function RegisterScreen({ navigation }: Props) {
       mode: 'register',
       registration: {
         name:     name.trim(),
-        provider: provider!,
-        bank,
+        provider: 'orange_money',
+        bank:     { bankName: '', branchCode: '', accountNumber: '', accountType: 'savings' },
       },
     })
   }
-
-  const detectedMeta = provider ? PROVIDER_META[provider] : null
-
-  const { isDark } = useTheme()
-  const bg        = isDark ? '#1A1C24' : '#F4F2EB'
-  const inputBg   = isDark ? '#2D2E41' : '#FFFFFF'
-  const textCol   = isDark ? '#F2F2F7' : colors.textPrimary
-  const mutedCol  = isDark ? '#8A8A9A' : colors.textMuted
-  const borderCol = isDark ? '#3A3A5C' : colors.border
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+
+        {/* ── Title bar ──────────────────────────────── */}
+        <View style={styles.titleBar}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={textCol} />
+          </TouchableOpacity>
+          <Text style={[styles.titleBarText, { color: textCol }]}>Your Details</Text>
+          <View style={styles.titleBarSpacer} />
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={textCol} />
+          {/* ── Country pill ───────────────────────────── */}
+          <TouchableOpacity
+            style={styles.countryPill}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
+          >
+            <View style={styles.countryBadge}>
+              <Text style={styles.countryBadgeText}>{countryCode}</Text>
+            </View>
+            <Text style={styles.countryPillText}>{countryName} • {currency}</Text>
           </TouchableOpacity>
 
-          <View style={styles.header}>
-            <Text style={styles.heading}>Create your account</Text>
-            <Text style={[styles.subheading, { color: mutedCol }]}>
-              Tell us about yourself, we'll verify your number after
-            </Text>
-          </View>
-
-          {/* ── Full name ─────────────────────────────── */}
+          {/* ── Full name ──────────────────────────────── */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: textCol }]}>Full Name</Text>
+            <Text style={[styles.fieldLabel, { color: mutedCol }]}>Full Name</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: inputBg, borderColor: nameFocused ? colors.primary : borderCol, color: textCol }]}
+              style={[styles.input, { backgroundColor: inputBg, borderColor: nameFocused ? '#7439E0' : borderCol, color: textCol }]}
               placeholder="e.g. Kefilwe Moeti"
               placeholderTextColor={mutedCol}
               value={name}
@@ -138,67 +133,47 @@ export default function RegisterScreen({ navigation }: Props) {
             />
           </View>
 
-          {/* ── Phone number ──────────────────────────── */}
+          {/* ── Phone number ───────────────────────────── */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: textCol }]}>Phone Number</Text>
-            <Text style={[styles.fieldSub, { color: mutedCol }]}>
-              Your mobile money provider will be detected automatically.
-            </Text>
-            <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: phoneFocused ? colors.primary : borderCol }]}>
-              <View style={styles.countryCode}>
-                <Text style={styles.flag}>🇧🇼</Text>
-                <Text style={[styles.countryCodeText, { color: textCol }]}>+267</Text>
+            <Text style={[styles.fieldLabel, { color: mutedCol }]}>Phone Number</Text>
+            <View style={styles.phoneRow}>
+              <View style={[styles.dialBox, { backgroundColor: inputBg, borderColor: borderCol }]}>
+                <Text style={[styles.dialText, { color: textCol }]}>{dialCode}</Text>
               </View>
-              <View style={[styles.divider, { backgroundColor: borderCol }]} />
               <TextInput
                 ref={phoneRef}
-                style={[styles.phoneInput, { color: textCol }]}
-                placeholder="71 000 000"
+                style={[styles.phoneInput, { backgroundColor: inputBg, borderColor: phoneFocused ? '#7439E0' : borderCol, color: textCol }]}
+                placeholder={phoneConfig.placeholder}
                 placeholderTextColor={mutedCol}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
                 onFocus={() => setPhoneFocused(true)}
                 onBlur={() => setPhoneFocused(false)}
-                maxLength={9}
-                returnKeyType="next"
+                maxLength={phoneConfig.digits + 2}
+                returnKeyType="done"
               />
             </View>
-
-            {detectedMeta ? (
-              <View style={[styles.providerPill, { backgroundColor: detectedMeta.color + '18' }]}>
-                <View style={[styles.providerDot, { backgroundColor: detectedMeta.color }]} />
-                <Text style={[styles.providerPillText, { color: detectedMeta.color }]}>
-                  {detectedMeta.label} · {detectedMeta.network}
-                </Text>
-                <Ionicons name="checkmark-circle" size={15} color={detectedMeta.color} />
-              </View>
-            ) : cleanPhone.length >= 2 ? (
-              <View style={styles.providerUnknown}>
-                <Ionicons name="alert-circle-outline" size={14} color={mutedCol} />
-                <Text style={[styles.providerUnknownText, { color: mutedCol }]}>
-                  Number not recognised — mobile money may not be available
-                </Text>
-              </View>
-            ) : null}
           </View>
 
-          {/* ── Bank details ──────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={[styles.sectionLabel, { color: textCol }]}>Banking Details <Text style={[styles.sectionLabelOptional, { color: textCol }]}>(OPTIONAL)</Text></Text>
+          {/* ── Important notice ───────────────────────── */}
+          <View style={styles.importantCard}>
+            <Text style={styles.importantText}>
+              <Text style={styles.importantBold}>⚠️ Important: </Text>
+              This must be YOUR mobile money number. Contributors will send money here.
+            </Text>
           </View>
-          <BankPicker value={bank} onChange={setBank} isDark={isDark} inputBg={inputBg} textCol={textCol} mutedCol={mutedCol} borderCol={borderCol} />
 
-          {/* ── Consent ───────────────────────────────── */}
+          {/* ── Consent ────────────────────────────────── */}
           <TouchableOpacity
             style={[styles.consentRow, { backgroundColor: inputBg, borderColor: borderCol }]}
             onPress={() => setConsent(v => !v)}
             activeOpacity={0.8}
           >
-            <View style={[styles.checkbox, { borderColor: isDark ? '#6B6B7B' : borderCol, backgroundColor: isDark && !consent ? '#3A3A4A' : 'transparent' }, consent && styles.checkboxChecked]}>
+            <View style={[styles.checkbox, { borderColor: consent ? '#7439E0' : borderCol }, consent && styles.checkboxChecked]}>
               {consent && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
-            <Text style={[styles.consentText, { color: isDark ? 'rgba(255,255,255,0.8)' : mutedCol }]}>
+            <Text style={[styles.consentText, { color: mutedCol }]}>
               I agree to Tshelo's{' '}
               <Text style={styles.consentLink}>Terms of Service</Text>
               {' '}and{' '}
@@ -207,25 +182,21 @@ export default function RegisterScreen({ navigation }: Props) {
             </Text>
           </TouchableOpacity>
 
-          {/* ── Submit ────────────────────────────────── */}
+          {/* ── Continue ───────────────────────────────── */}
           <TouchableOpacity
             style={[styles.primaryButton, isValid && styles.buttonActive]}
-            onPress={handleSendOTP}
+            onPress={handleContinue}
             activeOpacity={isValid ? 0.85 : 1}
             disabled={loading}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>Create an Account</Text>
+              : <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
+                  Continue
+                </Text>
             }
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={[styles.footerText, { color: textCol }]}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.replace('Login')}>
-              <Text style={styles.footerLink}>Log in</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -233,204 +204,182 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1 },
-  flex:  { flex: 1 },
+  safe: { flex: 1 },
+  flex: { flex: 1 },
+
+  // ── Title bar ───────────────────────────────────────────────
+  titleBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleBarText: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: fonts.display.bold,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  titleBarSpacer: { width: 36 },
+
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 48,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 36,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  header: { marginBottom: 32 },
-  heading: {
-    fontSize: 30,
-    fontFamily: fonts.display.bold,
-    color: '#9D86FF',
-    marginBottom: 8,
-  },
-  subheading: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  field: { marginBottom: 24 },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 6,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  sectionLabelOptional: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  fieldSub: {
-    fontSize: 12,
-    color: '#4A4A4A',
-    lineHeight: 18,
-    marginBottom: 10,
-    marginTop: -2,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    fontSize: 16,
-    color: colors.textPrimary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  inputFocused: {
-    borderColor: colors.borderFocus,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  rowFocused: {
-    borderColor: colors.borderFocus,
-  },
-  countryCode: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 16,
-    gap: 6,
-  },
-  flag: { fontSize: 18 },
-  countryCodeText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
-  },
-  phoneInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  providerPill: {
+
+  // ── Country pill ────────────────────────────────────────────
+  countryPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    gap: 6,
+    backgroundColor: '#EDE9FE',
+    borderRadius: 28,
+    paddingRight: 16,
+    paddingVertical: 4,
+    paddingLeft: 4,
+    gap: 10,
+    marginBottom: 28,
   },
-  providerDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  countryBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#C4B5FD',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  providerPillText: {
+  countryBadgeText: {
     fontSize: 13,
+    fontWeight: '800',
+    color: '#5B21B6',
+  },
+  countryPillText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7439E0',
+  },
+
+  // ── Form fields ─────────────────────────────────────────────
+  field:      { marginBottom: 20 },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    minHeight: 56,
+  },
+
+  // ── Phone ───────────────────────────────────────────────────
+  phoneRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  dialBox: {
+    width: 80,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  dialText: {
+    fontSize: 16,
     fontWeight: '600',
   },
-  providerUnknown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  providerUnknownText: {
-    fontSize: 12,
-    color: colors.textMuted,
+  phoneInput: {
     flex: 1,
-    lineHeight: 18,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
   },
+
+  // ── Important card ──────────────────────────────────────────
+  importantCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  importantText: {
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 21,
+  },
+  importantBold: {
+    fontWeight: '700',
+  },
+
+  // ── Consent ─────────────────────────────────────────────────
   consentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
     marginBottom: 28,
-    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
     marginTop: 1,
+    backgroundColor: 'transparent',
   },
   checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#7439E0',
+    borderColor: '#7439E0',
   },
   consentText: {
     flex: 1,
     fontSize: 13,
-    color: colors.textSecondary,
     lineHeight: 20,
   },
-  consentLink: { color: colors.primaryMid, fontWeight: '600' },
+  consentLink: {
+    color: '#7439E0',
+    fontWeight: '600',
+  },
+
+  // ── Button ──────────────────────────────────────────────────
   primaryButton: {
     backgroundColor: '#D4D4D8',
     borderRadius: 28,
     paddingVertical: 17,
     alignItems: 'center',
-    marginBottom: 24,
   },
   buttonActive: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
+    backgroundColor: '#7439E0',
+    shadowColor: '#7439E0',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
   primaryButtonText: {
-    color: '#676767',
+    color: '#9A9A9A',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
@@ -438,10 +387,4 @@ const styles = StyleSheet.create({
   primaryButtonTextActive: {
     color: '#FFFFFF',
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  footerText: { fontSize: 14, color: colors.textSecondary },
-  footerLink: { fontSize: 14, fontWeight: '700', color: colors.primaryMid },
 })

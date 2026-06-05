@@ -106,7 +106,7 @@ const PROVIDER_COLORS: Record<MobileMoneyProvider, string> = {
 type Styles = ReturnType<typeof makeStyles>
 
 function thebeToBWP(thebe: number): string {
-  return `BWP ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
+  return `P ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
 }
 
 function formatDate(iso: string): string {
