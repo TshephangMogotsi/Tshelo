@@ -1,17 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Alert,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
@@ -21,6 +11,8 @@ import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
+import { hapticSuccess, hapticError } from '../../lib/haptics'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OTP'>
@@ -43,6 +35,7 @@ function detectProvider(phone: string): MobileMoneyNumber['provider'] {
 export default function OTPScreen({ navigation, route }: Props) {
   const { phone, mode, registration, mobileMoneyReturn } = route.params
   const { refreshProfile } = useAuth()
+  const requireOnline = useRequireOnline()
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [countdown, setCountdown] = useState(RESEND_COUNTDOWN)
   const [loading, setLoading] = useState(false)
@@ -82,6 +75,7 @@ export default function OTPScreen({ navigation, route }: Props) {
       return
     }
 
+    if (!requireOnline()) return
     const { error } = await supabase.auth.signInWithOtp({ phone })
     if (error) { Alert.alert('Error', error.message); return }
     setCountdown(RESEND_COUNTDOWN)
@@ -111,35 +105,42 @@ export default function OTPScreen({ navigation, route }: Props) {
       return
     }
 
+    if (!requireOnline()) { setLoading(false); return }
     const { data, error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
 
     if (error) {
       setLoading(false)
+      hapticError()
       Alert.alert('Invalid code', 'The code is incorrect or has expired. Try again.')
       return
     }
 
+    hapticSuccess()
     const userId = data.user?.id
     if (!userId) { setLoading(false); return }
 
     if (registration) {
       const now = new Date().toISOString()
-      await supabase.from('users').update({
-        name: registration.name,
+      const { error: updateError } = await supabase.from('users').update({
+        name:  registration.name,
         mobile_money_provider: registration.provider,
-        bank_name:         registration.bank.bankName,
-        bank_branch_code:  registration.bank.branchCode,
+        bank_name:           registration.bank.bankName,
+        bank_branch_code:    registration.bank.branchCode,
         bank_account_number: registration.bank.accountNumber,
-        bank_account_type: registration.bank.accountType,
-        profile_completed: true,
-        onboarding_completed: true,
-        terms_accepted_at: now,
-        terms_version: '1.0',
-        privacy_accepted_at: now,
-        privacy_version: '1.0',
-        data_processing_consent: true,
+        profile_completed:          true,
+        onboarding_completed:       true,
+        terms_accepted_at:          now,
+        terms_version:              '1.0',
+        privacy_accepted_at:        now,
+        privacy_version:            '1.0',
+        data_processing_consent:    true,
         data_processing_consent_at: now,
       }).eq('id', userId)
+      if (updateError) {
+        Alert.alert('Registration error', updateError.message)
+        setLoading(false)
+        return
+      }
       setLoading(false)
       navigation.navigate('BankDetails', {
         name: registration.name,

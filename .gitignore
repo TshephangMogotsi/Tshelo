@@ -40,3 +40,12 @@ yarn-error.*
 /ios
 /android
 .env
+
+# MCP config contains a Supabase access token — never commit
+.mcp.json
+
+# Firebase service account keys — never commit
+*firebase-adminsdk*.json
+
+# Supabase CLI temp files
+supabase/.temp/

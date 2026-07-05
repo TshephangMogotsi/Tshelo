@@ -1,20 +1,11 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  Linking,
-  Share,
-  Alert,
-} from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Linking, Share, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
+import { fundPreviewUrl } from '../../lib/supabase'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
@@ -41,34 +32,47 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
-  const { fundName, category, emoji, goalBWP, targetDate } = route.params
+  const { fundName, category, emoji, goalBWP, targetDate, shareCode, fundId } = route.params
 
-  const fundCode   = 'ABC123'
-  const inviteLink = `tshelo.com/join/${fundCode}`
-  const message    = `"Dumelang family! 🙏 I've created a fund for ${fundName} on Tshelo. Join here to contribute and see all payments transparently: ${inviteLink}"`
+  const fundCode   = shareCode ?? '—'
+  const inviteLink = shareCode ? fundPreviewUrl(shareCode) : 'https://tshelo.app'
+  const message    = `Dumelang! 🙏 I've created a fund for *${fundName}* on Tshelo. Join here to contribute and see all payments transparently:\n\n${inviteLink}`
 
   async function handleWhatsApp() {
     const url = `whatsapp://send?text=${encodeURIComponent(message)}`
     const canOpen = await Linking.canOpenURL(url)
     if (canOpen) {
-      Linking.openURL(url)
+      await Linking.openURL(url)
     } else {
       Alert.alert('WhatsApp not found', 'Please install WhatsApp to share via it.')
     }
+    handleDone()
   }
 
   async function handleSMS() {
-    Linking.openURL(`sms:?body=${encodeURIComponent(message)}`)
+    await Linking.openURL(`sms:?body=${encodeURIComponent(message)}`)
+    handleDone()
   }
 
   async function handleCopyLink() {
     try {
       await Share.share({ message: inviteLink })
     } catch (_) {}
+    handleDone()
   }
 
-  function handleSkip() {
-    navigation.popToTop()
+  function handleDone() {
+    if (fundId) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'Tabs' as any },
+          { name: 'FundDetail', params: { fundId } },
+        ],
+      })
+    } else {
+      navigation.popToTop()
+    }
   }
 
   return (
@@ -102,7 +106,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
             <View style={styles.fundIconCircle}>
               <Text style={styles.fundEmoji}>{emoji}</Text>
             </View>
-            <View>
+            <View style={styles.fundNameWrap}>
               <Text style={styles.fundName}>{fundName}</Text>
               <View style={styles.categoryTag}>
                 <Text style={styles.categoryTagText}>{category}</Text>
@@ -126,6 +130,15 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
               <Text style={styles.statValue}>Just you</Text>
             </View>
           </View>
+
+          {shareCode ? (
+            <>
+              <View style={styles.summaryDivider} />
+              <Text style={styles.codeLabel}>INVITE CODE</Text>
+              <Text style={styles.codeValue}>{shareCode}</Text>
+              <Text style={styles.codeHint}>Share this code with anyone you want to invite</Text>
+            </>
+          ) : null}
         </View>
 
         {/* ── Invite section ─────────────────────── */}
@@ -157,7 +170,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
         </View>
 
         {/* ── Skip ───────────────────────────────── */}
-        <TouchableOpacity onPress={handleSkip} activeOpacity={0.7} style={styles.skipBtn}>
+        <TouchableOpacity onPress={handleDone} activeOpacity={0.7} style={styles.skipBtn}>
           <Text style={styles.skipText}>I'll invite people later</Text>
         </TouchableOpacity>
 
@@ -254,6 +267,9 @@ function makeStyles(colors: AppColors) {
       justifyContent: 'center',
     },
     fundEmoji: { fontSize: 20 },
+    fundNameWrap: {
+      flex: 1,
+    },
     fundName: {
       fontSize: 16,
       fontWeight: '700',
@@ -276,6 +292,25 @@ function makeStyles(colors: AppColors) {
       height: 1,
       backgroundColor: colors.border,
       marginBottom: 16,
+      marginTop: 16,
+    },
+    codeLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 1,
+      color: colors.textMuted,
+      marginBottom: 6,
+    },
+    codeValue: {
+      fontSize: 22,
+      fontWeight: '900',
+      letterSpacing: 3,
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    codeHint: {
+      fontSize: 12,
+      color: colors.textMuted,
     },
     statsRow: {
       flexDirection: 'row',

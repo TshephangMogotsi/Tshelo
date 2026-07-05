@@ -1,0 +1,63 @@
+TSHELO FUND MEMBER PROFILE VISIBILITY — SQL TO APPLY
+========================================================
+
+Purpose
+-------
+Fixes: co-members and pending join requesters show as "Unknown" everywhere
+in the app (Members tab, Pending Requests, contribution autosuggest,
+expense "Paid By" picker) — both before AND after approval.
+
+Root cause, confirmed via:
+  supabase db query --linked "select policyname, cmd, qual from pg_policies where tablename='users';"
+which returned only:
+  users_select_own  SELECT  (id = auth.uid())
+  users_update_own  UPDATE  (id = auth.uid())
+
+So `public.users` has exactly one SELECT policy, and it only lets a user
+read their OWN row. Every place in the app that embeds `user:users!user_id
+(name, phone)` through a fund_members join silently returns null for any
+row that isn't the caller's own — this was already broken for viewing any
+other real member's name in any fund (public or private), not just the new
+pending-approval feature. It just hadn't been exercised with two distinct
+accounts until now.
+
+Why not just widen users_select_own to "any fund co-member can see your
+row"? Because public.users also holds bank_account_number, bank_account_name,
+security_answer_1_hash/2/3, recovery_phone, recovery_email, mobile_money_number,
+etc. RLS is row-level, not column-level — a policy permissive enough to let
+a co-member read your name would also expose all of that. Instead, this adds
+a narrow SECURITY DEFINER function that returns only id/name/phone, and only
+for people who share a fund with the caller.
+
+
+1. Narrow profile-lookup function
+------------------------------------
+
+CREATE OR REPLACE FUNCTION public.get_fund_member_profiles(p_fund_id uuid)
+RETURNS TABLE(member_row_id uuid, user_id uuid, name text, phone text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT fm.id, u.id, u.name, u.phone
+  FROM fund_members fm
+  JOIN users u ON u.id = fm.user_id
+  WHERE fm.fund_id = p_fund_id
+    AND EXISTS (
+      SELECT 1 FROM fund_members caller
+      WHERE caller.fund_id = p_fund_id AND caller.user_id = auth.uid()
+    );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_fund_member_profiles(uuid) TO authenticated;
+
+
+Result once applied
+--------------------
+Only exposes name + phone (not bank details, security answers, etc), and
+only for a fund the caller is themselves a fund_members row of (any status
+— owner, admin, member, or pending), scoped to that one fund_id. App code
+(FundDetailScreen members + pending requests, RecordContributionScreen
+autosuggest, RecordExpenseScreen "Paid By") is being switched from the
+direct `users` embed to calling this RPC once per screen and merging by
+user_id/member_row_id.

@@ -1,109 +1,192 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Image,
-  Alert,
-} from 'react-native'
-import * as ImagePicker from 'expo-image-picker'
+  Text, StyleSheet, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
+import { supabase } from '../../lib/supabase'
+import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
-import { fonts } from '../../theme/typography'
+import { CategoryOption, MAX_EXPENSE_BWP } from './recordExpense/categories'
+import { pickFromLibrary, takePhoto, uploadReceipt } from './recordExpense/receipt'
+import ChooseMethodStep from './recordExpense/ChooseMethodStep'
+import ManualEntryStep, { PayerOption } from './recordExpense/ManualEntryStep'
+import ReviewStep, { ReviewItem } from './recordExpense/ReviewStep'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'RecordExpense'>
-  route: RouteProp<MainStackParamList, 'RecordExpense'>
+  route:      RouteProp<MainStackParamList, 'RecordExpense'>
 }
 
-const CATEGORIES = [
-  'Funeral Services',
-  'Catering',
-  'Transport',
-  'Venue',
-  'Clothing',
-  'Flowers & Décor',
-  'Printing',
-  'Other',
-]
-
-const MAX_EXPENSE_BWP = 10000
+type Step = 'choose' | 'manual' | 'review'
 
 export default function RecordExpenseScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
+  const { userId, userName } = useAuth()
+  const requireOnline = useRequireOnline()
   const styles = makeStyles(colors)
 
-  const { fundId, fundTitle } = route.params
+  const { fundId, fundTitle, currencyCode } = route.params
+  const currencySymbol = currencyCode === 'BWP' ? 'P' : currencyCode
 
+  const [step, setStep]               = useState<Step>('choose')
+  const [receiptUri, setReceiptUri]   = useState<string | null>(null)
+  const [isSaving, setIsSaving]       = useState(false)
+  const [payers, setPayers]           = useState<PayerOption[]>([])
+
+  // ── Manual entry state ──────────────────────────────────
   const [vendor, setVendor]           = useState('')
-  const [category, setCategory]       = useState<string | null>(null)
+  const [category, setCategory]       = useState<CategoryOption | null>(null)
+  const [location, setLocation]       = useState('')
+  const [description, setDescription] = useState('')
   const [amountBWP, setAmountBWP]     = useState('')
-  const [expenseDate, setExpenseDate] = useState(
-    new Date().toISOString().split('T')[0]
-  )
-  const [notes, setNotes]           = useState('')
-  const [receiptUri, setReceiptUri] = useState<string | null>(null)
+  const [paidBy, setPaidBy]           = useState('self')
+
+  useEffect(() => {
+    let active = true
+    async function loadPayers() {
+      const [{ data: memberRows }, { data: profiles }] = await Promise.all([
+        supabase.from('fund_members').select('user_id').eq('fund_id', fundId).eq('status', 'joined'),
+        supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
+      ])
+
+      if (!active || !memberRows) return
+
+      const nameByUserId = new Map<string, string>(
+        (profiles ?? []).map((p: any) => [p.user_id, p.name])
+      )
+
+      const others = memberRows
+        .filter(m => m.user_id && m.user_id !== userId)
+        .map(m => ({
+          id:     m.user_id as string,
+          userId: m.user_id as string,
+          name:   nameByUserId.get(m.user_id as string) ?? 'Member',
+        }))
+
+      setPayers(others)
+    }
+    loadPayers()
+    return () => { active = false }
+  }, [fundId, userId])
 
   const parsedAmount = parseFloat(amountBWP.replace(/,/g, ''))
   const amountValid  = !isNaN(parsedAmount) && parsedAmount > 0 && parsedAmount <= MAX_EXPENSE_BWP
+  const isManualValid = vendor.trim().length >= 2 && amountValid
 
-  const isValid = vendor.trim().length >= 2 && amountValid
-
-  function handleAmountChange(text: string) {
-    setAmountBWP(text.replace(/[^0-9.]/g, ''))
+  async function handleScanReceipt() {
+    const uri = await takePhoto()
+    if (!uri) return
+    setReceiptUri(uri)
+    setStep('review')
   }
 
-  function handleDateChange(text: string) {
-    const digits = text.replace(/\D/g, '').slice(0, 8)
-    let formatted = digits
-    if (digits.length > 4) formatted = digits.slice(0, 4) + '-' + digits.slice(4)
-    if (digits.length > 6) formatted = digits.slice(0, 4) + '-' + digits.slice(4, 6) + '-' + digits.slice(6)
-    setExpenseDate(formatted)
+  async function handleUploadReceipt() {
+    const uri = await pickFromLibrary()
+    if (!uri) return
+    setReceiptUri(uri)
+    setStep('review')
   }
 
-  async function handlePickReceipt() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow photo access to attach a receipt.')
+  function handleBack() {
+    if (step === 'choose') {
+      navigation.goBack()
       return
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    })
-    if (!result.canceled && result.assets.length > 0) {
-      setReceiptUri(result.assets[0].uri)
+    setStep('choose')
+    setReceiptUri(null)
+  }
+
+  async function handleSaveManual() {
+    if (!isManualValid || isSaving || !userId) return
+    if (!requireOnline()) return
+    setIsSaving(true)
+
+    try {
+      let receiptUrl: string | null = null
+      if (receiptUri) {
+        receiptUrl = await uploadReceipt(fundId, userId, receiptUri)
+      }
+
+      const baseDescription = description.trim() || vendor.trim()
+      const finalDescription = location.trim()
+        ? `${baseDescription} · ${location.trim()}`
+        : baseDescription
+
+      const payer = paidBy !== 'self' ? payers.find(p => p.id === paidBy) : null
+
+      const { error } = await supabase.from('expenses').insert({
+        fund_id:       fundId,
+        added_by:      userId,
+        description:   finalDescription,
+        vendor_name:   vendor.trim(),
+        amount:        parsedAmount,
+        currency_code: currencyCode,
+        ...(category   ? { category: category.value } : {}),
+        ...(receiptUrl ? { receipt_url: receiptUrl }  : {}),
+        ...(payer      ? { is_sponsored: true, sponsored_by_user_id: payer.userId, sponsored_by_name: payer.name } : {}),
+      })
+
+      if (error) {
+        hapticError()
+        Alert.alert('Could not save expense', error.message)
+        return
+      }
+
+      hapticSuccess()
+      navigation.goBack()
+    } catch (e) {
+      hapticError()
+      Alert.alert('Could not save expense', e instanceof Error ? e.message : 'Please try again.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  async function handleTakePhoto() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow camera access to photograph a receipt.')
-      return
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 })
-    if (!result.canceled && result.assets.length > 0) {
-      setReceiptUri(result.assets[0].uri)
-    }
-  }
+  async function handleSaveReview(shopName: string, includedItems: ReviewItem[]) {
+    if (isSaving || !userId) return
+    setIsSaving(true)
 
-  function handleReceiptOptions() {
-    Alert.alert('Attach Receipt', 'Choose a source', [
-      { text: 'Take Photo',          onPress: handleTakePhoto },
-      { text: 'Choose from Library', onPress: handlePickReceipt },
-      { text: 'Cancel', style: 'cancel' },
-    ])
+    try {
+      let receiptUrl: string | null = null
+      if (receiptUri) {
+        receiptUrl = await uploadReceipt(fundId, userId, receiptUri)
+      }
+
+      const rows = includedItems.map(item => ({
+        fund_id:       fundId,
+        added_by:      userId,
+        description:   item.name.trim(),
+        item_name:     item.name.trim(),
+        vendor_name:   shopName.trim(),
+        amount:        parseFloat(item.amount),
+        quantity:      1,
+        unit_price:    parseFloat(item.amount),
+        currency_code: currencyCode,
+        ...(item.category ? { category: item.category.value } : {}),
+        ...(receiptUrl    ? { receipt_url: receiptUrl }        : {}),
+      }))
+
+      const { error } = await supabase.from('expenses').insert(rows)
+
+      if (error) {
+        hapticError()
+        Alert.alert('Could not save expense', error.message)
+        return
+      }
+
+      hapticSuccess()
+      navigation.goBack()
+    } catch (e) {
+      hapticError()
+      Alert.alert('Could not save expense', e instanceof Error ? e.message : 'Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -119,167 +202,55 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header ─────────────────────────────── */}
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={isSaving}>
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
 
-          <View style={styles.header}>
-            <Text style={styles.heading}>Record Expense</Text>
-            <Text style={styles.subheading} numberOfLines={1}>{fundTitle}</Text>
-          </View>
-
-          {/* ── Vendor ─────────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Vendor / Payee</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Mmoloki Funeral Home"
-              placeholderTextColor={colors.textMuted}
-              value={vendor}
-              onChangeText={setVendor}
-              autoCapitalize="words"
-              returnKeyType="next"
+          {step === 'choose' && (
+            <ChooseMethodStep
+              fundTitle={fundTitle}
+              onScan={handleScanReceipt}
+              onUpload={handleUploadReceipt}
+              onManual={() => setStep('manual')}
             />
-          </View>
+          )}
 
-          {/* ── Category ───────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Category <Text style={styles.optional}>(optional)</Text></Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryScroll}
-            >
-              {CATEGORIES.map(cat => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.categoryPill,
-                    category === cat && styles.categoryPillActive,
-                  ]}
-                  onPress={() => setCategory(category === cat ? null : cat)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[
-                    styles.categoryPillText,
-                    category === cat && styles.categoryPillTextActive,
-                  ]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* ── Amount ─────────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Amount (P)</Text>
-            <View style={styles.currencyRow}>
-              <View style={styles.currencyPrefix}>
-                <Text style={styles.currencySymbol}>P</Text>
-              </View>
-              <TextInput
-                style={styles.currencyInput}
-                placeholder="0.00"
-                placeholderTextColor={colors.textMuted}
-                value={amountBWP}
-                onChangeText={handleAmountChange}
-                keyboardType="decimal-pad"
-                returnKeyType="next"
-              />
-            </View>
-            {amountBWP !== '' && !amountValid && (
-              <Text style={styles.errorText}>
-                {parsedAmount > MAX_EXPENSE_BWP
-                  ? `Exceeds sandbox cap of P ${MAX_EXPENSE_BWP.toLocaleString()}`
-                  : 'Enter a valid amount'}
-              </Text>
-            )}
-          </View>
-
-          {/* ── Expense date ───────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Date of Expense</Text>
-            <View style={styles.dateRow}>
-              <Text style={styles.dateIcon}>📅</Text>
-              <TextInput
-                style={styles.dateInput}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textMuted}
-                value={expenseDate}
-                onChangeText={handleDateChange}
-                keyboardType="number-pad"
-                maxLength={10}
-                returnKeyType="next"
-              />
-            </View>
-          </View>
-
-          {/* ── Receipt ────────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Receipt <Text style={styles.optional}>(optional)</Text></Text>
-
-            {receiptUri ? (
-              <View style={styles.receiptPreview}>
-                <Image source={{ uri: receiptUri }} style={styles.receiptImage} resizeMode="cover" />
-                <TouchableOpacity
-                  style={styles.removeReceiptBtn}
-                  onPress={() => setReceiptUri(null)}
-                >
-                  <Text style={styles.removeReceiptText}>✕ Remove</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.receiptUploadBox}
-                onPress={handleReceiptOptions}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.receiptUploadEmoji}>📷</Text>
-                <Text style={styles.receiptUploadTitle}>Attach Receipt</Text>
-                <Text style={styles.receiptUploadHint}>Photo or from library</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* ── Notes ──────────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Notes <Text style={styles.optional}>(optional)</Text></Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Any additional context…"
-              placeholderTextColor={colors.textMuted}
-              value={notes}
-              onChangeText={setNotes}
-              maxLength={200}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
+          {step === 'manual' && (
+            <ManualEntryStep
+              fundTitle={fundTitle}
+              currencySymbol={currencySymbol}
+              isSaving={isSaving}
+              userName={userName}
+              payers={payers}
+              vendor={vendor}
+              onVendorChange={setVendor}
+              category={category}
+              onCategoryChange={setCategory}
+              location={location}
+              onLocationChange={setLocation}
+              description={description}
+              onDescriptionChange={setDescription}
+              amountBWP={amountBWP}
+              onAmountChange={text => setAmountBWP(text.replace(/[^0-9.]/g, ''))}
+              parsedAmount={parsedAmount}
+              paidBy={paidBy}
+              onPaidByChange={setPaidBy}
+              receiptUri={receiptUri}
+              onReceiptChange={setReceiptUri}
+              isValid={isManualValid}
+              onSave={handleSaveManual}
             />
-            <Text style={styles.charCount}>{notes.length}/200</Text>
-          </View>
+          )}
 
-          {/* ── Audit note ─────────────────────────── */}
-          <View style={styles.auditCard}>
-            <Text style={styles.auditText}>
-              🔒 This expense will be recorded in the fund's audit log with your name and a timestamp. It cannot be deleted.
-            </Text>
-          </View>
-
-          {/* ── Submit ─────────────────────────────── */}
-          <TouchableOpacity
-            style={[styles.primaryButton, isValid && styles.buttonActive]}
-            activeOpacity={isValid ? 0.85 : 1}
-            onPress={() => {
-              if (!isValid) return
-              navigation.goBack()
-            }}
-          >
-            <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
-              Save Expense
-            </Text>
-          </TouchableOpacity>
+          {step === 'review' && (
+            <ReviewStep
+              fundTitle={fundTitle}
+              receiptUri={receiptUri}
+              currencySymbol={currencySymbol}
+              isSaving={isSaving}
+              onSave={handleSaveReview}
+            />
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -315,210 +286,6 @@ function makeStyles(colors: AppColors) {
     backIcon: {
       fontSize: 20,
       color: colors.textPrimary,
-    },
-    header: {
-      marginBottom: 28,
-    },
-    heading: {
-      fontSize: 30,
-      fontFamily: fonts.display.bold,
-      color: colors.heading,
-      marginBottom: 4,
-    },
-    subheading: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    field: {
-      marginBottom: 22,
-    },
-    label: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      marginBottom: 10,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    optional: {
-      fontSize: 12,
-      color: colors.textMuted,
-      textTransform: 'none',
-      fontWeight: '400',
-      letterSpacing: 0,
-    },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 16,
-      paddingHorizontal: 16,
-      paddingVertical: 15,
-      fontSize: 16,
-      color: colors.textPrimary,
-    },
-    textArea: {
-      minHeight: 88,
-      paddingTop: 14,
-    },
-    categoryScroll: {
-      gap: 8,
-      paddingRight: 8,
-    },
-    categoryPill: {
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 20,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      backgroundColor: colors.surface,
-    },
-    categoryPillActive: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primaryLight,
-    },
-    categoryPillText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textSecondary,
-    },
-    categoryPillTextActive: {
-      color: colors.primary,
-    },
-    currencyRow: {
-      flexDirection: 'row',
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 16,
-      backgroundColor: colors.surface,
-      overflow: 'hidden',
-    },
-    currencyPrefix: {
-      paddingHorizontal: 16,
-      paddingVertical: 15,
-      borderRightWidth: 1,
-      borderRightColor: colors.border,
-      backgroundColor: colors.background,
-      justifyContent: 'center',
-    },
-    currencySymbol: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    currencyInput: {
-      flex: 1,
-      fontSize: 16,
-      color: colors.textPrimary,
-      paddingHorizontal: 16,
-      paddingVertical: 15,
-    },
-    errorText: {
-      fontSize: 12,
-      color: colors.error,
-      marginTop: 4,
-    },
-    dateRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 16,
-      paddingHorizontal: 16,
-      gap: 10,
-    },
-    dateIcon: {
-      fontSize: 18,
-    },
-    dateInput: {
-      flex: 1,
-      fontSize: 16,
-      color: colors.textPrimary,
-      paddingVertical: 15,
-    },
-    receiptUploadBox: {
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderStyle: 'dashed',
-      borderRadius: 16,
-      paddingVertical: 28,
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      gap: 6,
-    },
-    receiptUploadEmoji: {
-      fontSize: 32,
-      marginBottom: 4,
-    },
-    receiptUploadTitle: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    receiptUploadHint: {
-      fontSize: 12,
-      color: colors.textMuted,
-    },
-    receiptPreview: {
-      borderRadius: 14,
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    receiptImage: {
-      width: '100%',
-      height: 200,
-    },
-    removeReceiptBtn: {
-      backgroundColor: colors.errorLight,
-      padding: 12,
-      alignItems: 'center',
-    },
-    removeReceiptText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.error,
-    },
-    charCount: {
-      fontSize: 11,
-      color: colors.textMuted,
-      textAlign: 'right',
-      marginTop: 4,
-    },
-    auditCard: {
-      backgroundColor: colors.primaryLight,
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 24,
-    },
-    auditText: {
-      fontSize: 13,
-      color: colors.textSecondary,
-      lineHeight: 20,
-    },
-    primaryButton: {
-      backgroundColor: colors.disabled,
-      borderRadius: 28,
-      paddingVertical: 17,
-      alignItems: 'center',
-    },
-    buttonActive: {
-      backgroundColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      elevation: 6,
-    },
-    primaryButtonText: {
-      color: colors.disabledText,
-      fontSize: 16,
-      fontWeight: '700',
-      letterSpacing: 0.2,
-    },
-    primaryButtonTextActive: {
-      color: '#FFFFFF',
     },
   })
 }

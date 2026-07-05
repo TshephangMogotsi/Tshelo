@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
+import { unregisterPushToken } from '../lib/pushNotifications'
 
 type AuthContextType = {
   isAuthenticated: boolean
   profileCompleted: boolean
+  userId: string | null
   userName: string
   tokenBalance: number
   refreshProfile: () => Promise<void>
@@ -15,14 +17,16 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [profileCompleted, setProfileCompleted] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const [userName, setUserName] = useState('')
   const [tokenBalance, setTokenBalance] = useState(0)
 
-  async function checkProfile(userId: string) {
+  async function checkProfile(uid: string) {
+    setUserId(uid)
     const { data } = await supabase
       .from('users')
       .select('profile_completed, name, token_balance')
-      .eq('id', userId)
+      .eq('id', uid)
       .single()
     setProfileCompleted(data?.profile_completed ?? false)
     setUserName(data?.name ?? '')
@@ -50,15 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    await unregisterPushToken()
     await supabase.auth.signOut()
     setIsAuthenticated(false)
     setProfileCompleted(false)
+    setUserId(null)
     setUserName('')
     setTokenBalance(0)
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, profileCompleted, userName, tokenBalance, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ isAuthenticated, profileCompleted, userId, userName, tokenBalance, refreshProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   )

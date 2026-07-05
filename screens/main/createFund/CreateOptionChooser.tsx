@@ -1,0 +1,193 @@
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { useTheme } from '../../../context/ThemeContext'
+import type { AppColors } from '../../../theme/themes'
+import FlowHeader from './FlowHeader'
+import {
+  BRAND_ACCENT,
+  BRAND_LAVENDER,
+  BRAND_PURPLE,
+  BRAND_PURPLE_DARK,
+  CREATE_OPTIONS,
+  CreateOption,
+} from './constants'
+
+type Props = {
+  onSelect: (option: CreateOption) => void
+  onBack: () => void
+}
+
+export default function CreateOptionChooser({ onSelect, onBack }: Props) {
+  const { colors, isDark } = useTheme()
+  const styles = makeStyles(colors)
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+
+      <FlowHeader title="Create" centered large onBack={onBack} />
+
+      <ScrollView contentContainerStyle={styles.optionScroll} showsVerticalScrollIndicator={false}>
+        {CREATE_OPTIONS.map(option => (
+          <TouchableOpacity
+            key={option.id}
+            style={[styles.optionCard, option.featured && styles.optionCardFeatured]}
+            activeOpacity={0.86}
+            onPress={() => {
+              onSelect(option.id)
+            }}
+          >
+            {option.featured && (
+              <View style={styles.bestValueBadge}>
+                <Text style={styles.bestValueText}>BEST VALUE</Text>
+              </View>
+            )}
+
+            <View style={[styles.optionIconRail, { backgroundColor: option.iconBg }]}>
+              <Ionicons
+                name={option.icon}
+                size={28}
+                color={option.featured ? '#FFFFFF' : option.tint}
+              />
+            </View>
+
+            <View style={styles.optionBody}>
+              <Text style={styles.optionTitle}>{option.title}</Text>
+              <Text style={styles.optionDescription}>{option.description}</Text>
+            </View>
+
+            <View style={[styles.priceBadge, option.featured && styles.tokenBadge]}>
+              <Text style={[styles.priceBadgeText, option.featured && styles.tokenBadgeText]}>
+                {option.price}
+              </Text>
+              {option.featured && (
+                <View style={styles.tokenCoin}>
+                  <Ionicons name="server" size={12} color="#FFFFFF" />
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    optionScroll: {
+      flexGrow: 1,
+      paddingHorizontal: 28,
+      paddingTop: 28,
+      paddingBottom: 48,
+      gap: 24,
+    },
+    optionCard: {
+      minHeight: 154,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 24,
+      paddingVertical: 26,
+      paddingLeft: 24,
+      paddingRight: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.04,
+      shadowRadius: 14,
+      elevation: 2,
+    },
+    optionCardFeatured: {
+      borderColor: BRAND_PURPLE,
+      borderWidth: 2,
+      backgroundColor: BRAND_LAVENDER,
+      shadowColor: BRAND_PURPLE,
+      shadowOpacity: 0.16,
+      shadowRadius: 18,
+      elevation: 5,
+    },
+    optionIconRail: {
+      width: 48,
+      height: 84,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 22,
+    },
+    optionBody: {
+      flex: 1,
+      paddingRight: 10,
+    },
+    optionTitle: {
+      fontSize: 22,
+      lineHeight: 29,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 10,
+    },
+    optionDescription: {
+      fontSize: 16,
+      lineHeight: 23,
+      fontWeight: '500',
+      color: colors.textMuted,
+    },
+    priceBadge: {
+      minWidth: 76,
+      minHeight: 40,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: BRAND_LAVENDER,
+      marginRight: -24,
+    },
+    priceBadgeText: {
+      fontSize: 16,
+      fontWeight: '900',
+      color: BRAND_PURPLE_DARK,
+    },
+    tokenBadge: {
+      minWidth: 76,
+      flexDirection: 'row',
+      gap: 8,
+      backgroundColor: '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    tokenBadgeText: {
+      color: BRAND_PURPLE,
+    },
+    tokenCoin: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: BRAND_ACCENT,
+    },
+    bestValueBadge: {
+      position: 'absolute',
+      top: -18,
+      left: '50%',
+      width: 142,
+      marginLeft: -71,
+      backgroundColor: BRAND_ACCENT,
+      borderRadius: 18,
+      paddingVertical: 7,
+      paddingHorizontal: 18,
+      zIndex: 1,
+    },
+    bestValueText: {
+      fontSize: 13,
+      fontWeight: '900',
+      color: '#FFFFFF',
+    },
+  })
+}

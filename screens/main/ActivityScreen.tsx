@@ -1,16 +1,7 @@
 import { useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  SectionList,
-  Modal,
-  Pressable,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, SectionList, Modal, Pressable } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'

@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
@@ -24,12 +25,14 @@ import RecordContributionScreen from '../screens/main/RecordContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
 import TokenPurchaseScreen      from '../screens/main/TokenPurchaseScreen'
 import SettingsScreen           from '../screens/main/SettingsScreen'
+import NotificationsScreen      from '../screens/main/NotificationsScreen'
 import SupportScreen            from '../screens/support/SupportScreen'
 import FundCreatedScreen        from '../screens/main/FundCreatedScreen'
 
 // ── Custom tab bar ────────────────────────────────────────────
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors } = useTheme()
+  const insets = useSafeAreaInsets()
   const activeRoute = state.routes[state.index]?.name
 
   function pressTab(name: keyof MainTabParamList) {
@@ -53,7 +56,11 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   }
 
   return (
-    <View style={[tabStyles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+    <View style={[tabStyles.container, {
+      backgroundColor: colors.surface,
+      borderTopColor: colors.border,
+      paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 8),
+    }]}>
       {renderTab('Home',  'Home',  'home-outline',   'home'  )}
       {renderTab('Funds', 'Funds', 'wallet-outline', 'wallet')}
 
@@ -75,7 +82,6 @@ const tabStyles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     paddingTop: 10,
     paddingHorizontal: 8,
     shadowColor: '#000',
@@ -152,6 +158,7 @@ export default function MainNavigator() {
       <Stack.Screen name="RecordExpense"      component={RecordExpenseScreen}     />
       <Stack.Screen name="TokenPurchase"      component={TokenPurchaseScreen}     />
       <Stack.Screen name="Settings"           component={SettingsScreen}          />
+      <Stack.Screen name="Notifications"      component={NotificationsScreen}     />
       <Stack.Screen name="Support"            component={SupportScreen}           />
       <Stack.Screen name="FundCreated"        component={FundCreatedScreen}       />
     </Stack.Navigator>

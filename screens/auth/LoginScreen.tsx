@@ -1,18 +1,7 @@
 import { useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
@@ -20,6 +9,7 @@ import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../context/ThemeContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>
@@ -27,6 +17,7 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const { isDark } = useTheme()
+  const requireOnline = useRequireOnline()
   const bg       = isDark ? '#1A1C24' : '#F4F2EB'
   const inputBg  = isDark ? '#2D2E41' : '#FFFFFF'
   const textCol  = isDark ? '#F2F2F7' : colors.textPrimary
@@ -42,6 +33,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   async function handleSendOTP() {
     if (!isValid) return
+    if (!requireOnline()) return
     const fullPhone = `+267${cleanedPhone}`
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })

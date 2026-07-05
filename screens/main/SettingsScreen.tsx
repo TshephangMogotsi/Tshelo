@@ -1,13 +1,5 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from 'react-native'
+import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { fonts } from '../../theme/typography'
 import { useAuth } from '../../context/AuthContext'
@@ -106,7 +98,7 @@ export default function SettingsScreen() {
         <View style={[s.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingsRow icon="person-outline"         label="Full name"     value={userName || '—'} />
           <SettingsRow icon="phone-portrait-outline" label="Mobile money"  onPress={() => {}} />
-          <SettingsRow icon="notifications-outline"  label="Notifications" onPress={() => {}} last />
+          <SettingsRow icon="notifications-outline"  label="Notifications" onPress={() => navigation.navigate('Notifications')} last />
         </View>
 
         {/* Appearance */}

@@ -1,0 +1,16 @@
+Tshelo — Progress Update (1 July 2026)
+
+Today's work focused on making the core fund experience fully live and reliable:
+
+- Join Fund is now fully working — enter an invite code, preview the fund, and join it.
+- Fixed several bugs that were blocking fund creation and stopping new funds from appearing after creation.
+- Home screen now shows each user's own real funds and events (previously it wasn't filtering correctly).
+- Home screen now correctly shows whether you're the fund owner or just a member.
+- Profile page is live — real name, phone, and token balance, with a guided setup prompt for new accounts missing a name.
+- Added the ability to delete a fund (owner only).
+- Recording an expense now actually saves it, including uploading a receipt photo — previously nothing was being saved.
+- Event + Fund creation now properly links the two together.
+- Fund invite links now show a nice preview card when shared in WhatsApp and similar apps.
+- Fixed sign-up/OTP issues that could cause a user's name to go missing after registration.
+
+Net result: the fund creation and joining flow, the home page, and the profile page are now working end-to-end on real data.

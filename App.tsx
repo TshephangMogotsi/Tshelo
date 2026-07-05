@@ -1,18 +1,60 @@
 import { useEffect, useState } from 'react'
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFonts } from 'expo-font'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as Notifications from 'expo-notifications'
+import * as SplashScreen from 'expo-splash-screen'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { ConnectivityProvider } from './context/ConnectivityContext'
+import OfflineBanner from './components/OfflineBanner'
+import ErrorBoundary from './components/ErrorBoundary'
 import AuthNavigator from './navigation/AuthNavigator'
 import MainNavigator from './navigation/MainNavigator'
 import OnboardingScreen from './screens/onboarding/OnboardingScreen'
+import { registerForPushNotificationsAsync } from './lib/pushNotifications'
+import type { MainStackParamList } from './navigation/types'
 
 const ONBOARDING_KEY = 'tshelo_onboarded_v1'
 
+// Keep the native splash visible until fonts + onboarding state are ready
+SplashScreen.preventAutoHideAsync()
+SplashScreen.setOptions({ fade: true, duration: 300 })
+
+export const navigationRef = createNavigationContainerRef<MainStackParamList>()
+
+function navigateFromNotificationData(data: Record<string, any> | undefined) {
+  if (!navigationRef.isReady()) return
+  const fundId = data?.fundId
+  if (typeof fundId === 'string') {
+    navigationRef.navigate('FundDetail', { fundId })
+  } else {
+    navigationRef.navigate('Notifications')
+  }
+}
+
 function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'CountrySelect' | 'Login' }) {
-  const { isAuthenticated, profileCompleted } = useAuth()
+  const { isAuthenticated, profileCompleted, userId } = useAuth()
+
+  useEffect(() => {
+    if (isAuthenticated && profileCompleted && userId) {
+      registerForPushNotificationsAsync(userId)
+    }
+  }, [isAuthenticated, profileCompleted, userId])
+
+  useEffect(() => {
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) navigateFromNotificationData(response.notification.request.content.data as any)
+    })
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      navigateFromNotificationData(response.notification.request.content.data as any)
+    })
+
+    return () => subscription.remove()
+  }, [])
+
   if (!isAuthenticated || !profileCompleted) return <AuthNavigator initialRouteName={initialAuthRoute} />
   return <MainNavigator />
 }
@@ -24,19 +66,23 @@ export default function App() {
     'Fraunces-Bold':     require('./assets/fonts/Fraunces_72pt-Bold.ttf'),
   })
 
-  // DEV: always show onboarding — remove __DEV__ check before release
-  const [hasOnboarded,    setHasOnboarded]    = useState<boolean | null>(__DEV__ ? false : null)
+  const [hasOnboarded,    setHasOnboarded]    = useState<boolean | null>(null)
   const [initialAuthRoute, setInitialAuthRoute] = useState<'Welcome' | 'CountrySelect' | 'Login'>('Welcome')
 
   useEffect(() => {
-    if (__DEV__) return
     AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
       setHasOnboarded(val === 'true')
     })
   }, [])
 
-  // Wait for both fonts and AsyncStorage
-  if (!fontsLoaded || hasOnboarded === null) return null
+  const appReady = fontsLoaded && hasOnboarded !== null
+
+  useEffect(() => {
+    if (appReady) SplashScreen.hideAsync()
+  }, [appReady])
+
+  // Splash stays up until fonts and AsyncStorage are ready
+  if (!appReady) return null
 
   async function completeOnboarding(dest?: 'CountrySelect' | 'Login') {
     if (dest) setInitialAuthRoute(dest)
@@ -46,23 +92,39 @@ export default function App() {
 
   if (!hasOnboarded) {
     return (
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <OnboardingScreen onDone={completeOnboarding} />
-        </SafeAreaProvider>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <SafeAreaProvider>
+            <OnboardingScreen onDone={completeOnboarding} />
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
     )
   }
 
+  const linking = {
+    prefixes: ['tshelo://'],
+    config: {
+      screens: {
+        JoinFund: 'join/:code',
+      },
+    },
+  }
+
   return (
-    <ThemeProvider>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <RootNavigator initialAuthRoute={initialAuthRoute} />
-          </NavigationContainer>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <ConnectivityProvider>
+            <AuthProvider>
+              <NavigationContainer ref={navigationRef} linking={linking}>
+                <RootNavigator initialAuthRoute={initialAuthRoute} />
+              </NavigationContainer>
+              <OfflineBanner />
+            </AuthProvider>
+          </ConnectivityProvider>
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }

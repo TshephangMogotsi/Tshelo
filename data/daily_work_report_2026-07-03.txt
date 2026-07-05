@@ -1,0 +1,273 @@
+TSHELO DAILY WORK REPORT — 2026-07-03
+========================================
+
+Feature/refactor work ran roughly 5:43am–11:58am (all uncommitted — working
+tree only, nothing from today is on any commit yet). That was followed by
+a separate session getting a native Android dev build running end to end,
+needed specifically to test push notifications (Expo Go doesn't support
+remote push on the SDK version this project uses).
+
+
+1. Fund/Event Creation Flow — Rebuilt As A Multi-Step Wizard
+------------------------------------------------------------------
+- CreateFundScreen.tsx cut from 3646 to 479 lines (87%) by extracting into
+  a new screens/main/createFund/ folder (17 files). The screen is no
+  longer just a fund form — it's now a combined Event / Fund / Event+Fund
+  creation wizard with three entry paths from CreateOptionChooser:
+    - "Event only" (free): EventTypeStep -> EventDetailsStep ->
+      EventOrganisersStep -> EventCreatedScreen
+    - "Fund only" (free): CurrencyStep -> FundFormStep
+    - "Event + Fund" (priced, "15" tokens, featured): EventFundTypeStep ->
+      EventFundDetailsStep -> EventFundOrganisersStep ->
+      EventFundBudgetStep (fund goal set as a percentage of total event
+      budget — fundGoalPercent is currently hardcoded to 65%)
+- Event and Event+Fund flows use separate, parallel step components
+  (EventTypeStep vs EventFundTypeStep, etc.) rather than shared ones —
+  each path has its own hero/progress styling (EventFundHero shows
+  stepsDone).
+- BUG NOT FIXED TODAY: EventFundBudgetStep's onCreate handler still just
+  navigates straight to FundCreatedScreen without ever calling Supabase —
+  the same silent-no-op pattern that was fixed for the "fund only" path
+  on 2026-07-01 (see that report's item 7) has resurfaced for the new
+  eventFund path in today's rebuild. No event or fund actually gets
+  created when a user completes this flow.
+
+
+2. Fund Detail Screen — From Mock Data To Fully Live
+------------------------------------------------------------------
+- FundDetailScreen.tsx (778 -> 651 lines, UI extracted into new
+  screens/main/fundDetail/ folder: types.ts, rows.tsx, FundHeader.tsx)
+  went from rendering MOCK_FUND / MOCK_CONTRIBUTIONS / MOCK_MEMBERS
+  placeholders to a fully live Supabase-backed screen.
+- Contribution fields corrected to match the real schema: payment_method /
+  detected_via / status / is_refunded, replacing invented columns
+  (source / provider / is_disputed) that were never in the DB.
+- Added a pending join-request workflow on the Members tab: organisers see
+  a "Pending Requests" section with Approve/Reject, updating
+  fund_members.status between pending / joined / declined.
+- Added member removal (sets status: 'removed').
+- Member names are now resolved via a get_fund_member_profiles(p_fund_id)
+  RPC rather than a direct join — see item 9 below for why the direct
+  join couldn't work.
+- Fund delete (soft delete via deleted_at) and real share/copy invite
+  using fundPreviewUrl() + Clipboard, replacing earlier stubs.
+
+
+3. Home Screen — Data Loading Extracted + Notification Bell
+------------------------------------------------------------------
+- HomeScreen.tsx (860 -> 560 lines) had its data loading pulled into
+  screens/main/home/loadHomeItems.ts: merges owned funds, fund_members
+  memberships, and event_organisers co-organiser rows, joins
+  event_fund_links to detect combined "eventFund" cards, and computes
+  per-item contribution/expense/member/guest totals.
+- Added a notification bell with unread-count badge (queries notifications
+  where is_read = false) that navigates to the new Notifications screen.
+
+
+4. Record Expense Screen — Split Into Step Components
+------------------------------------------------------------------
+- RecordExpenseScreen.tsx (524 -> 289 lines) split into
+  screens/main/recordExpense/: ChooseMethodStep (scan / upload / manual)
+  feeding into ManualEntryStep or ReviewStep (receipt-derived line items),
+  with receipt.ts handling pickFromLibrary / takePhoto / uploadReceipt.
+  The 38-value expense_category enum (documented 2026-07-01) was moved
+  into its own categories.ts.
+
+
+5. Push Notifications — Built End To End (New Feature)
+------------------------------------------------------------------
+- Token registration (lib/pushNotifications.ts, new): requests permission
+  via expo-notifications, sets the Android notification channel, gets an
+  Expo push token (project ID read from
+  Constants.expoConfig.extra.eas.projectId), and upserts it into a new
+  push_tokens table on conflict expo_push_token.
+  registerForPushNotificationsAsync() is called from App.tsx's
+  RootNavigator on mount once authenticated + profile complete.
+  unregisterPushToken() runs in AuthContext.signOut() before
+  supabase.auth.signOut(), deleting the device's token row.
+- Notification tap -> deep navigation: App.tsx adds a navigationRef and
+  listens via addNotificationResponseReceivedListener +
+  getLastNotificationResponseAsync (cold start), routing to FundDetail
+  if the payload carries a fundId, else to the new Notifications screen.
+- screens/main/NotificationsScreen.tsx (new): lists notifications rows
+  (type, title, body, data, is_read), bulk "Read all", tap-to-navigate.
+  Icon mapping covers 7 types: join_request, join_approved,
+  join_declined, member_joined, member_removed, contribution_added,
+  expense_added.
+- data/notifications_phase1.sql (server-side triggers, SECURITY DEFINER):
+  adds notification.type enum values, a create_notification() helper
+  (EXECUTE revoked from client roles), and RLS so clients can only
+  select/mark-read their own notifications (cannot insert directly).
+  Triggers fire on: fund_members INSERT (join_request to managers, or
+  member_joined to managers if already joined), fund_members UPDATE
+  (join_approved/join_declined to the requester, member_removed on
+  removal), contributions INSERT (contribution_added to all members),
+  and expenses INSERT via a statement-level trigger with a transition
+  table grouped by fund_id, so one multi-line-item receipt save produces
+  one notification per member instead of one per line item.
+  BUG FOUND, NOT FIXED: line 211 has a stray "›" character after a
+  closing `);` inside notify_fund_member_update() — this is a SQL syntax
+  error and the script will fail to run as-is until that character is
+  removed.
+- data/notifications_phase2.sql: creates the push_tokens table (user_id,
+  expo_push_token unique, device_id, platform) with RLS scoped to
+  user_id = auth.uid() for all operations — this table is written
+  directly by the client, unlike notifications. Notes that the Database
+  Webhook (notifications INSERT -> send-push function) has to be wired up
+  manually in the Supabase dashboard; it isn't scriptable.
+- supabase/functions/send-push/index.ts (new edge function): invoked by
+  that webhook, optionally checks a shared secret
+  (x-webhook-secret / PUSH_WEBHOOK_SECRET), looks up all push_tokens for
+  the notification's user_id, batches the send to Expo's push API
+  (exp.host/--/api/v2/push/send), and prunes tokens Expo reports as
+  DeviceNotRegistered. README.md documents deploy, secret setup, webhook
+  config, and a manual test-insert snippet.
+- Wired into navigation (MainNavigator.tsx, types.ts adds
+  Notifications: undefined) and into SettingsScreen.tsx / ProfileScreen.tsx,
+  whose "Notifications" rows previously had empty onPress handlers.
+- No new push-related npm packages were needed — expo-notifications was
+  already a dependency. The only new package.json addition today is
+  expo-dev-client (~6.0.21), unrelated to push: it's what let eas.json
+  gain a development-simulator build profile and switched local dev from
+  `expo start --android` to `expo run:android` (this is also the change
+  that led into this afternoon's dev-build troubleshooting — see item 10).
+
+
+6. Join Fund Flow — Rewritten With Private-Fund Approval Gating
+------------------------------------------------------------------
+- JoinFundScreen.tsx rewritten around an explicit state machine (input ->
+  searching -> preview -> joining -> requested). Uses the existing
+  find_fund_by_code RPC to preview title/goal/organiser/member count
+  before joining, and a new get_fund_privacy RPC to branch behavior:
+  private funds insert fund_members with status: 'pending' (no
+  joined_at) and show a "Request Sent" screen instead of joining
+  immediately; public funds still join instantly with status: 'joined'.
+- Code format loosened further from the 2026-07-01 fix — now any
+  alphanumeric string >= 6 chars (placeholder updated to
+  "FND-A1B2C3D4"). Screen also accepts a `code` route param for
+  deep-link pre-fill from tshelo://join/CODE.
+- CAVEAT: get_fund_privacy and the pending/approval schema this screen
+  depends on come from data/fund_privacy_sql_edits_log_1.0.txt, dated
+  2026-07-02. That file's own notes say it was never actually applied
+  to the live DB in that session (no SUPABASE_ACCESS_TOKEN available) —
+  worth confirming it was run before relying on this flow working live.
+
+
+7. Record Contribution Screen — Real Save, Provider Detection, Autosuggest
+--------------------------------------------------------------------------------
+- Added a contributor phone field with automatic mobile-money-provider
+  detection by prefix (71/72/73/76 -> Orange Money, 74/75 -> MyZaka,
+  77 -> Smega), user-overridable.
+- Added a fund-member autosuggest dropdown while typing a contributor
+  name (queries fund_members + get_fund_member_profiles RPC), auto-fills
+  phone on selection.
+- Implemented the actual save — previously the button just called
+  navigation.goBack(). Now inserts into contributions with
+  payment_method, detected_via, status: 'confirmed', confirmed_by,
+  tagged_by.
+
+
+8. Profile Screen — Rebuilt With Live Data + Edit Modal
+------------------------------------------------------------------
+- Reloads real name/email/phone from the users table on focus (was
+  previously reading only userName from context). Inline Edit Profile
+  modal auto-opens and is non-dismissable when name is empty — the same
+  "Complete Your Profile" first-run pattern documented as built on
+  2026-07-01, apparently rebuilt from scratch today since the working
+  copy had regressed to no edit capability in between.
+- Notifications row now navigates to the new NotificationsScreen.
+
+
+9. Smaller Fixes
+------------------------------------------------------------------
+- OTPScreen.tsx: the registration-path users UPDATE now surfaces a real
+  Alert.alert on failure instead of silently swallowing updateError.
+- ProfileSetupScreen.tsx: dropped bank_account_type from the update
+  payload (column doesn't exist on users) — same fix logged for OTPScreen
+  on 2026-07-01, but this file still had the stale field until today.
+- lib/supabase.ts: added fundPreviewUrl(fundCode) helper, used by
+  FundDetailScreen's share handler.
+- navigation/types.ts: RecordContribution/RecordExpense routes now
+  require a currencyCode param; FundCreated gained shareCode/fundId;
+  JoinFund gained an optional code param.
+- app.json: added "scheme": "tshelo" for deep linking. eas.json: added a
+  development-simulator build profile (iOS simulator target, extends
+  development).
+
+
+10. Native Android Dev Build — Environment Set Up From Scratch
+------------------------------------------------------------------
+- Diagnosed why `npm run android` (Expo Go path) failed: this project
+  uses a custom dev client (com.digitalnatives.tshelo, driven by the new
+  expo-dev-client dependency from item 5), which Expo Go can't run —
+  push notifications specifically require this, since Expo Go dropped
+  remote push support in recent SDKs.
+- Switched to `npx expo run:android` to build and install a real dev
+  client. Hit and fixed, in order:
+    - Stale AVD lock files (hardware-qemu.ini.lock, multiinstance.lock)
+      left over from a crashed emulator instance, causing a
+      "multiple emulators with same AVD" FATAL error on launch — removed.
+    - Missing Java: Gradle couldn't find a JDK. Pointed JAVA_HOME at
+      Android Studio's bundled JBR
+      (/Applications/Android Studio.app/Contents/jbr/Contents/Home)
+      rather than installing a separate JDK.
+    - Missing ANDROID_HOME / SDK location: Gradle failed with
+      "SDK location not found." Set ANDROID_HOME in .zshrc and wrote
+      android/local.properties (sdk.dir) so the build didn't need a new
+      shell to pick it up.
+    - Build appeared to hang for 9+ minutes on dependency resolution.
+      Diagnosed as severe memory pressure, not a real hang: the machine
+      has only 8GB RAM, and 6.9GB of 8GB swap was in use with the
+      emulator, Gradle daemon, and Android Studio's background JVMs all
+      running at once. The emulator process had already crashed under
+      the pressure; closing it (or letting it die) freed enough memory
+      for Gradle to proceed. Noted as a recurring risk for future native
+      builds on this machine — build with the emulator closed, only
+      launch it for the final install step.
+- Build was left running/in-progress at end of session; not yet
+  confirmed installed on-device.
+
+
+11. Files Touched Today
+------------------------------------------------------------------
+- App.tsx, app.json, eas.json, package.json, package-lock.json
+- context/AuthContext.tsx, lib/supabase.ts, lib/pushNotifications.ts (new)
+- navigation/MainNavigator.tsx, navigation/types.ts
+- screens/auth/OTPScreen.tsx, screens/auth/ProfileSetupScreen.tsx
+- screens/main/HomeScreen.tsx + screens/main/home/ (4 new files)
+- screens/main/CreateFundScreen.tsx + screens/main/createFund/ (17 new
+  files)
+- screens/main/FundDetailScreen.tsx + screens/main/fundDetail/ (3 new
+  files)
+- screens/main/FundCreatedScreen.tsx, JoinFundScreen.tsx,
+  RecordContributionScreen.tsx
+- screens/main/RecordExpenseScreen.tsx + screens/main/recordExpense/
+  (7 new files)
+- screens/main/ProfileScreen.tsx, SettingsScreen.tsx,
+  NotificationsScreen.tsx (new)
+- supabase/functions/send-push/index.ts + README.md (new)
+- data/notifications_phase1.sql, data/notifications_phase2.sql (new)
+- android/, ios/ native directories generated by `expo prebuild` (via
+  `expo run:android`) — not previously present, now untracked in the
+  working tree
+
+
+12. Known Open Items / Not Done / Bugs Found But Not Fixed
+------------------------------------------------------------------
+- EventFundBudgetStep's onCreate does not call Supabase — completing the
+  "Event + Fund" creation wizard creates nothing (item 1).
+- data/notifications_phase1.sql line 211 has a stray "›" character
+  causing a SQL syntax error — must be fixed before this script can run
+  (item 5).
+- get_fund_privacy RPC and the private-fund pending/approval schema that
+  JoinFundScreen now depends on may not actually be live yet — the SQL
+  that defines them (2026-07-02) noted it was never applied due to a
+  missing access token in that session (item 6).
+- The push_tokens -> send-push Database Webhook has to be configured
+  manually in the Supabase dashboard; unclear if this has been done yet.
+- Native Android dev build was still running/unverified at end of
+  session — need to confirm the APK actually installs and push
+  notifications deliver on-device.
+- None of today's SQL (notifications_phase1/2, and the still-unconfirmed
+  fund_privacy changes) are captured in a tracked supabase/migrations
+  file, continuing the gap noted in the 2026-07-01 report.

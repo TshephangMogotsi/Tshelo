@@ -1,18 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
@@ -20,6 +9,7 @@ import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
 import BankPicker, { BankFormValue } from '../../components/BankPicker'
 
 type Props = {
@@ -46,6 +36,7 @@ function detectProvider(phone: string): MobileMoneyProvider | null {
 
 export default function ProfileSetupScreen({ navigation }: Props) {
   const { refreshProfile } = useAuth()
+  const requireOnline = useRequireOnline()
   const [displayName, setDisplayName] = useState('')
   const [bank, setBank] = useState<BankFormValue>({
     bankName: '', branchCode: '', accountNumber: '', accountType: 'savings',
@@ -70,6 +61,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (!isValid) return
+    if (!requireOnline()) return
     setLoading(true)
 
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -87,7 +79,6 @@ export default function ProfileSetupScreen({ navigation }: Props) {
       bank_name:           bank.bankName,
       bank_branch_code:    bank.branchCode,
       bank_account_number: bank.accountNumber,
-      bank_account_type:   bank.accountType,
       profile_completed: true,
       onboarding_completed: true,
       terms_accepted_at: now,

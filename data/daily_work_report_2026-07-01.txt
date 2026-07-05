@@ -1,0 +1,279 @@
+TSHELO DAILY WORK REPORT — 2026-07-01
+========================================
+
+This covers all three Claude Code sessions run today (spanning late
+2026-06-30 night into 2026-07-01 morning), reconstructed from the session
+transcripts. It supersedes the narrower
+data/fund_creation_sql_edits_log_1.0.txt, which only covered the last
+session's two bugs.
+
+
+1. Home Screen Visual Polish
+------------------------------
+- Fixed "25 tokens" wrapping onto two lines (added flexDirection: 'row' /
+  alignItems: 'baseline' to the token text block).
+- Shrunk the token pill (height, icon size, font sizes) so it stopped
+  pushing the greeting text into a vertical layout.
+- Iterated on the greeting heading style (size, weight, then reverted),
+  eventually replacing the two-line "Hey there, here's your overview"
+  greeting with a single "Overview" heading.
+
+
+2. Home Screen: Removed Mock Data, Loads Live Supabase Data
+--------------------------------------------------------------
+- HomeScreen previously rendered MOCK_FUNDS / MOCK_SMS hardcoded
+  placeholders — never replaced after the initial build.
+- Rewritten to load live on every screen focus (useFocusEffect): funds,
+  events, event_fund_links, contributions, expenses, fund_members,
+  event_guests.
+- Added loading state, error state, and an empty state ("Nothing here
+  yet").
+
+
+3. Join Fund Flow — Built End To End
+----------------------------------------
+- Added `userId` (string | null) to AuthContext, populated on session
+  load, cleared on sign-out, available via useAuth().
+- Wired up JoinFundScreen: enter code → look up fund → check fund status
+  is active → check not already a member → insert fund_members → navigate
+  to FundDetail.
+- Fixed a share-code length mismatch: JoinFundScreen required exactly 16
+  hex chars, but the DB's generate_fund_share_code() produces 10-char
+  alphanumeric codes (e.g. "1972269F69"). Removed the hex-only filter and
+  the 4x4 segment display built for 16-char codes; now accepts any
+  alphanumeric code ≥6 chars.
+- FundCreatedScreen was showing a hardcoded "ABC123" placeholder instead
+  of the real share code — now passes and displays the actual code from
+  Supabase.
+- Discovered and fixed a chicken-and-egg RLS problem: a user couldn't see
+  a fund by code because they weren't a member yet. Initially patched with
+  a broad "any authenticated user can read all funds" policy, later
+  replaced (see #11) with a scoped find_fund_by_code() RPC so general fund
+  reads stay restricted to members/owners.
+- Added two entry points to JoinFundScreen from HomeScreen: a "Join Fund"
+  button in the empty state, and a persistent "Join Fund" pill in the
+  "YOUR ITEMS" header.
+
+
+4. Fund Detail Screen — Hooked To Real Data
+------------------------------------------------
+- Loads fund + the current user's membership role, then contributions/
+  expenses/members, via useFocusEffect + parallel Promise.all calls.
+- Replaced a thebeToBWP formatter that was wrong for live data (amounts are
+  stored directly in BWP, not thebe) with a correct formatter.
+- Added a fund delete feature: a "⋯" menu button in the header, visible to
+  the fund owner only (checked via fund.owner_id === userId, not just
+  isOrganiser — co-organisers/admins cannot delete). Soft delete via
+  deleted_at; HomeScreen's existing `.is('deleted_at', null)` filter makes
+  the fund disappear immediately without touching historical
+  contribution/expense records.
+
+
+5. Profile Screen Made Functional
+--------------------------------------
+- Diagnosed the "?" avatar issue: userName came back empty because the
+  users.name column was empty for accounts created via Supabase test OTP
+  numbers (which bypass the normal registration flow that sets the name).
+- Loaded real name/phone/token balance from Supabase into the profile
+  card.
+- Added an inline "Edit Profile" modal (opened via pencil icon or menu
+  row); saving calls refreshProfile() so the name updates everywhere,
+  including the HomeScreen avatar.
+- When name is empty, the edit modal now auto-opens with the title
+  "Complete Your Profile" and can't be dismissed without saving — so new
+  test/registered accounts are immediately prompted instead of silently
+  showing a blank name.
+
+
+6. Registration / OTP Flow Fixes
+-------------------------------------
+- Twilio SMS to Botswana (+267) was blocked by default Geo Permissions —
+  explained the Twilio Console fix (Messaging → Settings → Geo
+  Permissions).
+- Diagnosed a test-OTP-number format mismatch: Supabase's test number list
+  needs the leading "+" (e.g. +26774271667=123456) to match what the app
+  actually sends.
+- Fixed OTPScreen's registration path: it used `.update()` on `users`,
+  which touches 0 rows (and silently loses the submitted name) if the row
+  doesn't exist yet. Initially changed to `.upsert()`, but that hit RLS
+  (client can't INSERT into users directly) — reverted to `.update()`.
+- Root fix: added a `handle_new_user` Postgres trigger (SECURITY DEFINER)
+  that creates the public.users row automatically whenever a new
+  auth.users row is created, so the update always has a row to touch. SQL
+  was handed to the user and run directly in the Supabase SQL editor.
+- Fixed a `bank_account_type` column-doesn't-exist error: the field
+  existed in the app's BankDetails TypeScript type but was never added to
+  the actual users table. Dropped it from both the OTPScreen upsert and
+  ProfileSetupScreen update; kept bank_account_name, which does exist.
+
+
+7. Fund Creation Bugs (multiple rounds)
+--------------------------------------------
+- Found and fixed: the "fund only" creation path's Continue button
+  navigated straight to FundCreatedScreen without ever calling Supabase —
+  no insert happened at all. Added a real handleCreateFund with an
+  isCreatingFund loading state.
+- Fixed a column mismatch: the app sent `target_date`, but the live schema
+  (data/tshelo_db_latest.sql) has `contribution_deadline`. Also started
+  saving fund_emoji so the chosen emoji actually persists and shows on
+  HomeScreen.
+- Fixed a member_status enum bug: CreateFundScreen and JoinFundScreen both
+  inserted status: 'active', which isn't a valid value. The actual enum
+  (confirmed via `SELECT unnest(enum_range(NULL::member_status))`) is:
+  pending, joined, declined, removed, left. Both screens now insert
+  status: 'joined'; HomeScreen's exclusion filters were corrected from
+  `(left,banned)` / `(left,banned,pending)` to
+  `(left,removed,declined)` / `(left,removed,declined,pending)`.
+- Fixed a silent-failure chain: the fund_members insert had no error
+  handling, so if it failed the app still navigated to FundCreatedScreen
+  as if everything succeeded, and the fund would never show up on
+  HomeScreen (which only looked up funds via fund_members). Fixed by (a)
+  surfacing a real error alert if the fund_members insert fails, and (b)
+  making HomeScreen also pull funds by owner_id in addition to
+  fund_members, so ownership is never solely dependent on that row
+  existing.
+- This session's two bugs (already logged in
+  fund_creation_sql_edits_log_1.0.txt): 'organiser' isn't a valid
+  member_role enum value (only owner/admin/member exist — 'organiser'
+  belongs to the separate organiser_role enum used for event
+  co-organisers), and the fund_members insert policy required invited_by
+  = auth.uid() which the app never set. Also found and fixed that
+  self-service joining was structurally impossible under the old policy
+  (a joiner is never fund owner/admin) — replaced the live
+  fund_members_insert_manager RLS policy to add a self-join branch.
+
+
+8. share_code vs fund_code Cleanup
+----------------------------------------
+- Identified that share_code is nullable while fund_code is NOT NULL and
+  always generated — using share_code for invites meant a fund could end
+  up with no way for anyone to join it.
+- Swapped every fund-related use of share_code over to fund_code across
+  CreateFundScreen, FundDetailScreen, and JoinFundScreen. Event-related
+  code (which has its own separate share_code/event_code pair) was left
+  untouched.
+
+
+9. Home Screen Data Correctness
+-------------------------------------
+- Fixed role always showing 'organiser': HomeScreen previously hardcoded
+  role: 'organiser' on every fund card. Now carries through the user's
+  actual role from fund_members (fund_id → role map), and shows a
+  "Member" badge on cards where the user isn't the owner/admin.
+- Fixed events only checking creator_id: co-organisers added via
+  event_organisers (with user_id set once they accept an invite) weren't
+  showing the event on their HomeScreen. Now queries event_organisers in
+  parallel and combines creator_id = userId OR id IN (co-organiser event
+  ids) into a single events query.
+- Scoped the whole HomeScreen query set to the current user: funds via
+  fund_members (created or joined) plus owner_id fallback, events via
+  creator_id or co-organiser membership — previously it had no user
+  filter at all and showed every fund/event in the database to every
+  user.
+- Audited useFocusEffect dependency arrays across HomeScreen,
+  ProfileScreen, and FundDetailScreen after a suggestion that some used
+  `[]` (stale closures) — confirmed all three already use the correct
+  deps ([userId], [userId], [fundId, userId]); no bug found.
+
+
+10. RecordContribution / RecordExpense Screens
+----------------------------------------------------
+- Found both screens had fully built UI but "Save" just called
+  navigation.goBack() — nothing was ever written to Supabase.
+- Replaced ad-hoc `supabase.auth.getUser()` calls in both handlers with
+  the userId already available from AuthContext, removing an unnecessary
+  network round trip before the actual insert.
+- Implemented the real RecordExpenseScreen save flow: uploads the receipt
+  image to Supabase Storage (bucket: receipts, public), inserts the
+  expense row, wires the category enum (confirmed 38 real values via
+  `SELECT unnest(enum_range(NULL::expense_category))` — funeral, lobola,
+  graduation, catering, transport, baby, etc. — with human-readable
+  labels), and drops the date field entirely since the DB has no
+  expense_date column (only auto-set created_at). Required manual setup
+  in Supabase: create the receipts storage bucket and its upload policy.
+
+
+11. RLS Hardening Around Fund Discovery
+--------------------------------------------
+- The broad "all authenticated users can read all funds" policy added
+  earlier (to unblock join-by-code) was flagged as exposing every fund's
+  data to every signed-in user.
+- Replaced it with a find_fund_by_code() RPC (SECURITY DEFINER) that
+  returns only the fields needed for the join preview (title, goal,
+  organiser name, status), while the general funds SELECT policy went
+  back to members/owners only. JoinFundScreen now calls the RPC instead of
+  querying the funds table directly.
+
+
+12. eventFund Linking
+--------------------------
+- Found that creating an "Event + Fund" inserted the event and the fund as
+  two fully independent rows — nothing ever wrote to event_fund_links, and
+  fund.linked_event_id was never set.
+- Fixed handleCreateFund to set linked_event_id and fund_type: 'eventFund'
+  on the fund insert, update events.linked_fund_id as a back-pointer, and
+  insert into event_fund_links — the link update and the event_fund_links
+  insert run in parallel since they're independent of each other.
+
+
+13. Fund Created Screen — Navigation
+------------------------------------------
+- "Skip" previously called popToTop() (landing back on HomeScreen).
+  Changed to navigate directly into the new fund's FundDetail screen when
+  a fundId is available (via navigation.reset() with [Tabs, FundDetail] in
+  the stack), for a working back button to Home. WhatsApp/SMS/Copy share
+  buttons now also land on FundDetail after sharing. The eventFund flow
+  (no fundId yet at that point) still falls back to popToTop().
+- Fixed long fund names overflowing the summary card (missing flex: 1 on
+  the name's wrapping View).
+
+
+14. Shareable Fund Link With Link Preview
+------------------------------------------------
+- Built a Supabase Edge Function (supabase/functions/fund-preview) that
+  serves a branded HTML page with Open Graph meta tags for a given fund
+  code, so pasting the link into WhatsApp/Telegram/iMessage/Signal/
+  Messenger/email shows a proper preview card (title, goal, member count,
+  organiser name) instead of a bare link. No OG image yet — noted as a
+  later design task.
+- Exported fundPreviewUrl() from lib/supabase.ts and wired it into
+  FundCreatedScreen and FundDetailScreen's share handlers.
+- Deployed the function via the Supabase CLI; disabled the default JWT
+  requirement since this is meant to be a public preview page.
+- Added a custom URL scheme (tshelo://join/CODE) in app.json and the
+  navigation linking config, and updated JoinFundScreen to read a `code`
+  route param so a deep link pre-fills the invite code. Explained the
+  real constraint around deep linking without an owned domain: a custom
+  scheme only opens the app if a user manually taps a button on the
+  preview page (WhatsApp/browsers block automatic redirects to custom
+  schemes); true one-tap opening requires Universal/App Links tied to a
+  domain.
+
+
+15. Files Touched Today (across all three sessions)
+----------------------------------------------------------
+- App.tsx, app.json, navigation/types.ts
+- context/AuthContext.tsx, lib/supabase.ts
+- screens/auth/OTPScreen.tsx, screens/auth/ProfileSetupScreen.tsx
+- screens/main/HomeScreen.tsx, CreateFundScreen.tsx, FundCreatedScreen.tsx,
+  FundDetailScreen.tsx, JoinFundScreen.tsx, ProfileScreen.tsx,
+  RecordExpenseScreen.tsx
+- supabase/functions/fund-preview/index.ts (new)
+- Live Supabase (SQL run directly, not tracked in any migration file):
+  handle_new_user trigger, member_status-safe RLS policy pass, the
+  find_fund_by_code() RPC and its supporting policy changes, and today's
+  fund_members_insert_manager policy replacement.
+
+
+16. Known Open Items / Not Done Today
+--------------------------------------------
+- No OG image for the fund share preview yet (placeholder/none).
+- Deep linking only auto-opens the app with a manual tap; no Universal/App
+  Links (needs an owned domain).
+- None of the live SQL changes made today (trigger, RPC, policy edits) are
+  captured in a tracked migration file — data/tshelo_db_latest.sql is a
+  schema-only dump and doesn't include RLS policies or functions. Worth
+  setting up `supabase/migrations` so these changes aren't only living in
+  the dashboard.
+- expense_category pills are shown but not all 38 values are visually
+  grouped/organized in the UI — functional but could use categorization.

@@ -77,15 +77,16 @@ export type MainTabParamList = {
 export type MainStackParamList = {
   Tabs:                undefined
   CreateFund:          { isFirst?: boolean } | undefined
-  JoinFund:            undefined
+  JoinFund:            { code?: string } | undefined
   FundDetail:          { fundId: string }
   EventDetail:         { eventId: string }
   GuestList:           { eventId: string }
   EventBudget:         { eventId: string }
-  RecordContribution:  { fundId: string; fundTitle: string }
-  RecordExpense:       { fundId: string; fundTitle: string }
+  RecordContribution:  { fundId: string; fundTitle: string; currencyCode: string }
+  RecordExpense:       { fundId: string; fundTitle: string; currencyCode: string }
   TokenPurchase:       undefined
   Support:             undefined
   Settings:            undefined
-  FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; targetDate?: string }
+  Notifications:       undefined
+  FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; targetDate?: string; shareCode?: string; fundId?: string }
 }

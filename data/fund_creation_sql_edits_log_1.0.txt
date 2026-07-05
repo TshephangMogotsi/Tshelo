@@ -1,0 +1,117 @@
+TSHELO FUND CREATION FIX LOG 1.0 — 2026-07-01
+==============================================
+
+Purpose
+-------
+This file records the database and app changes made while debugging "Could
+not create fund" errors on the Create Fund screen.
+
+
+1. member_role Enum Mismatch
+-----------------------------
+
+Problem:
+- Creating a fund failed with:
+  "invalid input value for enum member_role: 'organiser'"
+- The app wrote role: 'organiser' when adding the fund creator to
+  fund_members.
+
+Cause found by querying pg_enum on the linked project:
+- public.member_role (used by fund_members.role) only allows:
+  owner, admin, member
+- public.organiser_role (used by event_organisers.role) is a separate enum
+  that allows: creator, organiser
+- The app was reusing the event vocabulary for fund membership.
+
+Fix (app code, no DB change needed):
+- screens/main/CreateFundScreen.tsx — insert role: 'owner' instead of
+  'organiser' when adding the creator to fund_members.
+- screens/main/FundDetailScreen.tsx — MemberRole type narrowed to
+  'owner' | 'admin' | 'member'; badge check and isOrganiser permission
+  check now compare against 'owner' (and 'admin' for the permission check)
+  instead of 'organiser'.
+- screens/main/HomeScreen.tsx — owned-fund role fallback (used when a
+  fund_members row doesn't exist yet) now defaults to 'owner' instead of
+  'organiser'. The 'organiser' literal was kept only for standalone event
+  list items, which are a display-only label never written to fund_members.
+
+Result:
+- Fund creation no longer fails on the enum, but a follow-up RLS error
+  surfaced (see next entry).
+
+
+2. fund_members Insert Blocked By RLS (fund creator)
+-----------------------------------------------------
+
+Problem:
+- After the enum fix, fund creation still failed with:
+  "new row violates row-level security policy for table fund_members"
+- The funds row was created successfully (visible on Home), but the
+  fund_members row for the creator was never inserted.
+
+Cause found by querying pg_policies for fund_members:
+- Existing INSERT policy "fund_members_insert_manager":
+    WITH CHECK (
+      invited_by = auth.uid()
+      AND (is_fund_owner(fund_id) OR is_fund_admin(fund_id))
+    )
+- screens/main/CreateFundScreen.tsx never set invited_by on the insert,
+  so it was null and failed invited_by = auth.uid().
+
+Fix (app code):
+- screens/main/CreateFundScreen.tsx — insert now also sets
+  invited_by: userId.
+
+
+3. Self-Service Join Was Structurally Impossible
+--------------------------------------------------
+
+Problem found while reviewing the same policy:
+- is_fund_owner(fund_id) checks funds.owner_id = auth.uid().
+- is_fund_admin(fund_id) checks for an existing fund_members row with
+  role in ('owner','admin') and status = 'joined'.
+- A user joining a fund via invite code (screens/main/JoinFundScreen.tsx)
+  satisfies neither condition, so the existing policy could never allow a
+  plain member to add themselves — only an existing owner/admin could add
+  someone else.
+
+Fix (live DB policy change, applied via Supabase CLI on project
+albihofmlafjzbusancu):
+
+DROP POLICY IF EXISTS "fund_members_insert_manager" ON public.fund_members;
+
+CREATE POLICY "fund_members_insert_manager"
+ON public.fund_members
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  (invited_by = auth.uid() AND (is_fund_owner(fund_id) OR is_fund_admin(fund_id)))
+  OR
+  (user_id = auth.uid() AND invited_by = auth.uid() AND role = 'member')
+);
+
+Fix (app code):
+- screens/main/JoinFundScreen.tsx — insert now also sets
+  invited_by: userId, to satisfy the new self-join branch of the policy.
+
+Result:
+- Fund creation completes without error.
+- Joining a fund via invite code is now possible for a plain member,
+  while owner/admin-adds-someone-else still works as before.
+
+
+4. Files Touched
+------------------
+- screens/main/CreateFundScreen.tsx
+- screens/main/FundDetailScreen.tsx
+- screens/main/HomeScreen.tsx
+- screens/main/JoinFundScreen.tsx
+- Supabase (live): fund_members_insert_manager RLS policy replaced
+
+
+5. Follow-Ups / Not Done Today
+---------------------------------
+- No further fund_members role tiers (e.g. promoting a member to admin)
+  were reviewed — only creation and self-join paths were touched.
+- Did not re-check event_organisers RLS policies for the same
+  invited_by / self-add gap; only fund_members was in scope today.

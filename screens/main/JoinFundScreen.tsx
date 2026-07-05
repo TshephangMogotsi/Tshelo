@@ -1,37 +1,151 @@
 import { useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
+import { supabase } from '../../lib/supabase'
+import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'JoinFund'>
+  route:      RouteProp<MainStackParamList, 'JoinFund'>
 }
 
-export default function JoinFundScreen({ navigation }: Props) {
+type Phase = 'input' | 'searching' | 'preview' | 'joining' | 'requested'
+
+type FundPreview = {
+  id:            string
+  title:         string
+  organiserName: string
+  goalAmount:    number
+  currencyCode:  string
+  memberCount:   number
+  isPrivate:     boolean
+}
+
+export default function JoinFundScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
+  const { userId } = useAuth()
+  const requireOnline = useRequireOnline()
   const styles = makeStyles(colors)
 
-  const [code, setCode] = useState('')
+  const initialCode = (route?.params as { code?: string } | undefined)?.code?.toUpperCase() ?? ''
+  const [code, setCode]       = useState(initialCode)
+  const [phase, setPhase]     = useState<Phase>('input')
+  const [preview, setPreview] = useState<FundPreview | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
-  const cleanedCode = code.trim().toLowerCase()
-  const isValid = cleanedCode.length === 16
+  const cleanedCode = code.trim().toUpperCase()
+  const isValid     = cleanedCode.length >= 6
 
   function handleCodeChange(text: string) {
-    const cleaned = text.replace(/[^a-fA-F0-9]/g, '').slice(0, 16)
-    setCode(cleaned.toUpperCase())
+    const cleaned = text.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase()
+    setCode(cleaned)
+    setError(null)
+    setPreview(null)
+    setPhase('input')
+  }
+
+  async function handleFind() {
+    if (!isValid || !userId) return
+    if (!requireOnline()) return
+    setPhase('searching')
+    setError(null)
+
+    const { data: rows, error: rpcError } = await supabase
+      .rpc('find_fund_by_code', { p_code: cleanedCode })
+
+    const fund = rows?.[0] ?? null
+
+    if (rpcError || !fund) {
+      setError('No fund found with that code. Double-check with the organiser.')
+      setPhase('input')
+      return
+    }
+
+    if (fund.status !== 'active') {
+      setError('This fund is closed and no longer accepting new members.')
+      setPhase('input')
+      return
+    }
+
+    const { data: existingMember } = await supabase
+      .from('fund_members')
+      .select('id')
+      .eq('fund_id', fund.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (existingMember) {
+      setError("You're already a member of this fund.")
+      setPhase('input')
+      return
+    }
+
+    const [{ count: memberCount }, { data: isPrivate }] = await Promise.all([
+      supabase
+        .from('fund_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('fund_id', fund.id),
+      supabase.rpc('get_fund_privacy', { p_fund_id: fund.id }),
+    ])
+
+    setPreview({
+      id:            fund.id,
+      title:         fund.title,
+      organiserName: fund.organiser_name ?? 'Unknown',
+      goalAmount:    fund.goal_amount ?? 0,
+      currencyCode:  fund.currency_code,
+      memberCount:   memberCount ?? 0,
+      isPrivate:     isPrivate ?? false,
+    })
+    setPhase('preview')
+  }
+
+  async function handleJoin() {
+    if (!preview || !userId) return
+    if (!requireOnline()) return
+    setPhase('joining')
+
+    const { error: insertError } = await supabase
+      .from('fund_members')
+      .insert({
+        fund_id:    preview.id,
+        user_id:    userId,
+        invited_by: userId,
+        role:       'member',
+        status:     preview.isPrivate ? 'pending' : 'joined',
+        ...(preview.isPrivate ? {} : { joined_at: new Date().toISOString() }),
+      })
+
+    if (insertError) {
+      hapticError()
+      Alert.alert('Error', 'Could not join the fund. Please try again.')
+      setPhase('preview')
+      return
+    }
+
+    hapticSuccess()
+    if (preview.isPrivate) {
+      setPhase('requested')
+      return
+    }
+
+    navigation.replace('FundDetail', { fundId: preview.id })
+  }
+
+  const isBusy = phase === 'searching' || phase === 'joining'
+
+  function formatMoney(amount: number, currencyCode: string) {
+    const symbol = currencyCode === 'BWP' ? 'P' : currencyCode
+    return `${symbol} ${amount.toLocaleString('en-BW', { maximumFractionDigits: 0 })}`
   }
 
   return (
@@ -42,6 +156,38 @@ export default function JoinFundScreen({ navigation }: Props) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        {phase === 'requested' ? (
+        <View style={styles.container}>
+          <View style={[styles.iconWrap, styles.requestedIconWrap]}>
+            <Text style={styles.icon}>⏳</Text>
+          </View>
+
+          <View style={styles.header}>
+            <Text style={styles.heading}>Request Sent</Text>
+            <Text style={styles.subheading}>
+              {preview?.title ?? 'This fund'} is private. The organiser needs to approve your
+              request before you can view or contribute.
+            </Text>
+          </View>
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>
+              ℹ️  You'll see this fund on your Home screen once you're admitted. No action needed
+              from you in the meantime.
+            </Text>
+          </View>
+
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.primaryButton, styles.buttonActive]}
+              activeOpacity={0.85}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={[styles.primaryButtonText, styles.primaryButtonTextActive]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        ) : (
         <View style={styles.container}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backIcon}>←</Text>
@@ -58,11 +204,16 @@ export default function JoinFundScreen({ navigation }: Props) {
             </Text>
           </View>
 
+          {/* ── Code input ─────────────────────────── */}
           <View style={styles.field}>
             <Text style={styles.label}>Invite Code</Text>
             <TextInput
-              style={[styles.codeInput, isValid && styles.codeInputValid]}
-              placeholder="e.g. A3F9B1C2D4E56789"
+              style={[
+                styles.codeInput,
+                isValid && styles.codeInputValid,
+                phase === 'preview' && styles.codeInputLocked,
+              ]}
+              placeholder="e.g. FND-A1B2C3D4"
               placeholderTextColor={colors.textMuted}
               value={code}
               onChangeText={handleCodeChange}
@@ -70,53 +221,103 @@ export default function JoinFundScreen({ navigation }: Props) {
               autoCorrect={false}
               returnKeyType="done"
               maxLength={16}
+              editable={!isBusy && phase !== 'preview'}
             />
             <Text style={styles.hint}>
-              Invite codes are 16 characters long and case-insensitive.
+              Invite codes are case-insensitive. Ask the organiser for their fund's code.
             </Text>
           </View>
 
-          {/* ── Code segments display ──────────────── */}
-          {code.length > 0 && (
-            <View style={styles.segmentRow}>
-              <Text style={styles.segmentText}>
-                {code.slice(0, 4) || '____'}
-              </Text>
-              <Text style={styles.segmentDash}>—</Text>
-              <Text style={styles.segmentText}>
-                {code.slice(4, 8) || '____'}
-              </Text>
-              <Text style={styles.segmentDash}>—</Text>
-              <Text style={styles.segmentText}>
-                {code.slice(8, 12) || '____'}
-              </Text>
-              <Text style={styles.segmentDash}>—</Text>
-              <Text style={styles.segmentText}>
-                {code.slice(12, 16) || '____'}
+
+          {/* ── Error ──────────────────────────────── */}
+          {error && (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {/* ── Fund preview ───────────────────────── */}
+          {preview && phase === 'preview' && (
+            <View style={styles.previewCard}>
+              <View style={styles.previewTitleRow}>
+                <Text style={styles.previewTitle}>{preview.title}</Text>
+                {preview.isPrivate && (
+                  <View style={styles.privateBadge}>
+                    <Text style={styles.privateBadgeText}>🔒 Private</Text>
+                  </View>
+                )}
+              </View>
+              {preview.isPrivate && (
+                <Text style={styles.privateHint}>
+                  Your join request will need approval from the organiser before you can view this fund.
+                </Text>
+              )}
+              <View style={styles.previewRows}>
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewRowLabel}>Organiser</Text>
+                  <Text style={styles.previewRowValue}>{preview.organiserName}</Text>
+                </View>
+                <View style={styles.previewDivider} />
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewRowLabel}>Goal</Text>
+                  <Text style={styles.previewRowValue}>
+                    {formatMoney(preview.goalAmount, preview.currencyCode)}
+                  </Text>
+                </View>
+                <View style={styles.previewDivider} />
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewRowLabel}>Members</Text>
+                  <Text style={styles.previewRowValue}>{preview.memberCount}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* ── Info card (input phase only) ───────── */}
+          {phase === 'input' && !error && (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>
+                ℹ️  Joining a fund does not cost any tokens. You'll be able to view contributions,
+                expenses, and the fund summary once admitted.
               </Text>
             </View>
           )}
 
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>
-              ℹ️  Joining a fund does not cost any tokens. You'll be able to view contributions,
-              expenses, and the fund summary once admitted.
-            </Text>
-          </View>
+          <View style={styles.actions}>
+            {/* Try different code link in preview phase */}
+            {phase === 'preview' && (
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={() => {
+                  setCode('')
+                  setPreview(null)
+                  setPhase('input')
+                }}
+              >
+                <Text style={styles.resetButtonText}>Try a different code</Text>
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity
-            style={[styles.primaryButton, isValid && styles.buttonActive]}
-            activeOpacity={isValid ? 0.85 : 1}
-            onPress={() => {
-              if (!isValid) return
-              // TODO: Supabase lookup by invite_code + insert fund_member
-            }}
-          >
-            <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
-              Join Fund
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryButton, (isValid || phase === 'preview') && !isBusy && styles.buttonActive]}
+              activeOpacity={(isValid || phase === 'preview') && !isBusy ? 0.85 : 1}
+              onPress={phase === 'preview' ? handleJoin : handleFind}
+              disabled={isBusy || (!isValid && phase !== 'preview')}
+            >
+              {isBusy ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={[
+                  styles.primaryButtonText,
+                  (isValid || phase === 'preview') && styles.primaryButtonTextActive,
+                ]}>
+                  {phase === 'preview' ? (preview?.isPrivate ? 'Request to Join' : 'Join Fund') : 'Find Fund'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
@@ -160,6 +361,9 @@ function makeStyles(colors: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 20,
+    },
+    requestedIconWrap: {
+      backgroundColor: colors.accentLight,
     },
     icon: {
       fontSize: 32,
@@ -205,6 +409,9 @@ function makeStyles(colors: AppColors) {
       borderColor: colors.primary,
       backgroundColor: colors.primaryLight,
     },
+    codeInputLocked: {
+      opacity: 0.5,
+    },
     hint: {
       fontSize: 12,
       color: colors.textMuted,
@@ -234,6 +441,77 @@ function makeStyles(colors: AppColors) {
       fontSize: 14,
       color: colors.textMuted,
     },
+    errorCard: {
+      backgroundColor: colors.errorLight,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 20,
+    },
+    errorText: {
+      fontSize: 13,
+      color: colors.error,
+      lineHeight: 20,
+    },
+    previewCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    previewTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      marginBottom: 8,
+    },
+    previewTitle: {
+      fontSize: 18,
+      fontFamily: fonts.display.bold,
+      color: colors.heading,
+      flex: 1,
+    },
+    privateBadge: {
+      backgroundColor: colors.accentLight,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    privateBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.accent,
+    },
+    privateHint: {
+      fontSize: 12,
+      color: colors.textMuted,
+      lineHeight: 17,
+      marginBottom: 16,
+    },
+    previewRows: {
+      gap: 0,
+    },
+    previewRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+    },
+    previewDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    previewRowLabel: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    previewRowValue: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
     infoCard: {
       backgroundColor: colors.primaryLight,
       borderRadius: 14,
@@ -244,6 +522,19 @@ function makeStyles(colors: AppColors) {
       fontSize: 13,
       color: colors.textSecondary,
       lineHeight: 20,
+    },
+    actions: {
+      marginTop: 'auto',
+      gap: 12,
+    },
+    resetButton: {
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    resetButtonText: {
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: '600',
     },
     primaryButton: {
       backgroundColor: colors.disabled,

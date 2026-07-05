@@ -1,14 +1,7 @@
 import { useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  Alert,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'

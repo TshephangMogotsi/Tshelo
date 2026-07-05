@@ -1,18 +1,7 @@
 import { useState, useRef } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
@@ -20,6 +9,7 @@ import { AuthStackParamList } from '../../navigation/types'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../context/ThemeContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
@@ -44,6 +34,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
   const phoneConfig  = PHONE_CONFIG[countryCode] ?? PHONE_CONFIG['BW']
 
   const { isDark } = useTheme()
+  const requireOnline = useRequireOnline()
   const inputBg   = isDark ? '#2D2E41' : '#FFFFFF'
   const textCol   = isDark ? '#F2F2F7' : '#1A1A2E'
   const mutedCol  = isDark ? '#8A8A9A' : '#9A9A9A'
@@ -68,6 +59,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
 
   async function handleContinue() {
     if (!isValid) return
+    if (!requireOnline()) return
     const fullPhone = `${dialCode}${cleanPhone}`
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })

@@ -1,20 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
+import { supabase } from '../../lib/supabase'
+import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
@@ -34,30 +29,166 @@ const PROVIDERS: { id: MobileMoneyProvider; label: string; color: string }[] = [
 
 const MAX_CONTRIBUTION_BWP = 10000
 
+function detectProvider(phone: string): MobileMoneyProvider | null {
+  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
+  if (digits.length < 2) return null
+  const prefix = parseInt(digits.slice(0, 2), 10)
+  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
+  if ([74, 75].includes(prefix))         return 'myzaka'
+  if (prefix === 77)                     return 'smega'
+  return null
+}
+
+type FundMemberOption = { id: string; name: string; phone: string }
+
 export default function RecordContributionScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
+  const { userId } = useAuth()
+  const requireOnline = useRequireOnline()
   const styles = makeStyles(colors)
 
-  const { fundId, fundTitle } = route.params
+  const { fundId, fundTitle, currencyCode } = route.params
 
   const [source, setSource]                   = useState<ContributionSource>('manual')
   const [contributorName, setContributorName] = useState('')
+  const [contributorPhone, setContributorPhone] = useState('')
   const [amountBWP, setAmountBWP]             = useState('')
-  const [provider, setProvider]               = useState<MobileMoneyProvider | null>(null)
+  const [providerOverride, setProviderOverride] = useState<MobileMoneyProvider | null>(null)
+  const [showProviderPicker, setShowProviderPicker] = useState(false)
   const [notes, setNotes]                     = useState('')
   const [smsSnippet, setSmsSnippet]           = useState('')
+  const [isSaving, setIsSaving]               = useState(false)
+  const [fundMembers, setFundMembers]         = useState<FundMemberOption[]>([])
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+  const [isNameFocused, setIsNameFocused]     = useState(false)
+  const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    let active = true
+    async function loadMembers() {
+      const [{ data: memberRows }, { data: profiles }] = await Promise.all([
+        supabase.from('fund_members').select('id').eq('fund_id', fundId).eq('status', 'joined'),
+        supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
+      ])
+
+      if (!active || !memberRows) return
+
+      const profileByRowId = new Map<string, { name: string; phone: string }>(
+        (profiles ?? []).map((p: any) => [p.member_row_id, { name: p.name, phone: p.phone }])
+      )
+
+      setFundMembers(
+        memberRows
+          .map(m => {
+            const profile = profileByRowId.get(m.id)
+            return profile ? { id: m.id, name: profile.name, phone: profile.phone } : null
+          })
+          .filter((m): m is FundMemberOption => m !== null)
+      )
+    }
+    loadMembers()
+    return () => { active = false }
+  }, [fundId])
+
+  useEffect(() => {
+    return () => { if (blurTimeout.current) clearTimeout(blurTimeout.current) }
+  }, [])
+
+  function handlePickMember(member: FundMemberOption) {
+    if (blurTimeout.current) clearTimeout(blurTimeout.current)
+    setSelectedMemberId(member.id)
+    setContributorName(member.name)
+    setContributorPhone(member.phone)
+    setProviderOverride(null)
+    setShowProviderPicker(false)
+    setIsNameFocused(false)
+  }
+
+  function handleNameChange(text: string) {
+    setContributorName(text)
+    setSelectedMemberId(null)
+  }
+
+  function handleNameFocus() {
+    if (blurTimeout.current) clearTimeout(blurTimeout.current)
+    setIsNameFocused(true)
+  }
+
+  function handleNameBlur() {
+    blurTimeout.current = setTimeout(() => setIsNameFocused(false), 150)
+  }
+
+  const nameSuggestions = selectedMemberId
+    ? []
+    : fundMembers.filter(m =>
+        contributorName.trim().length > 0 &&
+        m.name.toLowerCase().includes(contributorName.trim().toLowerCase())
+      )
+  const showSuggestions = isNameFocused && nameSuggestions.length > 0
+
+  const detectedProvider = detectProvider(contributorPhone)
+  const provider = providerOverride ?? detectedProvider
 
   const parsedAmount = parseFloat(amountBWP.replace(/,/g, ''))
   const amountValid  = !isNaN(parsedAmount) && parsedAmount > 0 && parsedAmount <= MAX_CONTRIBUTION_BWP
 
   const isValid =
     contributorName.trim().length >= 2 &&
+    contributorPhone.trim().length >= 7 &&
     amountValid &&
     provider !== null &&
     (source === 'manual' || smsSnippet.trim().length > 0)
 
   function handleAmountChange(text: string) {
     setAmountBWP(text.replace(/[^0-9.]/g, ''))
+  }
+
+  function handlePhoneChange(text: string) {
+    setContributorPhone(text)
+    setProviderOverride(null)
+    setShowProviderPicker(false)
+    setSelectedMemberId(null)
+  }
+
+  async function handleSave() {
+    if (!isValid || isSaving || !userId) return
+    if (!requireOnline()) return
+    setIsSaving(true)
+
+    try {
+      const now = new Date().toISOString()
+
+      const { error } = await supabase.from('contributions').insert({
+        fund_id:            fundId,
+        contributor_name:   contributorName.trim(),
+        contributor_phone:  contributorPhone.trim(),
+        tagged_by:          userId,
+        amount:             parsedAmount,
+        currency_code:      currencyCode,
+        payment_method:     provider,
+        detected_via:       source === 'sms_detected' ? 'sms' : 'manual',
+        status:             'confirmed',
+        confirmed_by:       userId,
+        confirmed_at:       now,
+        notes:              source === 'sms_detected'
+          ? [smsSnippet.trim(), notes.trim()].filter(Boolean).join('\n')
+          : (notes.trim() || null),
+      })
+
+      if (error) {
+        hapticError()
+        Alert.alert('Could not save contribution', error.message)
+        return
+      }
+
+      hapticSuccess()
+      navigation.goBack()
+    } catch (e) {
+      hapticError()
+      Alert.alert('Could not save contribution', e instanceof Error ? e.message : 'Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -152,17 +283,78 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
           )}
 
           {/* ── Contributor name ───────────────────── */}
-          <View style={styles.field}>
+          <View style={[styles.field, styles.nameFieldWrap]}>
             <Text style={styles.label}>Contributor Name</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Mpho Dube"
               placeholderTextColor={colors.textMuted}
               value={contributorName}
-              onChangeText={setContributorName}
+              onChangeText={handleNameChange}
+              onFocus={handleNameFocus}
+              onBlur={handleNameBlur}
               autoCapitalize="words"
               returnKeyType="next"
+              editable={!isSaving}
             />
+            {selectedMemberId && (
+              <Text style={styles.hint}>✓ Matched to fund member — phone filled in below.</Text>
+            )}
+            {showSuggestions && (
+              <View style={styles.suggestDropdown}>
+                <ScrollView keyboardShouldPersistTaps="handled" style={styles.suggestScroll} nestedScrollEnabled>
+                  {nameSuggestions.map(member => (
+                    <TouchableOpacity
+                      key={member.id}
+                      style={styles.suggestRow}
+                      onPress={() => handlePickMember(member)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.quickPickAvatar}>
+                        <Text style={styles.quickPickAvatarText}>
+                          {member.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.suggestBody}>
+                        <Text style={styles.suggestName} numberOfLines={1}>{member.name}</Text>
+                        <Text style={styles.suggestPhone} numberOfLines={1}>{member.phone}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* ── Contributor phone ──────────────────── */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Contributor Phone</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 71234567"
+              placeholderTextColor={colors.textMuted}
+              value={contributorPhone}
+              onChangeText={handlePhoneChange}
+              keyboardType="phone-pad"
+              returnKeyType="next"
+              editable={!isSaving}
+            />
+            {contributorPhone.trim().length >= 2 && (
+              detectedProvider ? (
+                <View style={styles.detectedRow}>
+                  <Text style={[styles.hint, { color: PROVIDERS.find(p => p.id === detectedProvider)!.color, fontWeight: '700' }]}>
+                    ✓ {PROVIDERS.find(p => p.id === detectedProvider)!.label} detected
+                  </Text>
+                  {!showProviderPicker && (
+                    <TouchableOpacity onPress={() => setShowProviderPicker(true)} disabled={isSaving}>
+                      <Text style={styles.changeProviderText}>Not correct?</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.hint}>Could not detect a provider from this number — select one below.</Text>
+              )
+            )}
           </View>
 
           {/* ── Amount ─────────────────────────────── */}
@@ -180,6 +372,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
                 onChangeText={handleAmountChange}
                 keyboardType="decimal-pad"
                 returnKeyType="next"
+                editable={!isSaving}
               />
             </View>
             {amountBWP !== '' && !amountValid && (
@@ -191,38 +384,40 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
             )}
           </View>
 
-          {/* ── Provider ───────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Mobile Money Provider</Text>
-            <View style={styles.providerRow}>
-              {PROVIDERS.map(p => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[
-                    styles.providerChip,
-                    provider === p.id && { borderColor: p.color, backgroundColor: p.color + '14' },
-                  ]}
-                  onPress={() => setProvider(p.id)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.providerDot, { backgroundColor: p.color + '22' }]}>
-                    <Text style={[styles.providerDotText, { color: p.color }]}>
-                      {p.label.charAt(0)}
+          {/* ── Provider (only shown when auto-detect needs help) ── */}
+          {(!detectedProvider || showProviderPicker) && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Mobile Money Provider</Text>
+              <View style={styles.providerRow}>
+                {PROVIDERS.map(p => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[
+                      styles.providerChip,
+                      provider === p.id && { borderColor: p.color, backgroundColor: p.color + '14' },
+                    ]}
+                    onPress={() => !isSaving && setProviderOverride(p.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.providerDot, { backgroundColor: p.color + '22' }]}>
+                      <Text style={[styles.providerDotText, { color: p.color }]}>
+                        {p.label.charAt(0)}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.providerChipLabel,
+                      provider === p.id && { color: p.color, fontWeight: '700' },
+                    ]}>
+                      {p.label}
                     </Text>
-                  </View>
-                  <Text style={[
-                    styles.providerChipLabel,
-                    provider === p.id && { color: p.color, fontWeight: '700' },
-                  ]}>
-                    {p.label}
-                  </Text>
-                  {provider === p.id && (
-                    <Text style={[styles.providerCheck, { color: p.color }]}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {provider === p.id && (
+                      <Text style={[styles.providerCheck, { color: p.color }]}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* ── Notes ──────────────────────────────── */}
           <View style={styles.field}>
@@ -237,6 +432,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
               multiline
               numberOfLines={3}
               textAlignVertical="top"
+              editable={!isSaving}
             />
             <Text style={styles.charCount}>{notes.length}/200</Text>
           </View>
@@ -250,16 +446,18 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
 
           {/* ── Submit ─────────────────────────────── */}
           <TouchableOpacity
-            style={[styles.primaryButton, isValid && styles.buttonActive]}
-            activeOpacity={isValid ? 0.85 : 1}
-            onPress={() => {
-              if (!isValid) return
-              navigation.goBack()
-            }}
+            style={[styles.primaryButton, isValid && !isSaving && styles.buttonActive]}
+            activeOpacity={isValid && !isSaving ? 0.85 : 1}
+            onPress={handleSave}
+            disabled={isSaving || !isValid}
           >
-            <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
-              Save Contribution
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={[styles.primaryButtonText, isValid && styles.primaryButtonTextActive]}>
+                Save Contribution
+              </Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -364,6 +562,66 @@ function makeStyles(colors: AppColors) {
       color: colors.textMuted,
       textAlign: 'center',
     },
+    quickPickAvatar: {
+      width: 26,
+      height: 26,
+      borderRadius: 8,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickPickAvatarText: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    nameFieldWrap: {
+      position: 'relative',
+      zIndex: 30,
+    },
+    suggestDropdown: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      marginTop: 4,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      elevation: 8,
+      zIndex: 30,
+      overflow: 'hidden',
+    },
+    suggestScroll: {
+      maxHeight: 220,
+    },
+    suggestRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    suggestBody: {
+      flex: 1,
+    },
+    suggestName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    suggestPhone: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 1,
+    },
     input: {
       backgroundColor: colors.surface,
       borderWidth: 1.5,
@@ -449,6 +707,18 @@ function makeStyles(colors: AppColors) {
       fontSize: 12,
       color: colors.textMuted,
       marginTop: 6,
+    },
+    detectedRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 6,
+    },
+    changeProviderText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.primary,
+      textDecorationLine: 'underline',
     },
     charCount: {
       fontSize: 11,

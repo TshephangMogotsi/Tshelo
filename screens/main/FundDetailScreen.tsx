@@ -1,328 +1,382 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  Share,
-  Alert,
-} from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Share, Alert, ActivityIndicator, Clipboard } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { RouteProp } from '@react-navigation/native'
+import { RouteProp, useFocusEffect } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
+import { supabase, fundPreviewUrl } from '../../lib/supabase'
+import {
+  Contribution,
+  Expense,
+  FundDetail,
+  Member,
+  MemberRole,
+  PendingRequest,
+  Tab,
+  formatMoney,
+} from './fundDetail/types'
+import { ContributionRow, ExpenseRow, MemberRow, PendingRequestRow } from './fundDetail/rows'
+import FundHeader from './fundDetail/FundHeader'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'FundDetail'>
   route: RouteProp<MainStackParamList, 'FundDetail'>
 }
 
-type Tab = 'contributions' | 'expenses' | 'members'
-
-type MobileMoneyProvider = 'orange_money' | 'myzaka' | 'smega'
-type ContributionSource  = 'sms_detected' | 'manual'
-type MemberRole          = 'organiser' | 'member'
-
-type Contribution = {
-  id: string
-  contributor_name: string
-  amount: number
-  source: ContributionSource
-  provider: MobileMoneyProvider | null
-  confirmed_at: string
-  notes: string | null
-  is_disputed: boolean
-}
-
-type Expense = {
-  id: string
-  vendor: string
-  category: string | null
-  amount: number
-  expense_date: string
-  notes: string | null
-  is_disputed: boolean
-}
-
-type Member = {
-  id: string
-  display_name: string
-  phone: string
-  role: MemberRole
-  joined_at: string
-}
-
-const MOCK_FUND = {
-  id: '1',
-  title: "Kgosi's Funeral Fund",
-  status: 'active' as const,
-  goal_amount: 500000,
-  total_contributions: 320000,
-  total_expenses: 25000,
-  balance: 295000,
-  member_count: 12,
-  organiser_id: 'current-user',
-  invite_code: 'A3F9B1C2D4E56789',
-}
-
-const MOCK_CONTRIBUTIONS: Contribution[] = [
-  { id: 'c1', contributor_name: 'Mpho Dube',    amount: 50000,  source: 'sms_detected', provider: 'orange_money', confirmed_at: '2026-05-10T09:14:00Z', notes: null,                  is_disputed: false },
-  { id: 'c2', contributor_name: 'Tebogo Nkwe',  amount: 30000,  source: 'manual',       provider: 'myzaka',       confirmed_at: '2026-05-09T14:30:00Z', notes: 'Paid at the meeting', is_disputed: false },
-  { id: 'c3', contributor_name: 'Lesedi Moagi', amount: 100000, source: 'sms_detected', provider: 'orange_money', confirmed_at: '2026-05-08T11:05:00Z', notes: null,                  is_disputed: true  },
-  { id: 'c4', contributor_name: 'Amogelang S.', amount: 40000,  source: 'manual',       provider: 'smega',        confirmed_at: '2026-05-07T16:20:00Z', notes: null,                  is_disputed: false },
-  { id: 'c5', contributor_name: 'Kagiso Pule',  amount: 100000, source: 'sms_detected', provider: 'myzaka',       confirmed_at: '2026-05-06T08:00:00Z', notes: null,                  is_disputed: false },
-]
-
-const MOCK_EXPENSES: Expense[] = [
-  { id: 'e1', vendor: 'Mmoloki Funeral Home', category: 'Funeral Services', amount: 15000, expense_date: '2026-05-11', notes: 'Deposit payment',    is_disputed: false },
-  { id: 'e2', vendor: 'Choppies Supermarket',  category: 'Catering',         amount: 10000, expense_date: '2026-05-10', notes: 'Food for the family', is_disputed: false },
-]
-
-const MOCK_MEMBERS: Member[] = [
-  { id: 'm1', display_name: 'Kefilwe Moeti',   phone: '+267 71 234 567', role: 'organiser', joined_at: '2026-05-05T08:00:00Z' },
-  { id: 'm2', display_name: 'Mpho Dube',       phone: '+267 72 111 222', role: 'member',    joined_at: '2026-05-05T09:00:00Z' },
-  { id: 'm3', display_name: 'Tebogo Nkwe',     phone: '+267 73 333 444', role: 'member',    joined_at: '2026-05-06T10:00:00Z' },
-  { id: 'm4', display_name: 'Lesedi Moagi',    phone: '+267 74 555 666', role: 'member',    joined_at: '2026-05-06T11:00:00Z' },
-  { id: 'm5', display_name: 'Amogelang Seolo', phone: '+267 75 777 888', role: 'member',    joined_at: '2026-05-07T08:30:00Z' },
-]
-
-const PROVIDER_LABELS: Record<MobileMoneyProvider, string> = {
-  orange_money: 'Orange Money',
-  myzaka:       'MyZaka',
-  smega:        'Smega',
-}
-
-const PROVIDER_COLORS: Record<MobileMoneyProvider, string> = {
-  orange_money: '#FF6B00',
-  myzaka:       '#009FE3',
-  smega:        '#8B2FC9',
-}
-
-
-type Styles = ReturnType<typeof makeStyles>
-
-function thebeToBWP(thebe: number): string {
-  return `P ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-BW', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  })
-}
-
-function ProgressBar({ value, max, styles }: { value: number; max: number; styles: Styles }) {
-  const pct = Math.min(value / max, 1)
-  return (
-    <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${pct * 100}%` as any }]} />
-    </View>
-  )
-}
-
-// ── Contribution row ───────────────────────────────────────────
-function ContributionRow({ item, styles, colors }: { item: Contribution; styles: Styles; colors: AppColors }) {
-  const providerColor = item.provider ? PROVIDER_COLORS[item.provider] : colors.textMuted
-
-  return (
-    <View style={styles.listRow}>
-      <View style={[styles.providerDot, { backgroundColor: providerColor + '20' }]}>
-        <Text style={[styles.providerDotText, { color: providerColor }]}>
-          {item.provider ? item.provider.charAt(0).toUpperCase() : '?'}
-        </Text>
-      </View>
-
-      <View style={styles.listRowBody}>
-        <View style={styles.listRowTop}>
-          <Text style={styles.listRowName} numberOfLines={1}>{item.contributor_name}</Text>
-          <Text style={styles.listRowAmount}>{thebeToBWP(item.amount)}</Text>
-        </View>
-        <View style={styles.listRowBottom}>
-          <Text style={styles.listRowDate}>{formatDate(item.confirmed_at)}</Text>
-          <View style={styles.badgeRow}>
-            {item.source === 'sms_detected' && (
-              <View style={styles.smsBadge}>
-                <Text style={styles.smsBadgeText}>SMS</Text>
-              </View>
-            )}
-            {item.is_disputed && (
-              <View style={styles.disputedBadge}>
-                <Text style={styles.disputedBadgeText}>Disputed</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        {item.notes && <Text style={styles.listRowNote}>{item.notes}</Text>}
-      </View>
-    </View>
-  )
-}
-
-// ── Expense row ────────────────────────────────────────────────
-function ExpenseRow({ item, styles, colors }: { item: Expense; styles: Styles; colors: AppColors }) {
-  return (
-    <View style={styles.listRow}>
-      <View style={[styles.providerDot, { backgroundColor: colors.errorLight }]}>
-        <Text style={[styles.providerDotText, { color: colors.error }]}>↑</Text>
-      </View>
-
-      <View style={styles.listRowBody}>
-        <View style={styles.listRowTop}>
-          <Text style={styles.listRowName} numberOfLines={1}>{item.vendor}</Text>
-          <Text style={[styles.listRowAmount, { color: colors.error }]}>
-            −{thebeToBWP(item.amount)}
-          </Text>
-        </View>
-        <View style={styles.listRowBottom}>
-          <Text style={styles.listRowDate}>{formatDate(item.expense_date)}</Text>
-          {item.category && (
-            <View style={styles.categoryChip}>
-              <Text style={styles.categoryChipText}>{item.category}</Text>
-            </View>
-          )}
-          {item.is_disputed && (
-            <View style={styles.disputedBadge}>
-              <Text style={styles.disputedBadgeText}>Disputed</Text>
-            </View>
-          )}
-        </View>
-        {item.notes && <Text style={styles.listRowNote}>{item.notes}</Text>}
-      </View>
-    </View>
-  )
-}
-
-// ── Member row ─────────────────────────────────────────────────
-function MemberRow({ item, styles }: { item: Member; styles: Styles }) {
-  const initials = item.display_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-
-  return (
-    <View style={styles.listRow}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{initials}</Text>
-      </View>
-      <View style={styles.listRowBody}>
-        <View style={styles.listRowTop}>
-          <Text style={styles.listRowName}>{item.display_name}</Text>
-          {item.role === 'organiser' && (
-            <View style={styles.organiserBadge}>
-              <Text style={styles.organiserBadgeText}>Organiser</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.listRowDate}>{item.phone}</Text>
-      </View>
-    </View>
-  )
-}
-
 export default function FundDetailScreen({ navigation, route }: Props) {
   const { fundId } = route.params
   const { colors, isDark } = useTheme()
+  const { userId } = useAuth()
   const styles = makeStyles(colors)
 
-  const [activeTab, setActiveTab] = useState<Tab>('contributions')
+  const [activeTab, setActiveTab]     = useState<Tab>('contributions')
+  const [fund, setFund]               = useState<FundDetail | null>(null)
+  const [contributions, setContributions] = useState<Contribution[]>([])
+  const [expenses, setExpenses]       = useState<Expense[]>([])
+  const [members, setMembers]         = useState<Member[]>([])
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([])
+  const [isOrganiser, setIsOrganiser] = useState(false)
+  const [isLoading, setIsLoading]     = useState(true)
+  const [loadError, setLoadError]     = useState<string | null>(null)
+  const [isDeleting, setIsDeleting]   = useState(false)
+  const [decidingId, setDecidingId]   = useState<string | null>(null)
 
-  const fund        = MOCK_FUND
-  const isOrganiser = true
-  const pct         = Math.round((fund.total_contributions / fund.goal_amount) * 100)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+
+      async function loadData() {
+        if (!userId) return
+        setIsLoading(true)
+        setLoadError(null)
+
+        const [{ data: fundData, error: fundError }, { data: membership }] = await Promise.all([
+          supabase
+            .from('funds')
+            .select('id, owner_id, title, status, goal_amount, currency_code, fund_code')
+            .eq('id', fundId)
+            .single(),
+          supabase
+            .from('fund_members')
+            .select('role')
+            .eq('fund_id', fundId)
+            .eq('user_id', userId)
+            .maybeSingle(),
+        ])
+
+        if (!active) return
+
+        if (fundError || !fundData) {
+          setLoadError('Could not load fund details.')
+          setIsLoading(false)
+          return
+        }
+
+        const organiser = fundData.owner_id === userId || membership?.role === 'owner' || membership?.role === 'admin'
+        setIsOrganiser(organiser)
+
+        const [{ data: contribData }, { data: expenseData }, { data: memberData }, { data: pendingData }, { data: profileData }] = await Promise.all([
+          supabase
+            .from('contributions')
+            .select('id, contributor_name, amount, payment_method, detected_via, status, is_refunded, confirmed_at, notes')
+            .eq('fund_id', fundId)
+            .order('confirmed_at', { ascending: false }),
+          supabase
+            .from('expenses')
+            .select('id, vendor_name, description, category, amount, created_at, notes, has_open_query')
+            .eq('fund_id', fundId)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('fund_members')
+            .select('id, user_id, role, joined_at')
+            .eq('fund_id', fundId)
+            .eq('status', 'joined')
+            .order('joined_at', { ascending: true }),
+          organiser
+            ? supabase
+                .from('fund_members')
+                .select('id, invited_at')
+                .eq('fund_id', fundId)
+                .eq('status', 'pending')
+                .order('invited_at', { ascending: true })
+            : Promise.resolve({ data: [] as any[] }),
+          supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
+        ])
+
+        if (!active) return
+
+        const profileByRowId = new Map<string, { user_id: string; name: string; phone: string }>(
+          (profileData ?? []).map((p: any) => [p.member_row_id, { user_id: p.user_id, name: p.name, phone: p.phone }])
+        )
+
+        const totalContributions = (contribData ?? [])
+          .filter(c => c.status === 'confirmed' && !c.is_refunded)
+          .reduce((s, c) => s + (c.amount ?? 0), 0)
+        const totalExpenses      = (expenseData ?? []).reduce((s, e) => s + (e.amount ?? 0), 0)
+
+        setFund({
+          id:                  fundData.id,
+          owner_id:            fundData.owner_id,
+          title:               fundData.title,
+          status:              fundData.status,
+          currency_code:       fundData.currency_code,
+          goal_amount:         fundData.goal_amount ?? 0,
+          total_contributions: totalContributions,
+          total_expenses:      totalExpenses,
+          balance:             totalContributions - totalExpenses,
+          member_count:        (memberData ?? []).length,
+          fund_code:           fundData.fund_code,
+        })
+
+        setContributions(contribData ?? [])
+        setExpenses(expenseData ?? [])
+        setMembers(
+          (memberData ?? []).map(m => {
+            const profile = profileByRowId.get(m.id)
+            return {
+              id:           m.id,
+              user_id:      m.user_id,
+              display_name: profile?.name ?? 'Unknown',
+              phone:        profile?.phone ?? '',
+              role:         m.role as MemberRole,
+              joined_at:    m.joined_at,
+            }
+          })
+        )
+        setPendingRequests(
+          (pendingData ?? []).map((p: any) => {
+            const profile = profileByRowId.get(p.id)
+            return {
+              id:           p.id,
+              user_id:      profile?.user_id ?? null,
+              display_name: profile?.name ?? 'Unknown',
+              phone:        profile?.phone ?? '',
+              requested_at: p.invited_at,
+            }
+          })
+        )
+
+        setIsLoading(false)
+      }
+
+      loadData()
+      return () => { active = false }
+    }, [fundId, userId])
+  )
+
+  async function handleApprove(memberId: string) {
+    if (decidingId) return
+    setDecidingId(memberId)
+    const { error } = await supabase
+      .from('fund_members')
+      .update({ status: 'joined', joined_at: new Date().toISOString() })
+      .eq('id', memberId)
+
+    setDecidingId(null)
+
+    if (error) {
+      Alert.alert('Could not approve request', error.message)
+      return
+    }
+
+    const request = pendingRequests.find(r => r.id === memberId)
+    setPendingRequests(prev => prev.filter(r => r.id !== memberId))
+    if (request) {
+      setMembers(prev => [...prev, {
+        id:           memberId,
+        user_id:      request.user_id,
+        display_name: request.display_name,
+        phone:        request.phone,
+        role:         'member',
+        joined_at:    new Date().toISOString(),
+      }])
+      setFund(prev => prev ? { ...prev, member_count: prev.member_count + 1 } : prev)
+    }
+  }
+
+  function confirmReject(memberId: string, displayName: string) {
+    Alert.alert(
+      'Reject Request',
+      `Reject ${displayName}'s request to join this fund?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reject', style: 'destructive', onPress: () => handleReject(memberId) },
+      ]
+    )
+  }
+
+  async function handleReject(memberId: string) {
+    if (decidingId) return
+    setDecidingId(memberId)
+    const { error } = await supabase
+      .from('fund_members')
+      .update({ status: 'declined' })
+      .eq('id', memberId)
+
+    setDecidingId(null)
+
+    if (error) {
+      Alert.alert('Could not reject request', error.message)
+      return
+    }
+
+    setPendingRequests(prev => prev.filter(r => r.id !== memberId))
+  }
+
+  function confirmRemoveMember(memberId: string, displayName: string) {
+    Alert.alert(
+      'Remove Member',
+      `Remove ${displayName} from this fund? They will lose access to view contributions and expenses, and will need to be re-invited or request to join again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => handleRemoveMember(memberId) },
+      ]
+    )
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    if (decidingId) return
+    setDecidingId(memberId)
+    const { error } = await supabase
+      .from('fund_members')
+      .update({ status: 'removed' })
+      .eq('id', memberId)
+
+    setDecidingId(null)
+
+    if (error) {
+      Alert.alert('Could not remove member', error.message)
+      return
+    }
+
+    setMembers(prev => prev.filter(m => m.id !== memberId))
+    setFund(prev => prev ? { ...prev, member_count: Math.max(0, prev.member_count - 1) } : prev)
+  }
 
   async function handleShareInvite() {
+    if (!fund?.fund_code) return
+    const link = fundPreviewUrl(fund.fund_code)
     await Share.share({
-      message: `Join my Tshelo fund "${fund.title}" — use invite code: ${fund.invite_code}`,
+      message: `Join *${fund.title}* on Tshelo 🙏\n\n${link}`,
+      url: link,
     })
   }
 
   function handleCopyCode() {
-    Alert.alert('Invite Code', fund.invite_code, [{ text: 'OK' }])
+    if (!fund?.fund_code) return
+    Clipboard.setString(fund.fund_code)
+    Alert.alert('Copied', 'Invite code copied to clipboard.')
+  }
+
+  function handleMoreOptions() {
+    Alert.alert(fund!.title, 'What would you like to do?', [
+      {
+        text: 'Delete Fund',
+        style: 'destructive',
+        onPress: confirmDelete,
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
+  function confirmDelete() {
+    Alert.alert(
+      'Delete Fund',
+      `Are you sure you want to delete "${fund!.title}"? This cannot be undone and all contribution and expense records will be hidden.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: deleteFund,
+        },
+      ]
+    )
+  }
+
+  async function deleteFund() {
+    if (!fund || isDeleting) return
+    setIsDeleting(true)
+    const { error } = await supabase
+      .from('funds')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', fund.id)
+
+    setIsDeleting(false)
+
+    if (error) {
+      Alert.alert('Could not delete fund', error.message)
+      return
+    }
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Tabs' as any }],
+    })
   }
 
   const TABS: { id: Tab; label: string; count: number }[] = [
-    { id: 'contributions', label: 'Contributions', count: MOCK_CONTRIBUTIONS.length },
-    { id: 'expenses',      label: 'Expenses',      count: MOCK_EXPENSES.length },
-    { id: 'members',       label: 'Members',        count: MOCK_MEMBERS.length },
+    { id: 'contributions', label: 'Contributions', count: contributions.length },
+    { id: 'expenses',      label: 'Expenses',      count: expenses.length },
+    { id: 'members',       label: 'Members',       count: members.length },
   ]
+
+  // ── Loading ────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  // ── Error ──────────────────────────────────────────────
+  if (loadError || !fund) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        <View style={styles.loadingWrap}>
+          <Text style={styles.errorText}>{loadError ?? 'Fund not found.'}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.errorBack}>
+            <Text style={styles.errorBackText}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
-      {/* ── Header ─────────────────────────────────── */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          {isOrganiser && (
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.recordBtn}
-                onPress={() => navigation.navigate('RecordContribution', {
-                  fundId: fund.id,
-                  fundTitle: fund.title,
-                })}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.recordBtnText}>＋ Contribution</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.recordBtn, styles.recordBtnExpense]}
-                onPress={() => navigation.navigate('RecordExpense', {
-                  fundId: fund.id,
-                  fundTitle: fund.title,
-                })}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.recordBtnText}>↑ Expense</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        <Text style={styles.fundTitle}>{fund.title}</Text>
-
-        {/* ── Stats row ──────────────────────────── */}
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{thebeToBWP(fund.balance)}</Text>
-            <Text style={styles.statLabel}>Balance</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{thebeToBWP(fund.goal_amount)}</Text>
-            <Text style={styles.statLabel}>Goal</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{fund.member_count}</Text>
-            <Text style={styles.statLabel}>Members</Text>
-          </View>
-        </View>
-
-        {/* ── Progress ───────────────────────────── */}
-        <View style={styles.progressRow}>
-          <ProgressBar value={fund.total_contributions} max={fund.goal_amount} styles={styles} />
-          <Text style={styles.progressPct}>{pct}%</Text>
-        </View>
-
-        {/* ── Invite code ────────────────────────── */}
-        <View style={styles.inviteRow}>
-          <View style={styles.inviteCode}>
-            <Text style={styles.inviteLabel}>Invite Code</Text>
-            <Text style={styles.inviteCodeText}>{fund.invite_code}</Text>
-          </View>
-          <TouchableOpacity style={styles.inviteAction} onPress={handleCopyCode} activeOpacity={0.8}>
-            <Text style={styles.inviteActionText}>Copy</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.inviteAction} onPress={handleShareInvite} activeOpacity={0.8}>
-            <Text style={styles.inviteActionText}>Share</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <FundHeader
+        fund={fund}
+        isOrganiser={isOrganiser}
+        isOwner={fund.owner_id === userId}
+        isDeleting={isDeleting}
+        onBack={() => navigation.goBack()}
+        onRecordContribution={() => navigation.navigate('RecordContribution', {
+          fundId: fund.id,
+          fundTitle: fund.title,
+          currencyCode: fund.currency_code,
+        })}
+        onRecordExpense={() => navigation.navigate('RecordExpense', {
+          fundId: fund.id,
+          fundTitle: fund.title,
+          currencyCode: fund.currency_code,
+        })}
+        onMoreOptions={handleMoreOptions}
+        onCopyCode={handleCopyCode}
+        onShareInvite={handleShareInvite}
+      />
 
       {/* ── Tabs ───────────────────────────────────── */}
       <View style={styles.tabBar}>
@@ -341,6 +395,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
                 {tab.count}
               </Text>
             </View>
+            {tab.id === 'members' && isOrganiser && pendingRequests.length > 0 && (
+              <View style={styles.tabPendingDot} />
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -352,15 +409,22 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           <>
             <View style={styles.summaryStrip}>
               <Text style={styles.summaryText}>
-                Total in: <Text style={styles.summaryValue}>{thebeToBWP(fund.total_contributions)}</Text>
+                Total in: <Text style={styles.summaryValue}>{formatMoney(fund.total_contributions, fund.currency_code)}</Text>
               </Text>
               <Text style={styles.summaryText}>
-                {MOCK_CONTRIBUTIONS.length} contribution{MOCK_CONTRIBUTIONS.length !== 1 ? 's' : ''}
+                {contributions.length} contribution{contributions.length !== 1 ? 's' : ''}
               </Text>
             </View>
-            {MOCK_CONTRIBUTIONS.map(c => (
-              <ContributionRow key={c.id} item={c} styles={styles} colors={colors} />
-            ))}
+            {contributions.length === 0 ? (
+              <View style={styles.emptyTab}>
+                <Text style={styles.emptyTabEmoji}>💰</Text>
+                <Text style={styles.emptyTabText}>No contributions recorded yet.</Text>
+              </View>
+            ) : (
+              contributions.map(c => (
+                <ContributionRow key={c.id} item={c} currencyCode={fund.currency_code} />
+              ))
+            )}
           </>
         )}
 
@@ -368,20 +432,20 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           <>
             <View style={styles.summaryStrip}>
               <Text style={styles.summaryText}>
-                Total out: <Text style={[styles.summaryValue, { color: colors.error }]}>{thebeToBWP(fund.total_expenses)}</Text>
+                Total out: <Text style={[styles.summaryValue, { color: colors.error }]}>{formatMoney(fund.total_expenses, fund.currency_code)}</Text>
               </Text>
               <Text style={styles.summaryText}>
-                {MOCK_EXPENSES.length} expense{MOCK_EXPENSES.length !== 1 ? 's' : ''}
+                {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
               </Text>
             </View>
-            {MOCK_EXPENSES.length === 0 ? (
+            {expenses.length === 0 ? (
               <View style={styles.emptyTab}>
                 <Text style={styles.emptyTabEmoji}>🧾</Text>
                 <Text style={styles.emptyTabText}>No expenses recorded yet.</Text>
               </View>
             ) : (
-              MOCK_EXPENSES.map(e => (
-                <ExpenseRow key={e.id} item={e} styles={styles} colors={colors} />
+              expenses.map(e => (
+                <ExpenseRow key={e.id} item={e} currencyCode={fund.currency_code} />
               ))
             )}
           </>
@@ -389,13 +453,36 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
         {activeTab === 'members' && (
           <>
+            {isOrganiser && pendingRequests.length > 0 && (
+              <>
+                <Text style={styles.pendingSectionTitle}>
+                  Pending Requests ({pendingRequests.length})
+                </Text>
+                {pendingRequests.map(r => (
+                  <PendingRequestRow
+                    key={r.id}
+                    request={r}
+                    isDeciding={decidingId === r.id}
+                    onApprove={() => handleApprove(r.id)}
+                    onReject={() => confirmReject(r.id, r.display_name)}
+                  />
+                ))}
+              </>
+            )}
+
             <View style={styles.summaryStrip}>
               <Text style={styles.summaryText}>
-                {MOCK_MEMBERS.length} of 20 member slots used
+                {members.length} member{members.length !== 1 ? 's' : ''}
               </Text>
             </View>
-            {MOCK_MEMBERS.map(m => (
-              <MemberRow key={m.id} item={m} styles={styles} />
+            {members.map(m => (
+              <MemberRow
+                key={m.id}
+                item={m}
+                canRemove={isOrganiser && m.role !== 'owner' && m.user_id !== userId}
+                isRemoving={decidingId === m.id}
+                onRemove={() => confirmRemoveMember(m.id, m.display_name)}
+              />
             ))}
           </>
         )}
@@ -411,147 +498,30 @@ function makeStyles(colors: AppColors) {
       backgroundColor: colors.background,
     },
 
-    // ── Header ───────────────────────────────────────
-    header: {
-      paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 16,
-    },
-    headerTop: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 11,
-      backgroundColor: colors.surface,
+    // ── Loading / Error ───────────────────────────────────
+    loadingWrap: {
+      flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
+      gap: 16,
     },
-    backIcon: {
-      fontSize: 20,
-      color: colors.textPrimary,
+    errorText: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      paddingHorizontal: 32,
     },
-    headerActions: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    recordBtn: {
+    errorBack: {
+      paddingVertical: 10,
+      paddingHorizontal: 24,
       backgroundColor: colors.surface,
       borderRadius: 20,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    recordBtnExpense: {},
-    recordBtnText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    fundTitle: {
-      fontSize: 22,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginBottom: 16,
-    },
-    statsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    stat: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    statValue: {
+    errorBackText: {
       fontSize: 14,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginBottom: 2,
-    },
-    statLabel: {
-      fontSize: 11,
-      color: colors.textMuted,
-    },
-    statDivider: {
-      width: 1,
-      height: 28,
-      backgroundColor: colors.border,
-    },
-    progressRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 14,
-    },
-    progressTrack: {
-      flex: 1,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.border,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      borderRadius: 3,
-      backgroundColor: colors.primary,
-    },
-    progressPct: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.primary,
-      width: 36,
-      textAlign: 'right',
-    },
-    inviteRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      gap: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    inviteCode: {
-      flex: 1,
-    },
-    inviteLabel: {
-      fontSize: 10,
-      color: colors.textMuted,
-      marginBottom: 2,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    inviteCodeText: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      letterSpacing: 1.5,
-    },
-    inviteAction: {
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      paddingVertical: 7,
-      paddingHorizontal: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    inviteActionText: {
-      fontSize: 12,
-      fontWeight: '700',
+      fontWeight: '600',
       color: colors.primary,
     },
 
@@ -575,6 +545,7 @@ function makeStyles(colors: AppColors) {
       paddingBottom: 12,
       borderBottomWidth: 2,
       borderBottomColor: 'transparent',
+      position: 'relative',
     },
     tabItemActive: {
       borderBottomColor: colors.primary,
@@ -607,6 +578,15 @@ function makeStyles(colors: AppColors) {
     tabCountTextActive: {
       color: colors.primary,
     },
+    tabPendingDot: {
+      position: 'absolute',
+      top: 2,
+      right: 8,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.error,
+    },
 
     // ── Content ──────────────────────────────────────
     content: {
@@ -633,132 +613,15 @@ function makeStyles(colors: AppColors) {
       color: colors.primary,
     },
 
-    // ── List rows ────────────────────────────────────
-    listRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 10,
-      gap: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    providerDot: {
-      width: 38,
-      height: 38,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    providerDotText: {
-      fontSize: 15,
-      fontWeight: '800',
-    },
-    listRowBody: {
-      flex: 1,
-    },
-    listRowTop: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 4,
-    },
-    listRowName: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      flex: 1,
-      marginRight: 8,
-    },
-    listRowAmount: {
-      fontSize: 15,
-      fontWeight: '800',
-      color: colors.primary,
-    },
-    listRowBottom: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      flexWrap: 'wrap',
-    },
-    listRowDate: {
+    // ── Pending requests ─────────────────────────────
+    pendingSectionTitle: {
       fontSize: 12,
+      fontWeight: '700',
       color: colors.textMuted,
-    },
-    listRowNote: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 4,
-      fontStyle: 'italic',
-    },
-    badgeRow: {
-      flexDirection: 'row',
-      gap: 6,
-    },
-    smsBadge: {
-      backgroundColor: colors.primaryLight,
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-    },
-    smsBadgeText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.primary,
-    },
-    disputedBadge: {
-      backgroundColor: colors.errorLight,
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-    },
-    disputedBadgeText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.error,
-    },
-    categoryChip: {
-      backgroundColor: colors.background,
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    categoryChipText: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: colors.textSecondary,
-    },
-
-    // ── Member avatar ────────────────────────────────
-    avatar: {
-      width: 38,
-      height: 38,
-      borderRadius: 12,
-      backgroundColor: colors.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    },
-    avatarText: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: colors.primary,
-    },
-    organiserBadge: {
-      backgroundColor: colors.primaryLight,
-      borderRadius: 6,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-    },
-    organiserBadgeText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 10,
+      marginTop: 8,
     },
 
     // ── Empty tab ────────────────────────────────────
