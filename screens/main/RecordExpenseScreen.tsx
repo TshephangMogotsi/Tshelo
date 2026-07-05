@@ -8,11 +8,12 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
+import { useHardwareBack } from '../../lib/useHardwareBack'
 import { supabase } from '../../lib/supabase'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { CategoryOption, MAX_EXPENSE_BWP } from './recordExpense/categories'
-import { pickFromLibrary, takePhoto, uploadReceipt } from './recordExpense/receipt'
+import { parseReceipt, pickFromLibrary, takePhoto, uploadReceipt, type ParsedReceipt } from './recordExpense/receipt'
 import ChooseMethodStep from './recordExpense/ChooseMethodStep'
 import ManualEntryStep, { PayerOption } from './recordExpense/ManualEntryStep'
 import ReviewStep, { ReviewItem } from './recordExpense/ReviewStep'
@@ -36,6 +37,8 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   const [step, setStep]               = useState<Step>('choose')
   const [receiptUri, setReceiptUri]   = useState<string | null>(null)
   const [isSaving, setIsSaving]       = useState(false)
+  const [isParsing, setIsParsing]     = useState(false)
+  const [parsedReceipt, setParsedReceipt] = useState<ParsedReceipt | null>(null)
   const [payers, setPayers]           = useState<PayerOption[]>([])
 
   // ── Manual entry state ──────────────────────────────────
@@ -81,15 +84,25 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   async function handleScanReceipt() {
     const uri = await takePhoto()
     if (!uri) return
-    setReceiptUri(uri)
-    setStep('review')
+    startReview(uri)
   }
 
   async function handleUploadReceipt() {
     const uri = await pickFromLibrary()
     if (!uri) return
+    startReview(uri)
+  }
+
+  // Show the review screen immediately and parse in the background —
+  // the user can start typing while Claude reads the receipt
+  function startReview(uri: string) {
     setReceiptUri(uri)
+    setParsedReceipt(null)
     setStep('review')
+    setIsParsing(true)
+    parseReceipt(uri)
+      .then(setParsedReceipt)
+      .finally(() => setIsParsing(false))
   }
 
   function handleBack() {
@@ -99,7 +112,14 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
     }
     setStep('choose')
     setReceiptUri(null)
+    setParsedReceipt(null)
   }
+
+  useHardwareBack(() => {
+    if (step === 'choose') return false // let navigation pop the screen
+    handleBack()
+    return true
+  })
 
   async function handleSaveManual() {
     if (!isManualValid || isSaving || !userId) return
@@ -248,6 +268,8 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
               receiptUri={receiptUri}
               currencySymbol={currencySymbol}
               isSaving={isSaving}
+              isParsing={isParsing}
+              prefill={parsedReceipt}
               onSave={handleSaveReview}
             />
           )}

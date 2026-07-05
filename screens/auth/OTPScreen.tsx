@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
+import { detectProviderOrUnknown as detectProvider } from '../../lib/providers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OTP'>
@@ -21,16 +22,6 @@ type Props = {
 
 const OTP_LENGTH = 6
 const RESEND_COUNTDOWN = 60
-
-function detectProvider(phone: string): MobileMoneyNumber['provider'] {
-  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
-  if (digits.length < 2) return 'unknown'
-  const prefix = parseInt(digits.slice(0, 2), 10)
-  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
-  if ([74, 75].includes(prefix))         return 'myzaka'
-  if (prefix === 77)                     return 'smega'
-  return 'unknown'
-}
 
 export default function OTPScreen({ navigation, route }: Props) {
   const { phone, mode, registration, mobileMoneyReturn } = route.params

@@ -6,6 +6,7 @@ import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
+import { useHardwareBack } from '../../lib/useHardwareBack'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import { supabase } from '../../lib/supabase'
 import {
@@ -307,6 +308,17 @@ export default function CreateFundScreen({ navigation }: Props) {
     }
     navigation.goBack()
   }
+
+  useHardwareBack(() => {
+    // Once the event exists, back means "done", same as the success
+    // screen's own buttons — never back into the completed wizard
+    if (eventCreated) {
+      navigation.popToTop()
+      return true
+    }
+    handleBack()
+    return true
+  })
 
   if (!createOption) {
     return <CreateOptionChooser onSelect={setCreateOption} onBack={handleBack} />

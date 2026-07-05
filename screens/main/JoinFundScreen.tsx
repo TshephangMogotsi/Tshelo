@@ -8,6 +8,7 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
+import { useHardwareBack } from '../../lib/useHardwareBack'
 import { supabase } from '../../lib/supabase'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
@@ -44,6 +45,16 @@ export default function JoinFundScreen({ navigation, route }: Props) {
 
   const cleanedCode = code.trim().toUpperCase()
   const isValid     = cleanedCode.length >= 6
+
+  useHardwareBack(() => {
+    // From the fund preview, back returns to code entry rather than
+    // popping the screen
+    if (phase === 'preview') {
+      setPhase('input')
+      return true
+    }
+    return false
+  })
 
   function handleCodeChange(text: string) {
     const cleaned = text.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase()

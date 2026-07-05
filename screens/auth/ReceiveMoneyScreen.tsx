@@ -9,27 +9,12 @@ import { AuthStackParamList, BankAccount, MobileMoneyNumber } from '../../naviga
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
+import ProviderLogo from '../../components/ProviderLogo'
+import { PROVIDER_LABELS, detectProviderOrUnknown as detectProvider } from '../../lib/providers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ReceiveMoney'>
   route:      RouteProp<AuthStackParamList, 'ReceiveMoney'>
-}
-
-const PROVIDER_LABELS: Record<MobileMoneyNumber['provider'], string> = {
-  orange_money: 'Orange Money',
-  myzaka:       'MyZaka',
-  smega:        'Smega',
-  unknown:      'Mobile Money',
-}
-
-function detectProvider(phone: string): MobileMoneyNumber['provider'] {
-  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
-  if (digits.length < 2) return 'unknown'
-  const prefix = parseInt(digits.slice(0, 2), 10)
-  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
-  if ([74, 75].includes(prefix))         return 'myzaka'
-  if (prefix === 77)                     return 'smega'
-  return 'unknown'
 }
 
 function formatPhone(phone: string) {
@@ -104,9 +89,15 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
             </View>
             <View style={styles.detailBox}>
               {mobileMoneyNumbers.map((item, index) => (
-                <View key={item.id} style={index > 0 && styles.detailDivider}>
-                  <Text style={styles.detailLabel}>{PROVIDER_LABELS[item.provider]}</Text>
-                  <Text style={styles.detailValue}>{formatPhone(item.phone)}</Text>
+                <View
+                  key={item.id}
+                  style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, index > 0 && styles.detailDivider]}
+                >
+                  <ProviderLogo provider={item.provider} size={30} />
+                  <View>
+                    <Text style={styles.detailLabel}>{PROVIDER_LABELS[item.provider]}</Text>
+                    <Text style={styles.detailValue}>{formatPhone(item.phone)}</Text>
+                  </View>
                 </View>
               ))}
             </View>

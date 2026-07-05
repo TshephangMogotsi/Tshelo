@@ -8,6 +8,8 @@ import { RouteProp } from '@react-navigation/native'
 import { AuthStackParamList, BankAccount, MobileMoneyNumber } from '../../navigation/types'
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
+import ProviderLogo from '../../components/ProviderLogo'
+import { PROVIDER_LABELS, detectProviderOrUnknown as detectProvider } from '../../lib/providers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'BankDetails'>
@@ -15,15 +17,6 @@ type Props = {
 }
 
 type Bank = { name: string; branchCode: string }
-type MobileMoneyProvider = MobileMoneyNumber['provider']
-
-const PROVIDER_LABELS: Record<MobileMoneyProvider, string> = {
-  orange_money: 'Orange Money',
-  myzaka:       'MyZaka',
-  smega:        'Smega',
-  unknown:      'Mobile Money',
-}
-
 const BANKS: Bank[] = [
   { name: 'First National Bank',   branchCode: '282267' },
   { name: 'Standard Chartered',    branchCode: '662167' },
@@ -33,16 +26,6 @@ const BANKS: Bank[] = [
   { name: 'BBS',                   branchCode: '340099' },
   { name: 'Other',                 branchCode: ''       },
 ]
-
-function detectProvider(phone: string): MobileMoneyProvider {
-  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
-  if (digits.length < 2) return 'unknown'
-  const prefix = parseInt(digits.slice(0, 2), 10)
-  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
-  if ([74, 75].includes(prefix))         return 'myzaka'
-  if (prefix === 77)                     return 'smega'
-  return 'unknown'
-}
 
 function formatPhone(phone: string) {
   const digits = phone.replace(/\D/g, '').replace(/^267/, '')
@@ -272,9 +255,12 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
 
             {mobileMoneyNumbers.map(item => (
               <View key={item.id} style={[styles.savedItem, { borderColor: borderCol }]}>
-                <View>
-                  <Text style={[styles.savedItemTitle, { color: textCol }]}>{formatPhone(item.phone)}</Text>
-                  <Text style={[styles.savedItemMeta, { color: mutedCol }]}>{PROVIDER_LABELS[item.provider]}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <ProviderLogo provider={item.provider} size={32} />
+                  <View>
+                    <Text style={[styles.savedItemTitle, { color: textCol }]}>{formatPhone(item.phone)}</Text>
+                    <Text style={[styles.savedItemMeta, { color: mutedCol }]}>{PROVIDER_LABELS[item.provider]}</Text>
+                  </View>
                 </View>
                 <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
               </View>

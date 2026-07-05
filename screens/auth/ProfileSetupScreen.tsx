@@ -11,27 +11,17 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import BankPicker, { BankFormValue } from '../../components/BankPicker'
+import ProviderLogo from '../../components/ProviderLogo'
+import { detectProvider, type MobileMoneyProvider } from '../../lib/providers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ProfileSetup'>
 }
 
-type MobileMoneyProvider = 'orange_money' | 'myzaka' | 'smega'
-
 const PROVIDER_META: Record<MobileMoneyProvider, { label: string; color: string; network: string }> = {
   orange_money: { label: 'Orange Money', color: '#EA6C0A', network: 'Orange Botswana' },
   myzaka:       { label: 'MyZaka',       color: '#0070C0', network: 'Mascom' },
   smega:        { label: 'Smega',        color: '#7C3AED', network: 'BTC Botswana' },
-}
-
-function detectProvider(phone: string): MobileMoneyProvider | null {
-  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
-  if (digits.length < 2) return null
-  const prefix = parseInt(digits.slice(0, 2), 10)
-  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
-  if ([74, 75].includes(prefix))         return 'myzaka'
-  if (prefix === 77)                     return 'smega'
-  return null
 }
 
 export default function ProfileSetupScreen({ navigation }: Props) {
@@ -141,7 +131,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
               <Text style={styles.label}>Mobile Money</Text>
               <Text style={styles.fieldSubtext}>Detected from your phone number.</Text>
               <View style={[styles.providerPill, { backgroundColor: detectedMeta.color + '18' }]}>
-                <View style={[styles.providerDot, { backgroundColor: detectedMeta.color }]} />
+                <ProviderLogo provider={provider} size={20} />
                 <Text style={[styles.providerPillText, { color: detectedMeta.color }]}>
                   {detectedMeta.label} · {detectedMeta.network}
                 </Text>

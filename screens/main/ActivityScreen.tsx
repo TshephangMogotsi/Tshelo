@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
+import ProviderLogo from '../../components/ProviderLogo'
 
 type ActivityType = 'contribution' | 'expense'
 type ActivityStatus = 'confirmed' | 'pending' | 'sms_detected'
@@ -58,6 +59,12 @@ const METHOD_ICONS: Record<PaymentMethod, keyof typeof Ionicons.glyphMap> = {
   'Orange Money': 'phone-portrait-outline',
   'MyZaka':       'phone-portrait-outline',
   'Manual':       'cash-outline',
+}
+
+const METHOD_PROVIDER_IDS: Record<PaymentMethod, string | null> = {
+  'Orange Money': 'orange_money',
+  'MyZaka':       'myzaka',
+  'Manual':       null,
 }
 
 const STATUS_CONFIG = {
@@ -177,7 +184,11 @@ export default function ActivityScreen({ navigation }: { navigation: any }) {
                     <Text style={styles.fundTagText} numberOfLines={1}>{item.fundName}</Text>
                   </View>
                   <View style={styles.methodTag}>
-                    <Ionicons name={METHOD_ICONS[item.method]} size={11} color={colors.textMuted} />
+                    {METHOD_PROVIDER_IDS[item.method] ? (
+                      <ProviderLogo provider={METHOD_PROVIDER_IDS[item.method]} size={12} plain />
+                    ) : (
+                      <Ionicons name={METHOD_ICONS[item.method]} size={11} color={colors.textMuted} />
+                    )}
                     <Text style={styles.methodText}>{item.method}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>

@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import { makeCommonStyles } from './common'
 import CategoryPickerModal from './CategoryPickerModal'
-import { CategoryOption } from './categories'
+import { CategoryOption, CATEGORIES } from './categories'
+import type { ParsedReceipt } from './receipt'
 
 export type ReviewItem = {
   id:       string
@@ -23,10 +24,12 @@ type Props = {
   receiptUri: string | null
   currencySymbol: string
   isSaving: boolean
+  isParsing?: boolean
+  prefill?: ParsedReceipt | null
   onSave: (shopName: string, includedItems: ReviewItem[]) => void
 }
 
-export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSaving, onSave }: Props) {
+export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSaving, isParsing = false, prefill = null, onSave }: Props) {
   const { colors } = useTheme()
   const common = makeCommonStyles(colors)
   const styles = makeStyles(colors)
@@ -34,6 +37,30 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
   const [shopName, setShopName] = useState('')
   const [items, setItems]       = useState<ReviewItem[]>([newReviewItem()])
   const [categoryModalItemId, setCategoryModalItemId] = useState<string | null>(null)
+  const [wasPrefilled, setWasPrefilled] = useState(false)
+
+  // Prefill from the scanned receipt, but never overwrite what the user
+  // has already typed while the parse was in flight
+  useEffect(() => {
+    if (!prefill) return
+    if (prefill.vendor) {
+      setShopName(prev => (prev.trim() ? prev : prefill.vendor!))
+    }
+    if (prefill.items.length > 0) {
+      setItems(prev => {
+        const untouched = prev.length === 1 && !prev[0].name.trim() && !prev[0].amount
+        if (!untouched) return prev
+        setWasPrefilled(true)
+        return prefill.items.map(item => ({
+          id:       `${Date.now()}-${Math.random()}`,
+          name:     item.name,
+          category: CATEGORIES.find(c => c.value === item.category) ?? null,
+          amount:   item.amount > 0 ? String(item.amount) : '',
+          included: true,
+        }))
+      })
+    }
+  }, [prefill])
 
   const includedItems = items.filter(i => i.included)
   const reviewTotal   = includedItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
@@ -61,10 +88,25 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
         <Image source={{ uri: receiptUri }} style={styles.receiptThumb} resizeMode="cover" />
       ) : null}
 
-      <View style={styles.bannerCard}>
-        <Text style={styles.bannerTitle}>✓ Receipt captured</Text>
-        <Text style={styles.bannerHint}>Add the shop and items below</Text>
-      </View>
+      {isParsing ? (
+        <View style={[styles.bannerCard, styles.bannerCardParsing]}>
+          <View style={styles.bannerParsingRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.bannerTitle, { color: colors.primary }]}>Reading your receipt…</Text>
+          </View>
+          <Text style={styles.bannerHint}>You can start typing — we'll only fill in what's still empty</Text>
+        </View>
+      ) : wasPrefilled ? (
+        <View style={styles.bannerCard}>
+          <Text style={styles.bannerTitle}>✓ Receipt read</Text>
+          <Text style={styles.bannerHint}>Check the items and amounts below before saving</Text>
+        </View>
+      ) : (
+        <View style={styles.bannerCard}>
+          <Text style={styles.bannerTitle}>✓ Receipt captured</Text>
+          <Text style={styles.bannerHint}>Add the shop and items below</Text>
+        </View>
+      )}
 
       <View style={common.field}>
         <Text style={common.label}>Shop / Vendor</Text>
@@ -179,6 +221,15 @@ function makeStyles(colors: AppColors) {
       borderRadius: 12,
       padding: 14,
       marginBottom: 20,
+    },
+    bannerCardParsing: {
+      backgroundColor: colors.primaryLight,
+    },
+    bannerParsingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 2,
     },
     bannerTitle: {
       fontSize: 14,

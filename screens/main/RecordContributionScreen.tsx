@@ -10,6 +10,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { supabase } from '../../lib/supabase'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
+import ProviderLogo from '../../components/ProviderLogo'
+import { detectProvider, type MobileMoneyProvider } from '../../lib/providers'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
@@ -18,7 +20,6 @@ type Props = {
   route: RouteProp<MainStackParamList, 'RecordContribution'>
 }
 
-type MobileMoneyProvider = 'orange_money' | 'myzaka' | 'smega'
 type ContributionSource  = 'sms_detected' | 'manual'
 
 const PROVIDERS: { id: MobileMoneyProvider; label: string; color: string }[] = [
@@ -28,16 +29,6 @@ const PROVIDERS: { id: MobileMoneyProvider; label: string; color: string }[] = [
 ]
 
 const MAX_CONTRIBUTION_BWP = 10000
-
-function detectProvider(phone: string): MobileMoneyProvider | null {
-  const digits = phone.replace(/\D/g, '').replace(/^267/, '')
-  if (digits.length < 2) return null
-  const prefix = parseInt(digits.slice(0, 2), 10)
-  if ([71, 72, 73, 76].includes(prefix)) return 'orange_money'
-  if ([74, 75].includes(prefix))         return 'myzaka'
-  if (prefix === 77)                     return 'smega'
-  return null
-}
 
 type FundMemberOption = { id: string; name: string; phone: string }
 
@@ -399,11 +390,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
                     onPress={() => !isSaving && setProviderOverride(p.id)}
                     activeOpacity={0.8}
                   >
-                    <View style={[styles.providerDot, { backgroundColor: p.color + '22' }]}>
-                      <Text style={[styles.providerDotText, { color: p.color }]}>
-                        {p.label.charAt(0)}
-                      </Text>
-                    </View>
+                    <ProviderLogo provider={p.id} size={34} />
                     <Text style={[
                       styles.providerChipLabel,
                       provider === p.id && { color: p.color, fontWeight: '700' },

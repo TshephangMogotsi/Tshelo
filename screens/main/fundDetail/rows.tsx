@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
+import ProviderLogo, { hasProviderLogo } from '../../../components/ProviderLogo'
 import {
   Contribution,
   Expense,
@@ -21,11 +22,15 @@ export function ContributionRow({ item, currencyCode }: { item: Contribution; cu
 
   return (
     <View style={styles.listRow}>
-      <View style={[styles.providerDot, { backgroundColor: providerColor + '20' }]}>
-        <Text style={[styles.providerDotText, { color: providerColor }]}>
-          {item.payment_method ? item.payment_method.charAt(0).toUpperCase() : '?'}
-        </Text>
-      </View>
+      {hasProviderLogo(item.payment_method) ? (
+        <ProviderLogo provider={item.payment_method} size={38} />
+      ) : (
+        <View style={[styles.providerDot, { backgroundColor: providerColor + '20' }]}>
+          <Text style={[styles.providerDotText, { color: providerColor }]}>
+            {item.payment_method ? item.payment_method.charAt(0).toUpperCase() : '?'}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.listRowBody}>
         <View style={styles.listRowTop}>
