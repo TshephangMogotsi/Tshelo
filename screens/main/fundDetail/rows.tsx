@@ -55,27 +55,28 @@ export function ContributionRow({ item, currencyCode }: { item: Contribution; cu
   )
 }
 
-export function ExpenseRow({ item, currencyCode }: { item: Expense; currencyCode: string }) {
+export function ExpenseRow({ item, currencyCode, onPress }: { item: Expense; currencyCode: string; onPress?: () => void }) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
 
-  const displayName = item.vendor_name ?? item.description
-
   return (
-    <View style={styles.listRow}>
+    <TouchableOpacity style={styles.listRow} onPress={onPress} disabled={!onPress} activeOpacity={0.7}>
       <View style={[styles.providerDot, { backgroundColor: colors.errorLight }]}>
         <Text style={[styles.providerDotText, { color: colors.error }]}>↑</Text>
       </View>
 
       <View style={styles.listRowBody}>
         <View style={styles.listRowTop}>
-          <Text style={styles.listRowName} numberOfLines={1}>{displayName}</Text>
+          <Text style={styles.listRowName} numberOfLines={1}>{item.description}</Text>
           <Text style={[styles.listRowAmount, { color: colors.error }]}>
             −{formatMoney(item.amount, currencyCode)}
           </Text>
         </View>
         <View style={styles.listRowBottom}>
           <Text style={styles.listRowDate}>{formatDate(item.created_at)}</Text>
+          {item.vendor_name ? (
+            <Text style={styles.listRowVendor} numberOfLines={1}>· {item.vendor_name}</Text>
+          ) : null}
           {item.category ? (
             <View style={styles.categoryChip}>
               <Text style={styles.categoryChipText}>{item.category}</Text>
@@ -89,7 +90,7 @@ export function ExpenseRow({ item, currencyCode }: { item: Expense; currencyCode
         </View>
         {item.notes ? <Text style={styles.listRowNote}>{item.notes}</Text> : null}
       </View>
-    </View>
+    </TouchableOpacity>
   )
 }
 
@@ -248,6 +249,12 @@ function makeStyles(colors: AppColors) {
     listRowDate: {
       fontSize: 12,
       color: colors.textMuted,
+    },
+    listRowVendor: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '600',
+      flexShrink: 1,
     },
     listRowNote: {
       fontSize: 12,

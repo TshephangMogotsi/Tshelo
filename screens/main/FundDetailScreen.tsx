@@ -21,6 +21,8 @@ import {
 } from './fundDetail/types'
 import { ContributionRow, ExpenseRow, MemberRow, PendingRequestRow } from './fundDetail/rows'
 import FundHeader from './fundDetail/FundHeader'
+import EditExpenseModal from './fundDetail/EditExpenseModal'
+import ActivityLogModal from './fundDetail/ActivityLogModal'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'FundDetail'>
@@ -44,6 +46,8 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   const [loadError, setLoadError]     = useState<string | null>(null)
   const [isDeleting, setIsDeleting]   = useState(false)
   const [decidingId, setDecidingId]   = useState<string | null>(null)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [showActivityLog, setShowActivityLog] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -87,7 +91,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
             .order('confirmed_at', { ascending: false }),
           supabase
             .from('expenses')
-            .select('id, vendor_name, description, category, amount, created_at, notes, has_open_query')
+            .select('id, vendor_name, description, category, amount, created_at, has_open_query')
             .eq('fund_id', fundId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false }),
@@ -116,8 +120,8 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
         const totalContributions = (contribData ?? [])
           .filter(c => c.status === 'confirmed' && !c.is_refunded)
-          .reduce((s, c) => s + (c.amount ?? 0), 0)
-        const totalExpenses      = (expenseData ?? []).reduce((s, e) => s + (e.amount ?? 0), 0)
+          .reduce((s, c) => s + Number(c.amount ?? 0), 0)
+        const totalExpenses      = (expenseData ?? []).reduce((s, e) => s + Number(e.amount ?? 0), 0)
 
         setFund({
           id:                  fundData.id,
@@ -320,6 +324,18 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     })
   }
 
+  function handleExpenseSaved(updated: Expense) {
+    setEditingExpense(null)
+    const next = expenses.map(e => (e.id === updated.id ? updated : e))
+    setExpenses(next)
+    const totalExpenses = next.reduce((s, e) => s + Number(e.amount ?? 0), 0)
+    setFund(prev => prev ? {
+      ...prev,
+      total_expenses: totalExpenses,
+      balance: prev.total_contributions - totalExpenses,
+    } : prev)
+  }
+
   const TABS: { id: Tab; label: string; count: number }[] = [
     { id: 'contributions', label: 'Contributions', count: contributions.length },
     { id: 'expenses',      label: 'Expenses',      count: expenses.length },
@@ -434,9 +450,16 @@ export default function FundDetailScreen({ navigation, route }: Props) {
               <Text style={styles.summaryText}>
                 Total out: <Text style={[styles.summaryValue, { color: colors.error }]}>{formatMoney(fund.total_expenses, fund.currency_code)}</Text>
               </Text>
-              <Text style={styles.summaryText}>
-                {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
-              </Text>
+              <View style={styles.summaryRight}>
+                <Text style={styles.summaryText}>
+                  {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
+                </Text>
+                {isOrganiser && (
+                  <TouchableOpacity onPress={() => setShowActivityLog(true)} activeOpacity={0.7}>
+                    <Text style={styles.historyLink}>History</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {expenses.length === 0 ? (
               <View style={styles.emptyTab}>
@@ -445,7 +468,12 @@ export default function FundDetailScreen({ navigation, route }: Props) {
               </View>
             ) : (
               expenses.map(e => (
-                <ExpenseRow key={e.id} item={e} currencyCode={fund.currency_code} />
+                <ExpenseRow
+                  key={e.id}
+                  item={e}
+                  currencyCode={fund.currency_code}
+                  onPress={isOrganiser ? () => setEditingExpense(e) : undefined}
+                />
               ))
             )}
           </>
@@ -487,6 +515,21 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           </>
         )}
       </ScrollView>
+
+      <EditExpenseModal
+        expense={editingExpense}
+        currencySymbol={fund.currency_code === 'BWP' ? 'P' : fund.currency_code}
+        onClose={() => setEditingExpense(null)}
+        onSaved={handleExpenseSaved}
+      />
+
+      <ActivityLogModal
+        visible={showActivityLog}
+        fundId={fund.id}
+        currencyCode={fund.currency_code}
+        memberNames={new Map(members.filter(m => m.user_id).map(m => [m.user_id as string, m.display_name]))}
+        onClose={() => setShowActivityLog(false)}
+      />
     </SafeAreaView>
   )
 }
@@ -609,6 +652,16 @@ function makeStyles(colors: AppColors) {
       color: colors.textSecondary,
     },
     summaryValue: {
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    summaryRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    historyLink: {
+      fontSize: 13,
       fontWeight: '700',
       color: colors.primary,
     },

@@ -21,7 +21,7 @@ export type Expense = {
   category:        string | null
   amount:          number
   created_at:      string
-  notes:           string | null
+  notes?:          string | null
   has_open_query:  boolean
 }
 
