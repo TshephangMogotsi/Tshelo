@@ -8,6 +8,7 @@ export const BRAND_ACCENT = '#F59E0B'
 export const BACK_HIT_SLOP = { top: 10, right: 10, bottom: 10, left: 10 }
 
 export type CreateOption = 'event' | 'fund' | 'eventFund'
+export type QuickActionId = 'join' | 'contribution' | 'expense' | 'members' | 'tokens'
 export type FundCurrency = 'BWP' | 'ZAR' | 'USD' | 'KES'
 export type PickedOrganiser = {
   id: string
@@ -52,6 +53,21 @@ export const EVENT_BUDGET_PRESETS = [
   { label: 'P25k',  value: '25,000' },
   { label: 'P50k',  value: '50,000' },
   { label: 'P100k', value: '100,000' },
+]
+
+export const QUICK_ACTIONS: {
+  id: QuickActionId
+  title: string
+  subtitle: string
+  icon: keyof typeof Ionicons.glyphMap
+  needsFund: boolean
+}[] = [
+  { id: 'join',         title: 'Join',    subtitle: 'a Fund',       icon: 'link-outline',       needsFund: false },
+  { id: 'contribution', title: 'Record',  subtitle: 'Contribution', icon: 'add-circle-outline', needsFund: true },
+  { id: 'expense',      title: 'Record',  subtitle: 'Expense',      icon: 'receipt-outline',    needsFund: true },
+  { id: 'members',      title: 'Add',     subtitle: 'Members',      icon: 'person-add-outline', needsFund: true },
+  // 'tokens' is intentionally not in this list — it gets its own section
+  // on the create hub instead of a rail chip (see CreateOptionChooser)
 ]
 
 export const CREATE_OPTIONS: {

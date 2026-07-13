@@ -72,14 +72,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   }
 
   const userInitials   = userName ? initials(userName) : '?'
-  const firstFundItem  = homeItems.find(i => i.kind !== 'event' && i.status.toLowerCase() === 'active')
 
   const presentKinds   = Array.from(new Set(homeItems.map(i => i.kind)))
   const showFilters    = presentKinds.length > 1
   const filteredItems  = activeFilter === 'all' ? homeItems : homeItems.filter(i => i.kind === activeFilter)
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <WelcomeOverlay
@@ -136,14 +135,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         <View style={styles.sectionTitleRow}>
           <Text style={styles.homeSectionTitle}>YOUR ITEMS</Text>
-          <TouchableOpacity
-            style={styles.joinFundBtn}
-            onPress={() => navigation.navigate('JoinFund')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="link-outline" size={14} color={colors.primary} />
-            <Text style={styles.joinFundBtnText}>Join Fund</Text>
-          </TouchableOpacity>
         </View>
 
         {showFilters && (
@@ -232,46 +223,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             />
           ))}
         </View>
-
-        <Text style={styles.homeSectionTitle}>QUICK ACTIONS</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (firstFundItem?.fundId) {
-                navigation.navigate('RecordContribution', { fundId: firstFundItem.fundId, fundTitle: firstFundItem.title })
-              } else {
-                navigation.navigate('CreateFund')
-              }
-            }}
-          >
-            <View style={styles.quickIcon}>
-              <Ionicons name="add" size={28} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.quickTitle}>Record</Text>
-              <Text style={styles.quickSubtitle}>Contribution</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (firstFundItem?.fundId) navigation.navigate('FundDetail', { fundId: firstFundItem.fundId })
-              else navigation.navigate('CreateFund')
-            }}
-          >
-            <View style={styles.quickIcon}>
-              <Ionicons name="person-add" size={26} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.quickTitle}>Add</Text>
-              <Text style={styles.quickSubtitle}>Members</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -306,9 +257,9 @@ function makeStyles(colors: AppColors) {
       gap: 12,
     },
     bellBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
@@ -336,7 +287,7 @@ function makeStyles(colors: AppColors) {
       color: '#FFFFFF',
     },
     tokenPill: {
-      height: 38,
+      height: 34,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -391,20 +342,6 @@ function makeStyles(colors: AppColors) {
       fontWeight: '900',
       letterSpacing: 2,
       color: colors.textMuted,
-    },
-    joinFundBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      backgroundColor: colors.primaryLight,
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    joinFundBtnText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.primary,
     },
     filterScroll: {
       marginBottom: 14,
@@ -496,58 +433,17 @@ function makeStyles(colors: AppColors) {
       fontWeight: '700',
       color: colors.primary,
     },
-    quickActions: {
-      flexDirection: 'row',
-      gap: 20,
-    },
-    quickActionCard: {
-      flex: 1,
-      minHeight: 88,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: colors.surface,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 18,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.04,
-      shadowRadius: 14,
-      elevation: 2,
-    },
-    quickIcon: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: colors.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    quickTitle: {
-      fontSize: 18,
-      lineHeight: 22,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    quickSubtitle: {
-      fontSize: 15,
-      lineHeight: 20,
-      color: colors.textMuted,
-    },
-
     // ── Header ─────────────────────────────────────────────────
     avatarWrap: { position: 'relative' },
     avatar: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarText: { fontSize: 17, fontWeight: '900', color: '#FFFFFF' },
+    avatarText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
 
     scrollContent: { paddingHorizontal: 20, paddingTop: 30, paddingBottom: 48 },
   })

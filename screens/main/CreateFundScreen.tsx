@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Alert } from 'react-native'
 import * as Contacts from 'expo-contacts'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { RouteProp } from '@react-navigation/native'
+import { RouteProp, useFocusEffect } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import { supabase } from '../../lib/supabase'
+import { HomeItem } from './home/helpers'
+import { loadHomeItems } from './home/loadHomeItems'
 import {
   CUSTOM_EVENT_EMOJIS,
   CreateOption,
@@ -18,6 +20,7 @@ import {
   FUND_CURRENCIES,
   FundCurrency,
   PickedOrganiser,
+  QuickActionId,
 } from './createFund/constants'
 import { formatDateISO, formatTimeISO, getInitials, parseAmount, sanitizeAmountInput } from './createFund/format'
 import CreateOptionChooser from './createFund/CreateOptionChooser'
@@ -71,6 +74,60 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [eventVenue,     setEventVenue]     = useState('')
   const [isCreatingFund, setIsCreatingFund] = useState(false)
   const [isPrivate,      setIsPrivate]      = useState(false)
+  const [firstFundItem,  setFirstFundItem]  = useState<HomeItem | null>(null)
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      if (userId) {
+        loadHomeItems(userId)
+          .then(items => {
+            if (!active) return
+            setFirstFundItem(items.find(i => i.kind !== 'event' && i.status.toLowerCase() === 'active') ?? null)
+          })
+          .catch(() => { if (active) setFirstFundItem(null) })
+      }
+      return () => { active = false }
+    }, [userId])
+  )
+
+  function handleQuickAction(id: QuickActionId) {
+    if (id === 'join') {
+      navigation.navigate('JoinFund')
+      return
+    }
+    if (id === 'tokens') {
+      navigation.navigate('TokenPurchase')
+      return
+    }
+
+    const fund = firstFundItem
+    if (!fund?.fundId) {
+      Alert.alert('No active fund yet', 'Create a fund below, or join one with an invite code, to get started.')
+      return
+    }
+    const fundId = fund.fundId
+
+    switch (id) {
+      case 'contribution':
+        navigation.navigate('RecordContribution', {
+          fundId,
+          fundTitle:    fund.title,
+          currencyCode: fund.currency_code,
+        })
+        break
+      case 'expense':
+        navigation.navigate('RecordExpense', {
+          fundId,
+          fundTitle:    fund.title,
+          currencyCode: fund.currency_code,
+        })
+        break
+      case 'members':
+        navigation.navigate('FundDetail', { fundId })
+        break
+    }
+  }
 
   const isValid = name.trim().length >= 3
   const eventDetailsValid = eventName.trim().length >= 3 && eventDate !== null && eventTime !== null && eventVenue.trim().length >= 3
@@ -321,7 +378,7 @@ export default function CreateFundScreen({ navigation }: Props) {
   })
 
   if (!createOption) {
-    return <CreateOptionChooser onSelect={setCreateOption} onBack={handleBack} />
+    return <CreateOptionChooser onSelect={setCreateOption} onQuickAction={handleQuickAction} onBack={handleBack} />
   }
 
   if (createOption === 'eventFund' && eventFundTypeDone && !eventFundDetailsDone) {
