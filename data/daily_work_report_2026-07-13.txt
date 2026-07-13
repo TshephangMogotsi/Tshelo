@@ -1,0 +1,96 @@
+TSHELO WORK REPORT — 2026-07-13 (Monday, covering the 07-11/07-12 weekend + today)
+========================================
+
+The week's work landed as four commits today (f7f5f4d, 9e19c96, 5c60069,
+e822391). The feature work in the first three accumulated in the working
+tree between Tue 07-07 (baseline migration commit) and the weekend — the
+expense-edit DB migration's timestamp anchors that stream to Sunday 07-12.
+Today's own work was the SMS-detection scaffold: built, device-tested and
+verified end-to-end before committing.
+
+1. Expense Editing + Tamper-Proof Audit Trail (f7f5f4d, weekend)
+------------------------------------------------------------------
+- Organisers can edit expenses from Fund Detail via a new
+  EditExpenseModal; totals and balance recompute in place after save.
+- New ActivityLogModal behind a "History" link (organisers only) shows
+  every expense create/edit/soft-delete.
+- DB migration 20260712110000: an expenses UPDATE RLS policy restricted
+  to fund owners/admins (mirrors expenses_insert), plus a SECURITY
+  DEFINER trigger that writes every expense change to audit_log — the
+  trail cannot be forged or skipped by any client.
+- Amount summation now coerces with Number(...) to survive numeric
+  columns arriving as strings.
+
+2. Create-Hub Redesign, Home Declutter (9e19c96, weekend)
+------------------------------------------------------------------
+- The create screen is now the single action hub: quick-actions rail
+  (Join Fund / Record Contribution / Record Expense / Add Members) plus
+  a dedicated tokens section.
+- Fund-dependent actions resolve the user's first active fund via
+  loadHomeItems on focus and route straight there.
+- Home loses its Join Fund button and quick-action cards in exchange —
+  pre-redesign copies of the three touched files are parked untracked in
+  screens/main/createFund/_backup_pre_redesign/ (redundant now that the
+  originals are in git history; safe to delete).
+
+3. Screen Polish, Logos (5c60069, weekend)
+------------------------------------------------------------------
+- Tab screens pass explicit SafeAreaView edges (top/left/right) so
+  content reaches the bottom edge behind the tab bar.
+- Last "Tshelo icon.png" references now use tshelo-icon.png (closes the
+  stale-filename note from the 07-05 report).
+- Higher-res Orange Money and Smega logo assets; ProviderLogo sizing
+  tweaks.
+
+4. SMS Detection Scaffold — Built and Verified On-Device (e822391, today)
+------------------------------------------------------------------
+- New local Expo native module modules/sms-listener: a Kotlin
+  BroadcastReceiver forwards incoming SMS ({sender, body}, multipart
+  messages stitched) to JS while the app process is alive. RECEIVE_SMS
+  contributed via the module manifest and app.json.
+- lib/smsWatcher.ts requests the runtime permission and fires an
+  immediate local notification when a message matches the test trigger
+  "Hello Tshelo"; started from App.tsx once signed in.
+- Verified end-to-end today on a physical device (new test unit
+  RZCT80CFDZD): real SMS sent -> notification received. The dev client
+  APK with the module is EAS build versionCode 3 lineage, installed via
+  adb.
+- Build gotcha worth remembering: a local Expo module's build.gradle
+  MUST define android.defaultConfig.versionName —
+  expo-module-gradle-plugin otherwise fails the whole build with a
+  misleading error cascade blaming unrelated packages (first EAS build
+  failed on this; second succeeded).
+- Also in this commit: EAS dev/preview profiles emit APKs, parse-receipt
+  edge function reads the "Tshelo_key" secret (was ANTHROPIC_API_KEY),
+  project .claude/settings.json, and the 07-05 report file.
+
+5. Workflow / Environment Notes
+------------------------------------------------------------------
+- Local Android (gradle) builds are currently impossible on this Mac:
+  JAVA_HOME points at a nonexistent Android Studio JBR path. All native
+  builds go through EAS cloud (eas build --profile development
+  --platform android), artifact installed with adb install -r.
+- New test device connects over USB; if Wi-Fi dev-server discovery is
+  flaky: adb reverse tcp:8081 tcp:8081, then http://localhost:8081 in
+  the dev client.
+- Claude Code permission prompts disabled for this project
+  (defaultMode: bypassPermissions in .claude/settings.local.json).
+
+6. Known Open Items / What's Left
+------------------------------------------------------------------
+- SMS next steps: (a) capture real Orange Money / MyZaka / Smega
+  messages and correct smsParser.ts's provisional regex formats;
+  (b) swap smsWatcher's "Hello Tshelo" keyword check for
+  parseMobileMoneySms() and route parsed payments into the app;
+  (c) killed-app detection needs a manifest-declared receiver +
+  headless task (another native build); (d) RECEIVE_SMS is a restricted
+  permission on Google Play — shipping needs a permission declaration
+  or the paste-to-parse fallback the parser already supports.
+- CARRYOVER, STILL NOT FIXED (flagged since 07-03): EventFundBudgetStep's
+  onCreate (screens/main/CreateFundScreen.tsx:375-384) still only calls
+  hapticSuccess() and navigates to FundCreated — completing the
+  "Event + Fund" wizard creates nothing in the database.
+- Local main is 8 commits ahead of origin/main (4 pre-existing + today's
+  4) — nothing pushed yet.
+- screens/main/createFund/_backup_pre_redesign/ left untracked on
+  purpose; delete once comfortable the redesign sticks.
