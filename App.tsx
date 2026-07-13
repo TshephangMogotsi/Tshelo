@@ -14,6 +14,7 @@ import AuthNavigator from './navigation/AuthNavigator'
 import MainNavigator from './navigation/MainNavigator'
 import OnboardingScreen from './screens/onboarding/OnboardingScreen'
 import { registerForPushNotificationsAsync } from './lib/pushNotifications'
+import { startSmsWatcher } from './lib/smsWatcher'
 import type { MainStackParamList } from './navigation/types'
 
 const ONBOARDING_KEY = 'tshelo_onboarded_v1'
@@ -42,6 +43,14 @@ function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'Co
       registerForPushNotificationsAsync(userId)
     }
   }, [isAuthenticated, profileCompleted, userId])
+
+  useEffect(() => {
+    if (!isAuthenticated || !profileCompleted) return
+    const watcher = startSmsWatcher()
+    return () => {
+      watcher.then(subscription => subscription?.remove())
+    }
+  }, [isAuthenticated, profileCompleted])
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then(response => {

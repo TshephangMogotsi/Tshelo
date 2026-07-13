@@ -5,7 +5,7 @@ import Anthropic from 'npm:@anthropic-ai/sdk'
 // { image: <base64 jpeg/png>, mediaType: 'image/jpeg' | 'image/png' }.
 // Requires the ANTHROPIC_API_KEY function secret.
 
-const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
+const anthropic = new Anthropic({ apiKey: Deno.env.get('Tshelo_key')! })
 
 // Mirrors CATEGORIES in screens/main/recordExpense/categories.ts
 const CATEGORY_VALUES = [

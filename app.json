@@ -30,7 +30,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.digitalnatives.tshelo"
+      "package": "com.digitalnatives.tshelo",
+      "permissions": ["android.permission.RECEIVE_SMS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"

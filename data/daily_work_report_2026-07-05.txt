@@ -1,0 +1,146 @@
+TSHELO DAILY WORK REPORT — 2026-07-05 (Sunday)
+========================================
+
+Three commits landed today (09:11, 13:41, 13:50), all in the same
+device-testing-readiness -> polish -> new-parser arc. A fourth batch of
+work is sitting uncommitted in the working tree as of now (asset filename
+cleanup + a Home screen header sizing pass).
+
+1. Prepare App For Physical-Device Testing + Notifications Work (6281cd0)
+------------------------------------------------------------------
+- Real brand icon wired everywhere: app icon, adaptive icon, splash,
+  favicon, plus a new white monochrome notification icon generated from
+  the brand icon. app.json got launcher name "Tshelo", automatic
+  userInterfaceStyle, a black splash via expo-splash-screen, and the
+  expo-notifications plugin with the brand accent color; splash now holds
+  until fonts/storage finish loading (no white flash).
+- Connectivity: new context/ConnectivityContext.tsx (useConnectivity(),
+  useRequireOnline() guard) wired into every network submit handler —
+  auth OTP, record contribution/expense, create/join fund. New
+  components/OfflineBanner.tsx shows a global "you're offline" banner.
+- New components/ErrorBoundary.tsx wraps both App.tsx branches above
+  ThemeProvider, with restart via Updates.reloadAsync().
+- EAS Update configured: runtimeVersion tied to appVersion, preview/
+  production channels in eas.json — JS-only fixes can now ship without a
+  native rebuild.
+- Supabase auth auto-refresh now starts/stops on AppState foreground/
+  background (lib/supabase.ts).
+- Haptics wrappers (lib/haptics.ts) wired into money-flow success/error
+  paths and OTP verify.
+- Onboarding now shows once per install — removed the __DEV__ override
+  that had been forcing it to always show.
+- Fixed a KeyboardAvoidingView gap in EventTypeStep's custom input.
+- Excluded Deno edge functions from the app's typecheck pass.
+- This commit also swept in prior in-progress work that hadn't been
+  committed yet: the full push-notifications feature, fund-privacy/
+  member-profile/fund-creation SQL migration docs, and the
+  createFund/recordExpense/fundDetail/home module refactors — all
+  previously reported in the 2026-07-03 report as uncommitted working-tree
+  state. Net diff: 94 files, +16474/-5896.
+
+
+2. Provider Logos, Unit Tests, Hardware Back, Receipt Scanning (81703fa)
+------------------------------------------------------------------
+- New components/ProviderLogo.tsx (white chip, generated marks) now shows
+  wherever a provider tile appears: contribution picker, profile pill,
+  bank details, receive money, fund detail rows, activity method tags.
+  Backed by new PNG logo assets for Orange Money, MyZaka, and Smega.
+- Consolidated 5 separate copies of detectProvider() into a single
+  lib/providers.ts.
+- Testing infra added from scratch: jest-expo configured, 30 tests
+  covering provider-prefix detection, amount parsing, and money/date
+  formatting (lib/__tests__/providers.test.ts,
+  screens/main/createFund/__tests__/format.test.ts,
+  screens/main/home/__tests__/helpers.test.ts).
+- New lib/useHardwareBack.ts hook: Android hardware back now steps
+  backward through the CreateFund/RecordExpense wizards and the JoinFund
+  preview screen instead of popping the whole screen off the stack.
+- Receipt scanning shipped: new supabase/functions/parse-receipt edge
+  function (Claude Haiku vision + structured outputs, deployed), image
+  downscaling via expo-image-manipulator before upload, and ReviewStep
+  prefills from the parsed result with a loading/parsing state — falls
+  back to manual entry on failure.
+- Net diff: 26 files, +6944/-2881 (dominated by a package-lock.json
+  refresh for the new jest/jest-expo/image-manipulator dependencies).
+
+
+3. Mobile-Money SMS Parser — New, Provisional (57178b0)
+------------------------------------------------------------------
+- New lib/smsParser.ts: pure text-in/data-out parser for Orange Money,
+  MyZaka, and Smega SMS messages. Detects provider (by sender ID or body
+  keywords), direction, amount, counterparty name/phone, reference, and
+  balance.
+- 127 lines of tests in lib/__tests__/smsParser.test.ts covering the
+  provisional regex patterns.
+- Explicitly flagged in the commit message as provisional: formats are
+  guessed pending real captured SMS messages from each provider. Patterns
+  live as data (regexes + fixtures), not logic, so correcting them later
+  should only mean editing this one file plus its fixtures.
+- Not yet wired into any screen — no importer of smsParser.ts exists
+  outside its own test file, so nothing in the app calls it yet
+  (auto-detecting contributions from an incoming SMS is presumably the
+  intended next step, but that integration hasn't started).
+
+
+4. Uncommitted, In Progress — Asset Filename Cleanup + Home Header Sizing
+--------------------------------------------------------------------------------
+- Renamed 6 asset files to remove spaces from filenames (already staged):
+    assets/image 1.png       -> assets/image-1.png
+    assets/image 2.png       -> assets/image-2.png
+    assets/image 3.png       -> assets/image-3.png
+    assets/image 3 new.png   -> assets/image-3-new.png
+    assets/image 4.png       -> assets/image-4.png
+    assets/Tshelo icon.png   -> assets/tshelo-icon.png
+- All require() references updated to match, in WelcomeScreen.tsx,
+  screens/deprecated/OnboardingScreen.tsx, and
+  screens/onboarding/OnboardingScreen.tsx — grepped the tree for the old
+  spaced filenames and found no leftover references, so this rename looks
+  complete and safe to commit as-is.
+- HomeScreen.tsx header sizing pass (unstaged, not yet part of the above
+  rename commit): notification bell button 38->34px, avatar 52->38px
+  (avatar text 17->14pt), token pill height 38->34px. Purely visual,
+  no logic changes.
+- Note: device_testing_infra memory/notes still refer to
+  "assets/Tshelo icon.png" as the icon source of truth — that filename is
+  now stale and should be updated to tshelo-icon.png wherever documented.
+
+
+5. Known Open Items / What's Left
+------------------------------------------------------------------
+- Nothing from today (or the asset rename / header tweak in progress) is
+  pushed — local main is 3 commits ahead of origin/main, plus the
+  uncommitted rename/HomeScreen changes on top.
+- Uncommitted work needs to be committed: the staged asset renames and
+  the unstaged WelcomeScreen/OnboardingScreen(x2)/HomeScreen edits belong
+  together as one commit (rename + reference updates + header sizing).
+- CARRYOVER, STILL NOT FIXED: EventFundBudgetStep's onCreate handler
+  (screens/main/CreateFundScreen.tsx:372-381) still just calls
+  hapticSuccess() and navigates straight to FundCreatedScreen — it never
+  touches Supabase. Completing the "Event + Fund" creation wizard still
+  creates nothing in the database. This bug was first flagged in the
+  2026-07-03 report and was not touched by any of today's three commits.
+- smsParser.ts is standalone and unwired — no screen imports it yet, and
+  its provider SMS formats are explicitly provisional/unverified against
+  real messages. Next step is presumably wiring it into an SMS-listener
+  or contribution-detection flow, then correcting formats against real
+  captured messages.
+- Native android/ and ios/ directories (generated by expo prebuild during
+  the 2026-07-03 dev-build session) are now gitignored rather than
+  tracked — confirms that gap from the prior report is resolved, but also
+  means the native Android dev build from 2026-07-03 was never confirmed
+  as verified-working on-device in any commit message since; worth
+  re-confirming push notifications actually deliver on a real device.
+- Carryover from 2026-07-03, status unconfirmed by anything in today's
+  commits: whether get_fund_privacy and the private-fund pending/approval
+  schema (data/fund_privacy_sql_edits_log_1.0.txt) were ever actually
+  applied to the live DB, and whether the push_tokens -> send-push
+  Database Webhook has been configured in the Supabase dashboard. Neither
+  is scriptable/verifiable from the repo alone.
+- None of today's or the prior session's SQL changes (notifications
+  phase1/2, fund_privacy, fund_member_profiles, fund_creation) are
+  captured as tracked supabase/migrations files — everything lives as
+  narrative .txt logs in data/. This gap has now persisted across three
+  reports (07-01, 07-03, 07-05).
+- google-services.json was added to the repo (not gitignored) in today's
+  first commit for Android push (FCM) support — not a secret, but worth a
+  conscious call that it's meant to be committed rather than an oversight.

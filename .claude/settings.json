@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "mcp__supabase__get_logs",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__list_tables",
+      "Bash(supabase db *)",
+      "Bash(docker info *)",
+      "Read(//Applications/**)",
+      "Bash(pg_dump --version)",
+      "mcp__supabase__execute_sql"
+    ]
+  }
+}
