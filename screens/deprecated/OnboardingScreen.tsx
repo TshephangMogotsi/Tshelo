@@ -30,19 +30,19 @@ const SLIDES: Slide[] = [
     id:    '1',
     title: 'Save together\nBuild together',
     body:  'Pool contributions for funerals, weddings, graduations and more, all in one transparent place',
-    image: require('../../assets/image 1.png'),
+    image: require('../../assets/image-1.png'),
   },
   {
     id:    '2',
     title: 'Every thebe,\naccounted for',
     body:  'See who contributed what, in real time. No spreadsheets, no confusion, no chasing',
-    image: require('../../assets/image 2.png'),
+    image: require('../../assets/image-2.png'),
   },
   {
     id:    '3',
     title: 'Safe, private\nand yours',
     body:  'Phone verification only, bank-level security. Your community data stays under your control',
-    image: require('../../assets/image 3.png'),
+    image: require('../../assets/image-3.png'),
   },
 ]
 

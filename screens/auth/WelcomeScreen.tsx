@@ -31,7 +31,7 @@ export default function WelcomeScreen({ navigation }: Props) {
         <View style={styles.logoArea}>
           <View style={styles.logoRing}>
             <Image
-              source={require('../../assets/Tshelo icon.png')}
+              source={require('../../assets/tshelo-icon.png')}
               style={styles.logo}
               resizeMode="cover"
             />

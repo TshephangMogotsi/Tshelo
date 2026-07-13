@@ -35,25 +35,25 @@ const SLIDES: Slide[] = [
     id:    '1',
     title: 'Community contributions,\nmade transparent',
     body:  'Track motshelo, stokvels, and family funds with complete visibility for everyone.',
-    image: require('../../assets/image 1.png'),
+    image: require('../../assets/image-1.png'),
   },
   {
     id:    '2',
     title: 'Track every\ncontribution',
     body:  'See who contributed, how much, and when. No more spreadsheets or confusion.',
-    image: require('../../assets/image 2.png'),
+    image: require('../../assets/image-2.png'),
   },
   {
     id:    '3',
     title: 'Full audit trail',
     body:  'Every action is recorded. Everyone can see the complete history. No secrets.',
-    image: require('../../assets/image 3 new.png'),
+    image: require('../../assets/image-3-new.png'),
   },
   {
     id:    '4',
     title: 'We never touch\nyour money',
     body:  'Tshelo is a tracking layer only. Payments happen your way — cash, mobile money, or bank transfer.',
-    image: require('../../assets/image 4.png'),
+    image: require('../../assets/image-4.png'),
   },
 ]
 

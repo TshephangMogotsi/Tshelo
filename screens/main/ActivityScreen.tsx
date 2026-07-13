@@ -101,7 +101,7 @@ export default function ActivityScreen({ navigation }: { navigation: any }) {
     .filter(s => s.data.length > 0)
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={styles.header}>

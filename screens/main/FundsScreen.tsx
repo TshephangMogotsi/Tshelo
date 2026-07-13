@@ -78,7 +78,7 @@ export default function FundsScreen({ navigation }: { navigation: any }) {
   const activeFunds = MOCK_FUNDS.filter(f => f.status === 'active')
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* ── Header ─────────────────────────────── */}

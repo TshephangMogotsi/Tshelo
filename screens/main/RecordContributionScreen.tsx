@@ -390,7 +390,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
                     onPress={() => !isSaving && setProviderOverride(p.id)}
                     activeOpacity={0.8}
                   >
-                    <ProviderLogo provider={p.id} size={34} />
+                    <ProviderLogo provider={p.id} width={50} />
                     <Text style={[
                       styles.providerChipLabel,
                       provider === p.id && { color: p.color, fontWeight: '700' },
