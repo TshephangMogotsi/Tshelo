@@ -34,6 +34,7 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   member_removed:     'exit-outline',
   contribution_added: 'cash-outline',
   expense_added:      'receipt-outline',
+  sms_detected:       'chatbubble-ellipses-outline',
 }
 
 function timeAgo(iso: string): string {
@@ -106,6 +107,12 @@ export default function NotificationsScreen({ navigation }: Props) {
 
   function handlePress(item: NotificationRow) {
     if (!item.is_read) markRead([item.id])
+
+    const detected = item.data?.detectedSms
+    if (detected && typeof detected.amount === 'number' && typeof detected.smsBody === 'string') {
+      navigation.navigate('AssignContribution', { detected })
+      return
+    }
 
     const fundId = item.fund_id ?? item.data?.fundId
     if (fundId) navigation.navigate('FundDetail', { fundId })

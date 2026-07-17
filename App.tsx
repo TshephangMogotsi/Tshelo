@@ -27,6 +27,11 @@ export const navigationRef = createNavigationContainerRef<MainStackParamList>()
 
 function navigateFromNotificationData(data: Record<string, any> | undefined) {
   if (!navigationRef.isReady()) return
+  const detected = data?.detectedSms
+  if (detected && typeof detected.amount === 'number' && typeof detected.smsBody === 'string') {
+    navigationRef.navigate('AssignContribution', { detected })
+    return
+  }
   const fundId = data?.fundId
   if (typeof fundId === 'string') {
     navigationRef.navigate('FundDetail', { fundId })
@@ -45,12 +50,12 @@ function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'Co
   }, [isAuthenticated, profileCompleted, userId])
 
   useEffect(() => {
-    if (!isAuthenticated || !profileCompleted) return
-    const watcher = startSmsWatcher()
+    if (!isAuthenticated || !profileCompleted || !userId) return
+    const watcher = startSmsWatcher(userId)
     return () => {
       watcher.then(subscription => subscription?.remove())
     }
-  }, [isAuthenticated, profileCompleted])
+  }, [isAuthenticated, profileCompleted, userId])
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then(response => {

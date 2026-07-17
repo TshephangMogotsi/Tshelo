@@ -12,7 +12,7 @@ import {
   formatMoney,
 } from './types'
 
-export function ContributionRow({ item, currencyCode }: { item: Contribution; currencyCode: string }) {
+export function ContributionRow({ item, currencyCode, onPress }: { item: Contribution; currencyCode: string; onPress?: () => void }) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
 
@@ -21,9 +21,11 @@ export function ContributionRow({ item, currencyCode }: { item: Contribution; cu
     : colors.textMuted
 
   return (
-    <View style={styles.listRow}>
+    <TouchableOpacity style={styles.listRow} onPress={onPress} disabled={!onPress} activeOpacity={0.7}>
       {hasProviderLogo(item.payment_method) ? (
-        <ProviderLogo provider={item.payment_method} size={38} />
+        <View style={styles.providerLogoWrap}>
+          <ProviderLogo provider={item.payment_method} size={15} />
+        </View>
       ) : (
         <View style={[styles.providerDot, { backgroundColor: providerColor + '20' }]}>
           <Text style={[styles.providerDotText, { color: providerColor }]}>
@@ -42,6 +44,11 @@ export function ContributionRow({ item, currencyCode }: { item: Contribution; cu
             {item.confirmed_at ? formatDate(item.confirmed_at) : 'Pending'}
           </Text>
           <View style={styles.badgeRow}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>
+                {item.is_refunded ? 'Refunded' : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              </Text>
+            </View>
             {item.detected_via !== 'manual' && (
               <View style={styles.smsBadge}>
                 <Text style={styles.smsBadgeText}>SMS</Text>
@@ -51,7 +58,7 @@ export function ContributionRow({ item, currencyCode }: { item: Contribution; cu
         </View>
         {item.notes ? <Text style={styles.listRowNote}>{item.notes}</Text> : null}
       </View>
-    </View>
+    </TouchableOpacity>
   )
 }
 
@@ -196,6 +203,20 @@ export function PendingRequestRow({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
+    providerLogoWrap: { alignSelf: 'center' },
+    statusBadge: {
+      borderRadius: 10,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statusBadgeText: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
     listRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',

@@ -1,10 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { Text, StyleSheet, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import EventFundHero from './EventFundHero'
-import OrganiserSection, { makeOrganiserStyles } from './OrganiserSection'
+import FlowHeader from './FlowHeader'
+import OrganiserSection from './OrganiserSection'
 import { BRAND_PURPLE, BRAND_PURPLE_DARK, PickedOrganiser } from './constants'
 
 type Props = {
@@ -26,15 +25,13 @@ export default function EventFundOrganisersStep({
   onContinue,
   onBack,
 }: Props) {
-  const { colors } = useTheme()
+  const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
-  const organiserStyles = makeOrganiserStyles(colors)
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={BRAND_PURPLE} />
-
-      <EventFundHero stepsDone={3} onBack={onBack} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <FlowHeader title="Event + Fund" step="Step 3 of 4" onBack={onBack} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -44,41 +41,15 @@ export default function EventFundOrganisersStep({
         >
           <OrganiserSection
             subtitle="Who's on the planning committee? They'll manage both the event and fund."
-            count={3 + pickedOrganisers.length}
-            creatorInitials="TM"
-            creatorName="Tshephang Moagi"
+            count={1 + pickedOrganisers.length}
+            creatorInitials="ME"
+            creatorName="You"
             search={organiserSearch}
             onSearchChange={onOrganiserSearchChange}
             pickedOrganisers={pickedOrganisers}
             onAddFromContacts={onAddFromContacts}
             onRemoveOrganiser={onRemoveOrganiser}
-          >
-            <View style={organiserStyles.organiserCard}>
-              <View style={organiserStyles.blueAvatar}>
-                <Text style={organiserStyles.organiserAvatarText}>MK</Text>
-              </View>
-              <View style={organiserStyles.organiserBody}>
-                <Text style={organiserStyles.organiserName} numberOfLines={1}>Mpho Kgosi</Text>
-                <Text style={organiserStyles.organiserPhone} numberOfLines={1}>+267 74 123 456</Text>
-              </View>
-              <TouchableOpacity style={organiserStyles.organiserRemove} activeOpacity={0.75}>
-                <Ionicons name="close" size={28} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={organiserStyles.organiserCard}>
-              <View style={organiserStyles.orangeAvatar}>
-                <Text style={organiserStyles.organiserAvatarText}>KM</Text>
-              </View>
-              <View style={organiserStyles.organiserBody}>
-                <Text style={organiserStyles.organiserName} numberOfLines={1}>Kago Modise</Text>
-                <Text style={organiserStyles.organiserPhone} numberOfLines={1}>+267 74 789 012</Text>
-              </View>
-              <TouchableOpacity style={organiserStyles.organiserRemove} activeOpacity={0.75}>
-                <Ionicons name="close" size={28} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          </OrganiserSection>
+          />
 
           <TouchableOpacity style={styles.eventFundContinue} activeOpacity={0.86} onPress={onContinue}>
             <Text style={styles.eventFundContinueText}>Continue</Text>
@@ -95,15 +66,15 @@ function makeStyles(colors: AppColors) {
     flex: { flex: 1 },
     organisersScroll: {
       flexGrow: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: 28,
-      paddingTop: 34,
+      backgroundColor: colors.background,
+      paddingHorizontal: 24,
+      paddingTop: 28,
       paddingBottom: 44,
     },
     eventFundContinue: {
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: BRAND_PURPLE_DARK,
+      backgroundColor: BRAND_PURPLE,
       borderRadius: 28,
       paddingVertical: 17,
       shadowColor: BRAND_PURPLE,

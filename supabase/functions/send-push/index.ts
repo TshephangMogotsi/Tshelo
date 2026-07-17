@@ -47,6 +47,12 @@ Deno.serve(async (req) => {
   const notification = payload.record
   if (!notification?.user_id) return new Response('No recipient', { status: 200 })
 
+  // Rows the app already surfaced as a local device notification (e.g.
+  // SMS-detected money-in) only feed the in-app list — don't push twice.
+  if (notification.data?.suppress_push === true) {
+    return new Response('Push suppressed', { status: 200 })
+  }
+
   const { data: tokenRows, error: tokenError } = await supabase
     .from('push_tokens')
     .select('id, expo_push_token')

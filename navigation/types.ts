@@ -68,7 +68,7 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Home:     undefined
-  Funds:    undefined
+  Tokens:   undefined
   Activity: undefined
   Reports:  undefined
   Profile:  undefined
@@ -78,15 +78,16 @@ export type MainStackParamList = {
   Tabs:                undefined
   CreateFund:          { isFirst?: boolean } | undefined
   JoinFund:            { code?: string } | undefined
-  FundDetail:          { fundId: string }
+  FundDetail:          { fundId: string; tab?: 'contributions' | 'expenses' | 'members' }
   EventDetail:         { eventId: string }
   GuestList:           { eventId: string }
   EventBudget:         { eventId: string }
   RecordContribution:  { fundId: string; fundTitle: string; currencyCode: string }
+  AssignContribution:  { detected: import('../lib/smsWatcher').DetectedSms }
   RecordExpense:       { fundId: string; fundTitle: string; currencyCode: string }
   TokenPurchase:       undefined
   Support:             undefined
   Settings:            undefined
   Notifications:       undefined
-  FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; targetDate?: string; shareCode?: string; fundId?: string }
+  FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; currencyCode?: string; currencySymbol?: string; targetDate?: string; shareCode?: string; fundId?: string }
 }

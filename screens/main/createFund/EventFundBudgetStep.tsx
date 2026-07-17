@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, Keyboar
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import EventFundHero from './EventFundHero'
+import FlowHeader from './FlowHeader'
 import { formatWholeAmount, parseAmount } from './format'
 import { BRAND_LAVENDER, BRAND_PURPLE, EVENT_BUDGET_PRESETS } from './constants'
 
@@ -11,6 +11,7 @@ type Props = {
   onEventBudgetChange: (text: string) => void
   fundGoalPercent: number
   eventName: string
+  isCreating: boolean
   onCreate: (fundGoalAmount: number) => void
   onBack: () => void
 }
@@ -20,10 +21,11 @@ export default function EventFundBudgetStep({
   onEventBudgetChange,
   fundGoalPercent,
   eventName,
+  isCreating,
   onCreate,
   onBack,
 }: Props) {
-  const { colors } = useTheme()
+  const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
   const budgetAmount = parseAmount(eventBudget)
@@ -33,9 +35,8 @@ export default function EventFundBudgetStep({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={BRAND_PURPLE} />
-
-      <EventFundHero stepsDone={4} onBack={onBack} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <FlowHeader title="Event + Fund" step="Step 4 of 4" onBack={onBack} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -44,7 +45,7 @@ export default function EventFundBudgetStep({
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.budgetTitle}>Budget &amp; Goal</Text>
-          <Text style={styles.budgetSubtitle}>Set your event budget and fund goal</Text>
+          <Text style={styles.budgetSubtitle}>Set the total budget and review the fund target.</Text>
 
           <View style={styles.budgetSectionTitleRow}>
             <Text style={styles.budgetSectionIcon}>📋</Text>
@@ -122,14 +123,14 @@ export default function EventFundBudgetStep({
           </View>
 
           <TouchableOpacity
-            style={[styles.createEventFundButton, !canCreateEventFund && styles.eventContinueDisabled]}
-            activeOpacity={canCreateEventFund ? 0.86 : 1}
+            style={[styles.createEventFundButton, (!canCreateEventFund || isCreating) && styles.eventContinueDisabled]}
+            activeOpacity={canCreateEventFund && !isCreating ? 0.86 : 1}
             onPress={() => {
-              if (!canCreateEventFund) return
+              if (!canCreateEventFund || isCreating) return
               onCreate(fundGoalAmount)
             }}
           >
-            <Text style={styles.createEventFundButtonText}>✨ Create Event +{'\n'}Fund</Text>
+            <Text style={styles.createEventFundButtonText}>{isCreating ? 'Creating...' : 'Create Event + Fund'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -143,21 +144,21 @@ function makeStyles(colors: AppColors) {
     flex: { flex: 1 },
     budgetScroll: {
       flexGrow: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: 28,
-      paddingTop: 34,
+      backgroundColor: colors.background,
+      paddingHorizontal: 24,
+      paddingTop: 28,
       paddingBottom: 44,
     },
     budgetTitle: {
-      fontSize: 28,
-      lineHeight: 34,
+      fontSize: 24,
+      lineHeight: 30,
       fontWeight: '900',
       color: colors.textPrimary,
       marginBottom: 12,
     },
     budgetSubtitle: {
-      fontSize: 18,
-      lineHeight: 26,
+      fontSize: 15,
+      lineHeight: 21,
       color: colors.textMuted,
       marginBottom: 28,
     },
@@ -186,30 +187,29 @@ function makeStyles(colors: AppColors) {
       marginBottom: 16,
     },
     eventBudgetInputBox: {
-      minHeight: 108,
+      minHeight: 56,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: BRAND_PURPLE,
-      borderRadius: 16,
-      paddingHorizontal: 22,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingHorizontal: 16,
       marginBottom: 14,
     },
     eventBudgetCurrency: {
-      fontSize: 26,
+      fontSize: 16,
       fontWeight: '900',
       color: colors.textMuted,
       marginRight: 2,
     },
     eventBudgetInput: {
-      minWidth: 150,
-      fontSize: 39,
-      fontWeight: '900',
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '400',
       color: colors.textPrimary,
       paddingVertical: 16,
-      textAlign: 'center',
     },
     eventBudgetPresetRow: {
       flexDirection: 'row',
@@ -218,11 +218,13 @@ function makeStyles(colors: AppColors) {
     },
     eventBudgetPreset: {
       flex: 1,
-      minHeight: 40,
+      minHeight: 48,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#F7F7FA',
-      borderRadius: 9,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
     },
     eventBudgetPresetActive: {
       backgroundColor: BRAND_PURPLE,
@@ -247,8 +249,8 @@ function makeStyles(colors: AppColors) {
       textAlign: 'center',
     },
     percentValue: {
-      fontSize: 60,
-      lineHeight: 68,
+      fontSize: 36,
+      lineHeight: 44,
       fontWeight: '900',
       color: BRAND_PURPLE,
       textAlign: 'center',
@@ -263,24 +265,24 @@ function makeStyles(colors: AppColors) {
       marginBottom: 20,
     },
     percentTrack: {
-      height: 14,
-      borderRadius: 7,
+      height: 8,
+      borderRadius: 4,
       backgroundColor: colors.border,
       marginBottom: 12,
       overflow: 'visible',
     },
     percentFill: {
       height: '100%',
-      borderRadius: 7,
+      borderRadius: 4,
       backgroundColor: BRAND_PURPLE,
     },
     percentThumb: {
       position: 'absolute',
-      top: -8,
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      marginLeft: -15,
+      top: -6,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      marginLeft: -10,
       backgroundColor: colors.surface,
       borderWidth: 2,
       borderColor: BRAND_PURPLE,
@@ -298,8 +300,8 @@ function makeStyles(colors: AppColors) {
     fundGoalCard: {
       alignItems: 'center',
       backgroundColor: BRAND_LAVENDER,
-      borderRadius: 18,
-      paddingVertical: 24,
+      borderRadius: 14,
+      paddingVertical: 18,
       marginBottom: 20,
     },
     fundGoalCardLabel: {
@@ -308,15 +310,17 @@ function makeStyles(colors: AppColors) {
       marginBottom: 8,
     },
     fundGoalCardValue: {
-      fontSize: 38,
-      lineHeight: 45,
+      fontSize: 28,
+      lineHeight: 34,
       fontWeight: '900',
       color: BRAND_PURPLE,
     },
     budgetSummaryCard: {
       flexDirection: 'row',
-      backgroundColor: '#DBEAFE',
-      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
       paddingHorizontal: 16,
       paddingVertical: 18,
       marginBottom: 28,
@@ -349,10 +353,10 @@ function makeStyles(colors: AppColors) {
     createEventFundButton: {
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#16A34A',
+      backgroundColor: BRAND_PURPLE,
       borderRadius: 28,
       paddingVertical: 17,
-      shadowColor: '#16A34A',
+      shadowColor: BRAND_PURPLE,
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.24,
       shadowRadius: 14,

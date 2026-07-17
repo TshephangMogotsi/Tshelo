@@ -11,7 +11,7 @@ type Props = {
 }
 
 export default function HomeItemCard({ item, onPress }: Props) {
-  const { colors } = useTheme()
+  const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
   const pct     = item.goal_amount > 0 ? Math.round((item.total_contributions / item.goal_amount) * 100) : 0
@@ -20,80 +20,86 @@ export default function HomeItemCard({ item, onPress }: Props) {
 
   return (
     <TouchableOpacity
-      style={styles.overviewCard}
+      style={[
+        styles.overviewCard,
+        isEvent ? styles.eventCard : isEF ? styles.eventFundCard : styles.fundCard,
+        isDark && styles.darkCard,
+      ]}
       onPress={onPress}
       activeOpacity={0.85}
     >
-      <View style={styles.overviewTop}>
-        <View style={[styles.fundLetterIcon, (isEvent || isEF) && styles.eventLetterIcon]}>
-          <Text style={styles.fundLetterText}>{item.emoji}</Text>
-        </View>
-        <View style={styles.overviewInfo}>
-          <Text style={styles.overviewTitle} numberOfLines={1}>{item.title}</Text>
-          <View style={styles.overviewTagRow}>
-            <View style={[styles.overviewTag, (isEvent || isEF) && styles.eventTag]}>
-              <Text style={[styles.overviewTagText, (isEvent || isEF) && styles.eventTagText]}>{item.category}</Text>
-            </View>
-            {!isEvent && item.role === 'member' && (
-              <View style={styles.memberBadge}>
-                <Text style={styles.memberBadgeText}>Member</Text>
+      <View style={styles.cardPanel}>
+        <View style={styles.overviewTop}>
+          <View style={styles.fundLetterIcon}>
+            <Text style={styles.fundLetterText}>{item.emoji}</Text>
+          </View>
+          <View style={styles.overviewInfo}>
+            <Text style={styles.overviewTitle} numberOfLines={1}>{item.title}</Text>
+            <View style={styles.overviewTagRow}>
+              <View style={styles.overviewTag}>
+                <Text style={styles.overviewTagText}>{item.category}</Text>
               </View>
-            )}
+              {!isEvent && item.role === 'member' && (
+                <View style={styles.memberBadge}>
+                  <Text style={styles.memberBadgeText}>Member</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
+
+        {!isEvent && (
+          <View style={styles.progressTrack}>
+            <LinearGradient
+              colors={[colors.primary, '#55CFC6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` as any }]}
+            />
+          </View>
+        )}
+
+        {(isEvent || isEF) && (
+          <View style={styles.eventMetaCard}>
+            <View style={styles.eventMetaItem}>
+              <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.eventMetaText} numberOfLines={1}>{formatEventDate(item.event_date)}</Text>
+            </View>
+            <View style={[styles.eventMetaItem, styles.eventMetaVenue]}>
+              <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.eventMetaText, styles.eventMetaVenueText]} numberOfLines={1}>{item.venue_name || 'Venue TBC'}</Text>
+            </View>
+            <View style={styles.eventMetaItem}>
+              <Ionicons name="people-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.eventMetaText} numberOfLines={1}>{item.guest_count}</Text>
+            </View>
+          </View>
+        )}
+
+        {!isEvent && (
+          <View style={styles.fundAmountsRow}>
+            <View style={styles.fundAmount}>
+              <Text style={styles.fundAmountLabel}>Available balance</Text>
+              <Text style={styles.fundAmountValue}>{formatMoney(item.balance, item.currency_code)}</Text>
+            </View>
+            <View style={[styles.fundAmount, styles.fundAmountRight]}>
+              <Text style={styles.fundAmountLabel}>Goal</Text>
+              <Text style={styles.fundAmountValue}>{formatMoney(item.goal_amount, item.currency_code)}</Text>
+            </View>
+          </View>
+        )}
       </View>
 
-      {!isEvent && (
-        <View style={styles.progressTrack}>
-          <LinearGradient
-            colors={[colors.primary, '#55CFC6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` as any }]}
-          />
-        </View>
-      )}
-
-      {(isEvent || isEF) && (
-        <View style={styles.eventMetaCard}>
-          <View style={styles.eventMetaItem}>
-            <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
-            <Text style={styles.eventMetaText}>{formatEventDate(item.event_date)}</Text>
-          </View>
-          <View style={styles.eventMetaItem}>
-            <Ionicons name="location-outline" size={15} color={colors.textMuted} />
-            <Text style={styles.eventMetaText} numberOfLines={1}>{item.venue_name || 'Venue TBC'}</Text>
-          </View>
-          <View style={styles.eventMetaItem}>
-            <Ionicons name="people-outline" size={15} color={colors.textMuted} />
-            <Text style={styles.eventMetaText}>{item.guest_count} {item.guest_count === 1 ? 'guest' : 'guests'}</Text>
-          </View>
-        </View>
-      )}
-
       <View style={styles.overviewBottom}>
-        <Text style={styles.overviewMeta}>
+        <Text style={styles.overviewMeta} numberOfLines={1}>
           {isEvent
             ? `${item.guest_count} invited`
             : `${formatMoney(item.total_contributions, item.currency_code)} contributed · ${item.member_count} members`}
         </Text>
-        <Text style={[styles.overviewAction, (isEvent || isEF) && styles.eventAction]}>
+        <Text style={styles.overviewAction}>
           {isEvent ? 'View event' : `${pct}%`}
         </Text>
       </View>
-
-      {!isEvent && (
-        <View style={styles.fundAmountsRow}>
-          <View style={styles.fundAmount}>
-            <Text style={styles.fundAmountLabel}>Available balance</Text>
-            <Text style={styles.fundAmountValue}>{formatMoney(item.balance, item.currency_code)}</Text>
-          </View>
-          <View style={[styles.fundAmount, styles.fundAmountRight]}>
-            <Text style={styles.fundAmountLabel}>Goal</Text>
-            <Text style={styles.fundAmountValue}>{formatMoney(item.goal_amount, item.currency_code)}</Text>
-          </View>
-        </View>
-      )}
     </TouchableOpacity>
   )
 }
@@ -101,33 +107,46 @@ export default function HomeItemCard({ item, onPress }: Props) {
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
     overviewCard: {
+      borderRadius: 21,
+      borderWidth: 1,
+      borderColor: '#D2C2FF',
+      backgroundColor: '#E7DEFF',
+      shadowColor: '#5A3FA3',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.13,
+      shadowRadius: 16,
+      elevation: 5,
+      overflow: 'visible',
+    },
+    fundCard: { backgroundColor: '#E7DEFF', borderColor: '#D2C2FF' },
+    eventCard: { backgroundColor: '#FFF0C2', borderColor: '#F5D977' },
+    eventFundCard: { backgroundColor: '#FFD8D0', borderColor: '#FFBCAF' },
+    darkCard: { backgroundColor: colors.primaryLight, borderColor: colors.border },
+    cardPanel: {
       backgroundColor: colors.surface,
-      borderRadius: 20,
-      padding: 14,
+      borderRadius: 19,
       borderWidth: 1,
       borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.04,
-      shadowRadius: 14,
-      elevation: 2,
+      padding: 14,
+      shadowColor: '#3C286B',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 9,
+      elevation: 3,
     },
     overviewTop: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
-      marginBottom: 14,
+      gap: 11,
+      marginBottom: 12,
     },
     fundLetterIcon: {
-      width: 46,
-      height: 46,
-      borderRadius: 23,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.primary,
-    },
-    eventLetterIcon: {
-      backgroundColor: '#55CFC6',
     },
     fundLetterText: {
       fontSize: 19,
@@ -136,12 +155,12 @@ function makeStyles(colors: AppColors) {
     },
     overviewInfo: {
       flex: 1,
-      gap: 9,
+      gap: 5,
     },
     overviewTitle: {
-      fontSize: 20,
-      lineHeight: 24,
-      fontWeight: '900',
+      fontSize: 16,
+      lineHeight: 21,
+      fontWeight: '800',
       color: colors.textPrimary,
     },
     overviewTagRow: {
@@ -152,55 +171,57 @@ function makeStyles(colors: AppColors) {
     },
     overviewTag: {
       alignSelf: 'flex-start',
-      minWidth: 95,
+      minWidth: 0,
       alignItems: 'center',
       backgroundColor: colors.primaryLight,
-      borderRadius: 18,
-      paddingHorizontal: 18,
-      paddingVertical: 8,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
     },
     overviewTagText: {
-      fontSize: 15,
-      fontWeight: '900',
+      fontSize: 10,
+      fontWeight: '700',
       color: colors.primary,
     },
     memberBadge: {
       alignSelf: 'flex-start',
       backgroundColor: colors.surface,
-      borderRadius: 18,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
       borderWidth: 1,
       borderColor: colors.border,
     },
     memberBadgeText: {
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: '600',
       color: colors.textMuted,
     },
-    eventTag: {
-      backgroundColor: '#CFF5EF',
-    },
-    eventTagText: {
-      color: '#0F9F8D',
-    },
     eventMetaCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 7,
-      marginBottom: 12,
-      paddingHorizontal: 11,
-      paddingVertical: 10,
-      borderRadius: 12,
-      backgroundColor: colors.background,
+      marginBottom: 2,
     },
     eventMetaItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
+      justifyContent: 'center',
+      gap: 5,
+      flexShrink: 0,
+      minHeight: 34,
+      paddingHorizontal: 9,
+      paddingVertical: 7,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
     },
+    eventMetaVenue: { flex: 1, minWidth: 0, flexShrink: 1 },
+    eventMetaVenueText: { flex: 1, minWidth: 0 },
     eventMetaText: {
-      flex: 1,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 11,
+      lineHeight: 15,
       fontWeight: '700',
       color: colors.textSecondary,
     },
@@ -209,56 +230,66 @@ function makeStyles(colors: AppColors) {
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
+      minHeight: 42,
+      paddingHorizontal: 16,
+      paddingTop: 7,
+      paddingBottom: 8,
     },
     overviewMeta: {
       flex: 1,
-      fontSize: 16,
-      lineHeight: 21,
+      fontSize: 12,
+      lineHeight: 17,
       fontWeight: '500',
-      color: colors.textSecondary,
+      color: colors.textPrimary,
+      opacity: 0.68,
     },
     overviewAction: {
-      fontSize: 16,
+      fontSize: 12,
       fontWeight: '900',
       color: colors.primary,
-    },
-    eventAction: {
-      color: '#059669',
+      letterSpacing: 0.3,
     },
     fundAmountsRow: {
       flexDirection: 'row',
-      gap: 12,
-      marginTop: 12,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
+      gap: 8,
+      marginTop: 10,
     },
     fundAmount: {
       flex: 1,
-      gap: 3,
+      gap: 2,
+      minHeight: 51,
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 11,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
     },
     fundAmountRight: {
-      alignItems: 'flex-end',
+      alignItems: 'flex-start',
     },
     fundAmountLabel: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: 9,
+      lineHeight: 13,
       fontWeight: '700',
       color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.45,
     },
     fundAmountValue: {
-      fontSize: 15,
-      lineHeight: 20,
+      fontSize: 14,
+      lineHeight: 19,
       fontWeight: '900',
       color: colors.textPrimary,
     },
     progressTrack: {
-      height: 12,
-      borderRadius: 6,
+      height: 7,
+      borderRadius: 4,
       backgroundColor: colors.border,
       overflow: 'hidden',
       marginBottom: 6,
     },
-    progressFill: { height: '100%', borderRadius: 6, backgroundColor: colors.primary },
+    progressFill: { height: '100%', borderRadius: 4, backgroundColor: colors.primary },
   })
 }

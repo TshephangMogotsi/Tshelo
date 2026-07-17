@@ -4,7 +4,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import EventFundHero from './EventFundHero'
+import FlowHeader from './FlowHeader'
 import DateTimeSheet from './DateTimeSheet'
 import { formatDateDisplay, formatTimeDisplay } from './format'
 import { BRAND_LAVENDER, BRAND_PURPLE, BRAND_PURPLE_DARK } from './constants'
@@ -42,7 +42,7 @@ export default function EventFundDetailsStep({
   onContinue,
   onBack,
 }: Props) {
-  const { colors } = useTheme()
+  const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
@@ -52,9 +52,8 @@ export default function EventFundDetailsStep({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={BRAND_PURPLE} />
-
-      <EventFundHero stepsDone={2} onBack={onBack} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <FlowHeader title="Event + Fund" step="Step 2 of 4" onBack={onBack} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -62,13 +61,8 @@ export default function EventFundDetailsStep({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.eventFundDetailsIntro}>
-            <Text style={styles.eventFundDetailsEmoji}>{selectedEventEmoji}</Text>
-            <View style={styles.eventFundDetailsIntroText}>
-              <Text style={styles.eventFundDetailsTitle}>Event details</Text>
-              <Text style={styles.eventFundDetailsSubtitle}>Tell us about your {selectedEventLabel.toLowerCase()}</Text>
-            </View>
-          </View>
+          <Text style={styles.eventFundDetailsTitle}>{selectedEventEmoji} Event details</Text>
+          <Text style={styles.eventFundDetailsSubtitle}>Tell us about your {selectedEventLabel.toLowerCase()}.</Text>
 
           <View style={styles.eventFundDetailsField}>
             <Text style={styles.eventFundDetailsLabel}>Event name</Text>
@@ -83,8 +77,7 @@ export default function EventFundDetailsStep({
               }}
               maxLength={90}
               autoCapitalize="words"
-              multiline
-              textAlignVertical="center"
+              returnKeyType="next"
             />
           </View>
 
@@ -132,14 +125,9 @@ export default function EventFundDetailsStep({
             </View>
           </View>
 
-          <View style={styles.eventFundNameCard}>
-            <View style={styles.eventFundNameHeader}>
-              <Text style={styles.eventFundNameLabel}>💜  Fund name</Text>
-              <TouchableOpacity onPress={() => onFundNameChange(derivedFundName)} activeOpacity={0.8}>
-                <Text style={styles.eventFundEditText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.eventFundDerivedName}>{derivedFundName}</Text>
+          <View style={styles.eventFundDetailsField}>
+            <Text style={styles.eventFundDetailsLabel}>Fund name</Text>
+            <TextInput style={styles.eventFundDetailsNameInput} value={derivedFundName} onChangeText={onFundNameChange} maxLength={90} />
           </View>
 
           <DateTimeSheet
@@ -180,98 +168,83 @@ function makeStyles(colors: AppColors) {
     flex: { flex: 1 },
     eventFundDetailsScroll: {
       flexGrow: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: 28,
-      paddingTop: 34,
+      backgroundColor: colors.background,
+      paddingHorizontal: 24,
+      paddingTop: 28,
       paddingBottom: 44,
     },
-    eventFundDetailsIntro: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 18,
-      marginBottom: 28,
-    },
-    eventFundDetailsEmoji: {
-      width: 76,
-      fontSize: 48,
-      textAlign: 'center',
-    },
-    eventFundDetailsIntroText: {
-      flex: 1,
-    },
     eventFundDetailsTitle: {
-      fontSize: 27,
-      lineHeight: 33,
+      fontSize: 24,
+      lineHeight: 30,
       fontWeight: '900',
       color: colors.textPrimary,
       marginBottom: 4,
     },
     eventFundDetailsSubtitle: {
-      fontSize: 18,
-      lineHeight: 25,
+      fontSize: 15,
+      lineHeight: 21,
       color: colors.textMuted,
-    },
-    eventFundDetailsField: {
       marginBottom: 24,
     },
+    eventFundDetailsField: {
+      marginBottom: 20,
+    },
     eventFundDetailsLabel: {
-      fontSize: 17,
-      lineHeight: 22,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginBottom: 10,
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textMuted,
+      marginBottom: 8,
     },
     eventFundDetailsNameInput: {
-      minHeight: 116,
+      minHeight: 56,
       backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: BRAND_PURPLE,
-      borderRadius: 16,
-      paddingHorizontal: 22,
-      paddingVertical: 18,
-      fontSize: 21,
-      lineHeight: 27,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      fontSize: 16,
       color: colors.textPrimary,
     },
     eventFundDateTimeRow: {
       flexDirection: 'row',
-      gap: 20,
-      marginBottom: 24,
+      gap: 12,
+      marginBottom: 20,
     },
     eventFundDateTimeField: {
       flex: 1,
     },
     eventFundDateTimeBox: {
-      minHeight: 92,
+      minHeight: 56,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.border,
-      borderRadius: 16,
+      borderRadius: 14,
       paddingHorizontal: 12,
       paddingVertical: 16,
     },
     eventFundDateTimeText: {
-      fontSize: 19,
-      lineHeight: 25,
+      fontSize: 16,
+      lineHeight: 22,
       color: colors.textPrimary,
       textAlign: 'center',
     },
     eventFundVenueBox: {
-      minHeight: 100,
+      minHeight: 82,
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.border,
-      borderRadius: 16,
-      paddingHorizontal: 22,
+      borderRadius: 14,
+      paddingHorizontal: 16,
     },
     eventFundVenueInput: {
       flex: 1,
-      fontSize: 19,
-      lineHeight: 26,
+      fontSize: 16,
+      lineHeight: 22,
       color: colors.textPrimary,
       paddingVertical: 18,
     },
@@ -306,7 +279,7 @@ function makeStyles(colors: AppColors) {
     eventFundContinue: {
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: BRAND_PURPLE_DARK,
+      backgroundColor: BRAND_PURPLE,
       borderRadius: 28,
       paddingVertical: 17,
       shadowColor: BRAND_PURPLE,

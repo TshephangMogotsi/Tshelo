@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons'
-import countries from 'world-countries'
 
 export const BRAND_PURPLE = '#7657F0'
 export const BRAND_PURPLE_DARK = '#7439E0'
@@ -10,7 +9,7 @@ export const BACK_HIT_SLOP = { top: 10, right: 10, bottom: 10, left: 10 }
 
 export type CreateOption = 'event' | 'fund' | 'eventFund'
 export type QuickActionId = 'join' | 'contribution' | 'expense' | 'members' | 'tokens'
-export type FundCurrency = string
+export type FundCurrency = 'BWP' | 'ZAR' | 'USD' | 'KES'
 export type PickedOrganiser = {
   id: string
   name: string
@@ -67,8 +66,7 @@ export const QUICK_ACTIONS: {
   { id: 'contribution', title: 'Record',  subtitle: 'Contribution', icon: 'add-circle-outline', needsFund: true },
   { id: 'expense',      title: 'Record',  subtitle: 'Expense',      icon: 'receipt-outline',    needsFund: true },
   { id: 'members',      title: 'Add',     subtitle: 'Members',      icon: 'person-add-outline', needsFund: true },
-  // 'tokens' is intentionally not in this list — it gets its own section
-  // on the create hub instead of a rail chip (see CreateOptionChooser)
+  { id: 'tokens',       title: 'Buy',     subtitle: 'Tokens',       icon: 'cash-outline',       needsFund: false },
 ]
 
 export const CREATE_OPTIONS: {
@@ -111,38 +109,15 @@ export const CREATE_OPTIONS: {
   },
 ]
 
-type FundCurrencyOption = {
+export const FUND_CURRENCIES: {
   id: FundCurrency
   code: string
   name: string
   helper?: string
   symbol: string
-}
-
-const currencyByCode = new Map<string, FundCurrencyOption>()
-for (const country of countries) {
-  for (const [code, details] of Object.entries(country.currencies)) {
-    if (!currencyByCode.has(code)) {
-      currencyByCode.set(code, { id: code, code, name: details.name, symbol: details.symbol || code })
-    }
-  }
-}
-
-const primaryCurrencyOverrides: Record<string, Partial<FundCurrencyOption>> = {
-  BWP: { name: 'Pula', symbol: 'P', helper: 'Your home currency' },
-  ZAR: { name: 'Rand', symbol: 'R' },
-  USD: { name: 'US dollar', symbol: '$' },
-}
-
-for (const [code, overrides] of Object.entries(primaryCurrencyOverrides)) {
-  const currency = currencyByCode.get(code)
-  if (currency) currencyByCode.set(code, { ...currency, ...overrides })
-}
-
-export const FUND_CURRENCIES: FundCurrencyOption[] = [...currencyByCode.values()].sort((a, b) => {
-  const primaryOrder = ['BWP', 'ZAR', 'USD']
-  const aIndex = primaryOrder.indexOf(a.code)
-  const bIndex = primaryOrder.indexOf(b.code)
-  if (aIndex !== -1 || bIndex !== -1) return (aIndex === -1 ? primaryOrder.length : aIndex) - (bIndex === -1 ? primaryOrder.length : bIndex)
-  return a.name.localeCompare(b.name)
-})
+}[] = [
+  { id: 'BWP', code: 'BWP', name: 'Pula',     helper: 'Your home currency', symbol: 'P' },
+  { id: 'ZAR', code: 'ZAR', name: 'Rand',     symbol: 'R' },
+  { id: 'USD', code: 'USD', name: 'Dollar',   symbol: '$' },
+  { id: 'KES', code: 'KES', name: 'Shilling', symbol: 'KSh' },
+]

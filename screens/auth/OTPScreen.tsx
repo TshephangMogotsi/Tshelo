@@ -155,7 +155,12 @@ export default function OTPScreen({ navigation, route }: Props) {
 
     if (!profile?.profile_completed) {
       navigation.navigate('ProfileSetup')
+      return
     }
+
+    // Make the navigator react immediately after a successful login instead
+    // of relying solely on the auth event timing.
+    await refreshProfile()
   }
 
   const { isDark } = useTheme()

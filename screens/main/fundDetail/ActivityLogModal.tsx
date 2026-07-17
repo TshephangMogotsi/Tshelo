@@ -7,9 +7,11 @@ import { supabase } from '../../../lib/supabase'
 import { makeCommonStyles } from '../recordExpense/common'
 import { CATEGORIES } from '../recordExpense/categories'
 import { formatMoney } from './types'
+import ActivityDetailsModal from './ActivityDetailsModal'
 
-type AuditEntry = {
+export type AuditEntry = {
   id:          string
+  entity_id:   string
   user_id:     string | null
   action:      string
   entity_type: string
@@ -26,6 +28,17 @@ type Props = {
   onClose: () => void
 }
 
+type LogFilter = 'all' | 'contribution' | 'expense' | 'member' | 'fund' | 'edits'
+
+const FILTERS: { id: LogFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'contribution', label: 'Contributions' },
+  { id: 'expense', label: 'Expenses' },
+  { id: 'member', label: 'Members' },
+  { id: 'fund', label: 'Fund' },
+  { id: 'edits', label: 'Edits' },
+]
+
 const ACTION_LABELS: Record<string, string> = {
   created: 'added',
   updated: 'edited',
@@ -37,6 +50,17 @@ const FIELD_LABELS: Record<string, string> = {
   vendor_name: 'Vendor',
   amount:      'Amount',
   category:    'Category',
+  contributor_name: 'Contributor',
+  payment_method: 'Payment method',
+  reference_number: 'Reference',
+  status: 'Status',
+  is_refunded: 'Refunded',
+  role: 'Role',
+  name: 'Member',
+  title: 'Fund name',
+  goal_amount: 'Goal',
+  contribution_deadline: 'Deadline',
+  is_private: 'Privacy',
 }
 
 export default function ActivityLogModal({ visible, fundId, currencyCode, memberNames, onClose }: Props) {
@@ -47,6 +71,8 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
   const [entries, setEntries]     = useState<AuditEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<LogFilter>('all')
+  const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null)
 
   useEffect(() => {
     if (!visible) return
@@ -58,7 +84,7 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
 
       const { data, error } = await supabase
         .from('audit_log')
-        .select('id, user_id, action, entity_type, old_values, new_values, created_at')
+        .select('id, entity_id, user_id, action, entity_type, old_values, new_values, created_at')
         .eq('fund_id', fundId)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -78,7 +104,9 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
 
   function formatValue(field: string, value: unknown): string {
     if (value === null || value === undefined || value === '') return '—'
-    if (field === 'amount') return formatMoney(Number(value), currencyCode)
+    if (field === 'amount' || field === 'goal_amount') return formatMoney(Number(value), currencyCode)
+    if (field === 'is_private') return value ? 'Private' : 'Public'
+    if (field === 'is_refunded') return value ? 'Yes' : 'No'
     if (field === 'category') {
       return CATEGORIES.find(c => c.value === value)?.label ?? String(value)
     }
@@ -97,11 +125,53 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
       .filter(k => k in FIELD_LABELS)
   }
 
+  const visibleEntries = entries.filter(entry => {
+    if (filter === 'all') return true
+    if (filter === 'edits') return entry.action === 'updated'
+    return entry.entity_type === filter
+  })
+
+  function entityLabel(entry: AuditEntry) {
+    if (entry.entity_type === 'contribution') return 'a contribution'
+    if (entry.entity_type === 'member') return 'a member'
+    if (entry.entity_type === 'fund') return 'fund details'
+    return 'an expense'
+  }
+
+  function createdDetail(entry: AuditEntry): string | null {
+    const values = entry.new_values
+    if (!values) return null
+    if (entry.entity_type === 'contribution') {
+      return `${formatValue('contributor_name', values.contributor_name)} · ${formatValue('amount', values.amount)}`
+    }
+    if (entry.entity_type === 'expense') {
+      return `${formatValue('description', values.description)} · ${formatValue('amount', values.amount)}`
+    }
+    if (entry.entity_type === 'member') {
+      const memberId = typeof values.member_user_id === 'string' ? values.member_user_id : null
+      return String(values.name || (memberId && memberNames.get(memberId)) || 'Member added')
+    }
+    return null
+  }
+
   return (
+    <>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={common.modalOverlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={[common.modalSheet, styles.sheet]}>
           <Text style={common.modalTitle}>Fund Activity</Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+            {FILTERS.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.filterChip, filter === item.id && styles.filterChipActive]}
+                onPress={() => setFilter(item.id)}
+              >
+                <Text style={[styles.filterText, filter === item.id && styles.filterTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           {isLoading ? (
             <View style={styles.centerWrap}>
@@ -111,26 +181,26 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
             <View style={styles.centerWrap}>
               <Text style={styles.emptyText}>Could not load activity: {loadError}</Text>
             </View>
-          ) : entries.length === 0 ? (
+          ) : visibleEntries.length === 0 ? (
             <View style={styles.centerWrap}>
               <Text style={styles.emptyEmoji}>🕓</Text>
               <Text style={styles.emptyText}>
-                No activity recorded yet. New and edited expenses will show up here.
+                {entries.length === 0 ? 'No fund activity recorded yet.' : 'No activity matches this filter.'}
               </Text>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
-              {entries.map(entry => {
+              {visibleEntries.map(entry => {
                 const actorName = (entry.user_id && memberNames.get(entry.user_id)) ?? 'A member'
                 const verb = ACTION_LABELS[entry.action] ?? entry.action
                 const fields = changedFields(entry)
 
                 return (
-                  <View key={entry.id} style={styles.entryRow}>
+                  <TouchableOpacity key={entry.id} style={styles.entryRow} onPress={() => setSelectedEntry(entry)} activeOpacity={0.75}>
                     <View style={styles.entryDot} />
                     <View style={styles.entryBody}>
                       <Text style={styles.entryHeadline}>
-                        <Text style={styles.entryActor}>{actorName}</Text> {verb} an expense
+                        <Text style={styles.entryActor}>{actorName}</Text> {verb} {entityLabel(entry)}
                       </Text>
                       <Text style={styles.entryTime}>{formatTime(entry.created_at)}</Text>
 
@@ -145,22 +215,29 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
                         </View>
                       ))}
 
-                      {entry.action === 'created' && entry.new_values ? (
+                      {entry.action === 'created' && createdDetail(entry) ? (
                         <Text style={styles.entryDetail} numberOfLines={1}>
-                          {formatValue('description', entry.new_values.description)}
-                          {' · '}
-                          {formatValue('amount', entry.new_values.amount)}
+                          {createdDetail(entry)}
                         </Text>
                       ) : null}
                     </View>
-                  </View>
+                    <Text style={styles.entryChevron}>›</Text>
+                  </TouchableOpacity>
                 )
               })}
             </ScrollView>
           )}
+
+          <ActivityDetailsModal
+            entry={selectedEntry}
+            actorName={(selectedEntry?.user_id && memberNames.get(selectedEntry.user_id)) ?? 'A member'}
+            currencyCode={currencyCode}
+            onClose={() => setSelectedEntry(null)}
+          />
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
+    </>
   )
 }
 
@@ -175,6 +252,30 @@ function makeStyles(colors: AppColors) {
       justifyContent: 'center',
       paddingVertical: 48,
       gap: 10,
+    },
+    filters: {
+      gap: 8,
+      paddingBottom: 10,
+    },
+    filterChip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      backgroundColor: colors.surface,
+    },
+    filterChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    filterText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    filterTextActive: {
+      color: '#FFFFFF',
     },
     emptyEmoji: {
       fontSize: 28,
@@ -203,6 +304,7 @@ function makeStyles(colors: AppColors) {
     entryBody: {
       flex: 1,
     },
+    entryChevron: { alignSelf: 'center', fontSize: 24, color: colors.textMuted },
     entryHeadline: {
       fontSize: 14,
       color: colors.textPrimary,

@@ -22,17 +22,28 @@ function formatDate(dateStr: string): string {
   return `${d} ${months[m - 1]} ${y}`
 }
 
-function formatAmount(bwp: string): string {
-  const n = parseFloat(bwp.replace(/,/g, ''))
+function formatAmount(value: string, currencyPrefix: string): string {
+  const n = parseFloat(value.replace(/,/g, ''))
   if (isNaN(n)) return '—'
-  return `P ${n.toLocaleString('en-BW', { minimumFractionDigits: 0 })}`
+  return `${currencyPrefix} ${n.toLocaleString('en-BW', { minimumFractionDigits: 0 })}`
 }
 
 export default function FundCreatedScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
-  const { fundName, category, emoji, goalBWP, targetDate, shareCode, fundId } = route.params
+  const {
+    fundName,
+    category,
+    emoji,
+    goalBWP,
+    currencyCode,
+    currencySymbol,
+    targetDate,
+    shareCode,
+    fundId,
+  } = route.params
+  const currencyPrefix = currencySymbol ?? (currencyCode === 'BWP' ? 'P' : currencyCode) ?? 'P'
 
   const fundCode   = shareCode ?? '—'
   const inviteLink = shareCode ? fundPreviewUrl(shareCode) : 'https://tshelo.app'
@@ -119,7 +130,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Target</Text>
-              <Text style={styles.statValue}>{goalBWP ? formatAmount(goalBWP) : '—'}</Text>
+              <Text style={styles.statValue}>{goalBWP ? formatAmount(goalBWP, currencyPrefix) : '—'}</Text>
             </View>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Date</Text>

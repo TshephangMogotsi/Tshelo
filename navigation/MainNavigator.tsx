@@ -9,7 +9,6 @@ import { useTheme } from '../context/ThemeContext'
 
 // Tab screens
 import HomeScreen     from '../screens/main/HomeScreen'
-import FundsScreen    from '../screens/main/FundsScreen'
 import ActivityScreen from '../screens/main/ActivityScreen'
 import ReportsScreen  from '../screens/main/ReportsScreen'
 import ProfileScreen  from '../screens/main/ProfileScreen'
@@ -22,6 +21,7 @@ import EventDetailScreen        from '../screens/main/EventDetailScreen'
 import GuestListScreen          from '../screens/main/GuestListScreen'
 import EventBudgetScreen        from '../screens/main/EventBudgetScreen'
 import RecordContributionScreen from '../screens/main/RecordContributionScreen'
+import AssignContributionScreen from '../screens/main/AssignContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
 import TokenPurchaseScreen      from '../screens/main/TokenPurchaseScreen'
 import SettingsScreen           from '../screens/main/SettingsScreen'
@@ -62,7 +62,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 8),
     }]}>
       {renderTab('Home',  'Home',  'home-outline',   'home'  )}
-      {renderTab('Funds', 'Funds', 'wallet-outline', 'wallet')}
+      {renderTab('Tokens', 'Tokens', 'cash-outline', 'cash')}
 
       {/* Create FAB */}
       <TouchableOpacity style={tabStyles.tab} onPress={() => (navigation as any).navigate('CreateFund')} activeOpacity={0.85}>
@@ -133,7 +133,7 @@ function TabNavigator() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home"     component={HomeScreen}     />
-      <Tab.Screen name="Funds"    component={FundsScreen}    />
+      <Tab.Screen name="Tokens"   component={TokenPurchaseScreen as any} />
       <Tab.Screen name="Activity" component={ActivityScreen} />
       <Tab.Screen name="Reports"  component={ReportsScreen}  />
       <Tab.Screen name="Profile"  component={ProfileScreen}  />
@@ -155,6 +155,7 @@ export default function MainNavigator() {
       <Stack.Screen name="GuestList"          component={GuestListScreen}         />
       <Stack.Screen name="EventBudget"        component={EventBudgetScreen}       />
       <Stack.Screen name="RecordContribution" component={RecordContributionScreen}/>
+      <Stack.Screen name="AssignContribution" component={AssignContributionScreen}/>
       <Stack.Screen name="RecordExpense"      component={RecordExpenseScreen}     />
       <Stack.Screen name="TokenPurchase"      component={TokenPurchaseScreen}     />
       <Stack.Screen name="Settings"           component={SettingsScreen}          />

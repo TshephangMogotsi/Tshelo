@@ -22,6 +22,8 @@ type Props = {
   onBack: () => void
   onRecordContribution: () => void
   onRecordExpense: () => void
+  onViewHistory: () => void
+  onViewEvent?: () => void
   onMoreOptions: () => void
   onCopyCode: () => void
   onShareInvite: () => void
@@ -35,6 +37,8 @@ export default function FundHeader({
   onBack,
   onRecordContribution,
   onRecordExpense,
+  onViewHistory,
+  onViewEvent,
   onMoreOptions,
   onCopyCode,
   onShareInvite,
@@ -84,7 +88,22 @@ export default function FundHeader({
         </View>
       </View>
 
-      <Text style={styles.fundTitle}>{fund.title}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.fundTitle}>{fund.title}</Text>
+        {fund.status !== 'active' && <Text style={styles.statusBadge}>{fund.status}</Text>}
+        <TouchableOpacity style={styles.historyBtn} onPress={onViewHistory} activeOpacity={0.8}>
+          <Text style={styles.historyIcon}>↻</Text>
+          <Text style={styles.historyText}>History</Text>
+        </TouchableOpacity>
+      </View>
+
+      {onViewEvent && (
+        <TouchableOpacity style={styles.linkedEventBtn} onPress={onViewEvent} activeOpacity={0.8}>
+          <Text style={styles.linkedEventIcon}>📅</Text>
+          <Text style={styles.linkedEventText}>View linked event</Text>
+          <Text style={styles.linkedEventArrow}>↔</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.statsRow}>
         <View style={styles.stat}>
@@ -187,11 +206,63 @@ function makeStyles(colors: AppColors) {
       lineHeight: 22,
     },
     fundTitle: {
+      flex: 1,
       fontSize: 22,
       fontWeight: '800',
       color: colors.textPrimary,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
       marginBottom: 16,
     },
+    historyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      borderRadius: 18,
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    statusBadge: {
+      fontSize: 10,
+      fontWeight: '900',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      borderRadius: 10,
+      paddingHorizontal: 7,
+      paddingVertical: 4,
+      backgroundColor: colors.border,
+    },
+    historyIcon: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    historyText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    linkedEventBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 12,
+      backgroundColor: colors.primaryLight,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    linkedEventIcon: { fontSize: 16 },
+    linkedEventText: { flex: 1, fontSize: 13, fontWeight: '800', color: colors.primary },
+    linkedEventArrow: { fontSize: 16, fontWeight: '800', color: colors.primary },
     statsRow: {
       flexDirection: 'row',
       alignItems: 'center',

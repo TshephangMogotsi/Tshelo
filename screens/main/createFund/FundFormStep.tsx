@@ -127,7 +127,7 @@ export default function FundFormStep({
                     onPress={() => onGoalChange(preset.value)}
                   >
                     <Text style={[styles.goalPresetText, active && styles.goalPresetTextActive]}>
-                      {preset.label}
+                      {currencySymbol}{Number(preset.value.replace(/,/g, '')) / 1000}k
                     </Text>
                   </TouchableOpacity>
                 )

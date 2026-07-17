@@ -41,13 +41,13 @@ export default function EventCreatedScreen({ eventName, eventEmoji, eventDate, e
           <View style={styles.eventCreatedCardBody}>
             <Text style={styles.eventCreatedName}>{eventName}</Text>
             <View style={styles.eventCreatedMetaRow}>
-              <Ionicons name="calendar-outline" size={15} color="#FFFFFF" />
+              <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
               <Text style={styles.eventCreatedMeta}>
                 {eventDate ? formatEventDateDisplay(eventDate) : 'Date to be confirmed'}
               </Text>
             </View>
             <View style={styles.eventCreatedMetaRow}>
-              <Ionicons name="location-outline" size={15} color="#FFFFFF" />
+              <Ionicons name="location-outline" size={15} color={colors.textMuted} />
               <Text style={styles.eventCreatedMeta}>
                 {eventVenue.trim() || 'Venue to be confirmed'}
               </Text>
@@ -136,8 +136,10 @@ function makeStyles(colors: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 16,
-      backgroundColor: BRAND_PURPLE,
-      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 14,
       paddingHorizontal: 22,
       paddingVertical: 18,
       marginBottom: 28,
@@ -154,7 +156,7 @@ function makeStyles(colors: AppColors) {
       fontSize: 20,
       lineHeight: 26,
       fontWeight: '900',
-      color: '#FFFFFF',
+      color: colors.textPrimary,
       marginBottom: 12,
     },
     eventCreatedMetaRow: {
@@ -167,7 +169,7 @@ function makeStyles(colors: AppColors) {
       flex: 1,
       fontSize: 14,
       lineHeight: 19,
-      color: 'rgba(255,255,255,0.86)',
+      color: colors.textMuted,
     },
     eventCreatedInviteText: {
       fontSize: 19,
@@ -183,7 +185,7 @@ function makeStyles(colors: AppColors) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 10,
-      backgroundColor: '#2454D9',
+      backgroundColor: BRAND_PURPLE,
       borderRadius: 28,
       paddingHorizontal: 24,
       paddingVertical: 17,

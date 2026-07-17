@@ -39,10 +39,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) await checkProfile(session.user.id)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session)
-      if (session) await checkProfile(session.user.id)
-      else setProfileCompleted(false)
+      // Auth callbacks run while Supabase holds its auth lock. Do not await a
+      // Supabase query here or the callback (and navigator update) can stall
+      // until the app is restarted.
+      if (session) void checkProfile(session.user.id)
+      else {
+        setProfileCompleted(false)
+        setUserId(null)
+        setUserName('')
+        setTokenBalance(0)
+      }
     })
 
     return () => subscription.unsubscribe()

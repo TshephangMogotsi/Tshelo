@@ -1,411 +1,343 @@
-import { useState } from 'react'
-import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, SectionList, Modal, Pressable } from 'react-native'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
-import ProviderLogo from '../../components/ProviderLogo'
+import LoadingOverlay from '../../components/LoadingOverlay'
+import { supabase } from '../../lib/supabase'
 
-type ActivityType = 'contribution' | 'expense'
-type ActivityStatus = 'confirmed' | 'pending' | 'sms_detected'
-type PaymentMethod = 'Orange Money' | 'MyZaka' | 'Manual'
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
-type ActivityItem = {
-  id:          string
-  memberName:  string
-  fundId:      string
-  fundName:    string
-  method:      PaymentMethod
-  amount:      number
-  type:        ActivityType
-  status:      ActivityStatus
-}
-
-type Section = {
+type CalendarEvent = {
+  id: string
   title: string
-  data:  ActivityItem[]
+  emoji: string
+  date: string
+  time: string | null
+  venue: string
+  linkedFundId: string | null
 }
 
-function thebeToBWP(thebe: number) {
-  return `P ${(thebe / 100).toLocaleString('en-BW', { minimumFractionDigits: 2 })}`
+function dateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-const RAW_ACTIVITY: ActivityItem[] = [
-  { id: '1', memberName: 'Kgosi Moeng',      fundId: '1', fundName: "Kgosi's Funeral Fund",  method: 'Orange Money', amount: 25000, type: 'contribution', status: 'confirmed'    },
-  { id: '2', memberName: 'Naledi Phiri',      fundId: '1', fundName: "Kgosi's Funeral Fund",  method: 'MyZaka',       amount: 25000, type: 'contribution', status: 'pending'      },
-  { id: '3', memberName: 'Mpho Sefuthi',      fundId: '2', fundName: 'Mpho & Tebogo Wedding', method: 'Orange Money', amount: 20000, type: 'contribution', status: 'confirmed'    },
-  { id: '4', memberName: 'Admin',             fundId: '1', fundName: "Kgosi's Funeral Fund",  method: 'Manual',       amount:  5000, type: 'expense',      status: 'confirmed'    },
-  { id: '5', memberName: 'Boitumelo Sithole', fundId: '1', fundName: "Kgosi's Funeral Fund",  method: 'Orange Money', amount: 25000, type: 'contribution', status: 'sms_detected' },
-  { id: '6', memberName: 'Refilwe Dlamini',   fundId: '2', fundName: 'Mpho & Tebogo Wedding', method: 'Manual',       amount: 20000, type: 'contribution', status: 'confirmed'    },
-  { id: '7', memberName: 'Tebogo Motsepe',    fundId: '2', fundName: 'Mpho & Tebogo Wedding', method: 'MyZaka',       amount: 20000, type: 'contribution', status: 'confirmed'    },
-]
-
-const SECTIONS: Section[] = [
-  { title: 'Today',     data: RAW_ACTIVITY.slice(0, 2) },
-  { title: 'Yesterday', data: RAW_ACTIVITY.slice(2, 4) },
-  { title: '15 May',    data: RAW_ACTIVITY.slice(4)    },
-]
-
-const FILTERS = ['All', 'Contributions', 'Expenses', "Kgosi's Fund", 'Mpho & Tebogo']
-
-const FUNDS = [
-  { id: '1', title: "Kgosi's Funeral Fund" },
-  { id: '2', title: 'Mpho & Tebogo Wedding' },
-]
-
-const METHOD_ICONS: Record<PaymentMethod, keyof typeof Ionicons.glyphMap> = {
-  'Orange Money': 'phone-portrait-outline',
-  'MyZaka':       'phone-portrait-outline',
-  'Manual':       'cash-outline',
+function parseDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
 }
 
-const METHOD_PROVIDER_IDS: Record<PaymentMethod, string | null> = {
-  'Orange Money': 'orange_money',
-  'MyZaka':       'myzaka',
-  'Manual':       null,
+function monthLabel(date: Date) {
+  return date.toLocaleDateString('en-BW', { month: 'long', year: 'numeric' })
 }
 
-const STATUS_CONFIG = {
-  confirmed:    { label: 'Confirmed',     bg: '#D1FAE5', text: '#065F46' },
-  pending:      { label: 'Pending',       bg: '#FEF3C7', text: '#92400E' },
-  sms_detected: { label: 'SMS detected', bg: '#EDE9FE', text: '#5B21B6' },
+function scheduleLabel(value: string) {
+  return parseDate(value).toLocaleDateString('en-BW', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  })
 }
 
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+function timeLabel(value: string | null) {
+  if (!value) return 'Time to be confirmed'
+  const [hour, minute] = value.split(':').map(Number)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${`${minute}`.padStart(2, '0')} ${suffix}`
+}
+
+function calendarDays(month: Date) {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1)
+  const start = new Date(month.getFullYear(), month.getMonth(), 1 - first.getDay())
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    return date
+  })
 }
 
 export default function ActivityScreen({ navigation }: { navigation: any }) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
-  const [filter,      setFilter]      = useState('All')
-  const [showPicker,  setShowPicker]  = useState(false)
+  const today = useMemo(() => new Date(), [])
+  const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const hasLoadedRef = useRef(false)
+  const lastLoadedAtRef = useRef(0)
 
-  const totalIn  = RAW_ACTIVITY.filter(a => a.type === 'contribution').reduce((s, a) => s + a.amount, 0)
-  const totalOut = RAW_ACTIVITY.filter(a => a.type === 'expense').reduce((s, a) => s + a.amount, 0)
-  const net      = totalIn - totalOut
+  useFocusEffect(useCallback(() => {
+    let active = true
+    async function loadEvents() {
+      if (hasLoadedRef.current && Date.now() - lastLoadedAtRef.current < 30_000) return
+      if (!hasLoadedRef.current) setIsLoading(true)
+      setLoadError(false)
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('id, name, event_emoji, event_date, event_time, venue_name, linked_fund_id, status')
+          .is('deleted_at', null)
+          .eq('status', 'active')
+          .order('event_date', { ascending: true })
+          .order('event_time', { ascending: true })
+        if (!active) return
+        if (error) throw error
+        setEvents((data ?? []).map(row => ({
+          id: row.id,
+          title: row.name,
+          emoji: row.event_emoji ?? '🎉',
+          date: row.event_date,
+          time: row.event_time ?? null,
+          venue: row.venue_name?.trim() || 'Venue to be confirmed',
+          linkedFundId: row.linked_fund_id ?? null,
+        })))
+        hasLoadedRef.current = true
+        lastLoadedAtRef.current = Date.now()
+      } catch {
+        if (active && !hasLoadedRef.current) setLoadError(true)
+      } finally {
+        if (active) setIsLoading(false)
+      }
+    }
+    loadEvents()
 
-  function filterItems(items: ActivityItem[]) {
-    if (filter === 'All')           return items
-    if (filter === 'Contributions') return items.filter(i => i.type === 'contribution')
-    if (filter === 'Expenses')      return items.filter(i => i.type === 'expense')
-    if (filter === "Kgosi's Fund")  return items.filter(i => i.fundId === '1')
-    if (filter === 'Mpho & Tebogo') return items.filter(i => i.fundId === '2')
-    return items
+    return () => { active = false }
+  }, []))
+
+  const days = useMemo(() => calendarDays(month), [month])
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>()
+    events.forEach(event => map.set(event.date, [...(map.get(event.date) ?? []), event]))
+    return map
+  }, [events])
+
+  const visibleEvents = useMemo(() => {
+    if (selectedDate) return eventsByDate.get(selectedDate) ?? []
+    return events.filter(event => {
+      const date = parseDate(event.date)
+      return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth()
+    })
+  }, [events, eventsByDate, month, selectedDate])
+
+  function moveMonth(offset: number) {
+    setMonth(previous => new Date(previous.getFullYear(), previous.getMonth() + offset, 1))
+    setSelectedDate(null)
   }
 
-  const filteredSections: Section[] = SECTIONS
-    .map(s => ({ ...s, data: filterItems(s.data) }))
-    .filter(s => s.data.length > 0)
+  function showToday() {
+    setMonth(new Date(today.getFullYear(), today.getMonth(), 1))
+    setSelectedDate(dateKey(today))
+  }
+
+  const listTitle = selectedDate ? scheduleLabel(selectedDate) : `${monthLabel(month)} schedule`
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={styles.header}>
-        <Text style={styles.heading}>Activity</Text>
+        <View>
+          <Text style={styles.heading}>Events</Text>
+          <Text style={styles.headerSubtitle}>{events.length} scheduled</Text>
+        </View>
+        <TouchableOpacity style={styles.todayButton} onPress={showToday} activeOpacity={0.8}>
+          <Ionicons name="today-outline" size={16} color={colors.primary} />
+          <Text style={styles.todayText}>Today</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Summary row */}
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{thebeToBWP(totalIn)}</Text>
-          <View style={styles.summaryLabelRow}>
-            <Ionicons name="arrow-down-outline" size={12} color="#059669" />
-            <Text style={[styles.summaryLabel, { color: '#059669' }]}>In</Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.calendarCard}>
+          <View style={styles.monthHeader}>
+            <TouchableOpacity style={styles.monthButton} onPress={() => moveMonth(-1)}>
+              <Ionicons name="chevron-back" size={19} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setSelectedDate(null)}>
+              <Text style={styles.monthTitle}>{monthLabel(month)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.monthButton} onPress={() => moveMonth(1)}>
+              <Ionicons name="chevron-forward" size={19} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.weekdays}>
+            {WEEKDAYS.map((day, index) => <Text key={`${day}-${index}`} style={styles.weekday}>{day}</Text>)}
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {days.map(date => {
+              const key = dateKey(date)
+              const inMonth = date.getMonth() === month.getMonth()
+              const selected = selectedDate === key
+              const isToday = key === dateKey(today)
+              const dayEvents = eventsByDate.get(key) ?? []
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={styles.dayCell}
+                  onPress={() => {
+                    if (!inMonth) setMonth(new Date(date.getFullYear(), date.getMonth(), 1))
+                    setSelectedDate(key)
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.dayNumberWrap, isToday && styles.todayCell, selected && styles.selectedCell]}>
+                    <Text style={[
+                      styles.dayNumber,
+                      !inMonth && styles.dayNumberMuted,
+                      isToday && styles.todayNumber,
+                      selected && styles.selectedNumber,
+                    ]}>{date.getDate()}</Text>
+                  </View>
+                  <View style={styles.dotRow}>
+                    {dayEvents.slice(0, 3).map((event, index) => (
+                      <View key={`${event.id}-${index}`} style={[styles.eventDot, event.linkedFundId && styles.fundEventDot]} />
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          <View style={styles.legend}>
+            <View style={styles.legendItem}><View style={styles.eventDot} /><Text style={styles.legendText}>Event</Text></View>
+            <View style={styles.legendItem}><View style={[styles.eventDot, styles.fundEventDot]} /><Text style={styles.legendText}>Event + Fund</Text></View>
           </View>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{thebeToBWP(totalOut)}</Text>
-          <View style={styles.summaryLabelRow}>
-            <Ionicons name="arrow-up-outline" size={12} color={colors.error} />
-            <Text style={[styles.summaryLabel, { color: colors.error }]}>Out</Text>
+
+        <View style={styles.scheduleHeader}>
+          <View>
+            <Text style={styles.scheduleTitle}>{listTitle}</Text>
+            <Text style={styles.scheduleCount}>{visibleEvents.length} event{visibleEvents.length === 1 ? '' : 's'}</Text>
           </View>
+          {selectedDate && (
+            <TouchableOpacity onPress={() => setSelectedDate(null)}><Text style={styles.showMonthText}>Show month</Text></TouchableOpacity>
+          )}
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: net >= 0 ? '#059669' : colors.error }]}>
-            {thebeToBWP(net)}
-          </Text>
-          <Text style={styles.summaryLabel}>Net</Text>
-        </View>
-      </View>
 
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersRow}
-        style={styles.filtersScroll}
-      >
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.chip, filter === f && styles.chipActive]}
-            onPress={() => setFilter(f)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Ledger */}
-      <SectionList
-        style={styles.list}
-        sections={filteredSections}
-        keyExtractor={item => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        stickySectionHeadersEnabled={false}
-        renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionHeader}>{section.title}</Text>
-        )}
-        renderItem={({ item }) => {
-          const isExpense = item.type === 'expense'
-          const status = STATUS_CONFIG[item.status]
-          return (
-            <View style={styles.row}>
-              <View style={styles.rowAvatar}>
-                <Text style={styles.rowAvatarText}>{initials(item.memberName)}</Text>
-              </View>
-              <View style={styles.rowBody}>
-                <View style={styles.rowTopLine}>
-                  <Text style={styles.rowName}>{item.memberName}</Text>
-                  <Text style={[styles.rowAmount, { color: isExpense ? colors.error : '#059669' }]}>
-                    {isExpense ? '−' : '+'}{thebeToBWP(item.amount)}
-                  </Text>
-                </View>
-                <View style={styles.rowMeta}>
-                  <View style={styles.fundTag}>
-                    <Text style={styles.fundTagText} numberOfLines={1}>{item.fundName}</Text>
-                  </View>
-                  <View style={styles.methodTag}>
-                    {METHOD_PROVIDER_IDS[item.method] ? (
-                      <ProviderLogo provider={METHOD_PROVIDER_IDS[item.method]} size={12} plain />
-                    ) : (
-                      <Ionicons name={METHOD_ICONS[item.method]} size={11} color={colors.textMuted} />
-                    )}
-                    <Text style={styles.methodText}>{item.method}</Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                    <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )
-        }}
-      />
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary }]}
-        onPress={() => setShowPicker(true)}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
-
-      {/* Fund picker */}
-      <Modal
-        visible={showPicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPicker(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setShowPicker(false)}>
-          <Pressable style={styles.pickerSheet} onPress={() => {}}>
-            <View style={styles.pickerHandle} />
-            <Text style={styles.pickerTitle}>Record Contribution For</Text>
-            {FUNDS.map(fund => (
+        {loadError ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="cloud-offline-outline" size={28} color={colors.textMuted} />
+            <Text style={styles.emptyTitle}>Couldn’t load your events</Text>
+            <Text style={styles.emptyText}>Check your connection and try again.</Text>
+          </View>
+        ) : visibleEvents.length === 0 && !isLoading ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-clear-outline" size={28} color={colors.textMuted} />
+            <Text style={styles.emptyTitle}>Nothing scheduled</Text>
+            <Text style={styles.emptyText}>{selectedDate ? 'There are no events on this day.' : 'There are no events in this month.'}</Text>
+          </View>
+        ) : (
+          <View style={styles.eventList}>
+            {visibleEvents.map(event => (
               <TouchableOpacity
-                key={fund.id}
-                style={styles.fundOption}
-                onPress={() => {
-                  setShowPicker(false)
-                  navigation.navigate('RecordContribution', { fundId: fund.id, fundTitle: fund.title })
-                }}
-                activeOpacity={0.75}
+                key={event.id}
+                style={styles.eventRow}
+                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
+                activeOpacity={0.82}
               >
-                <View style={styles.fundOptionIcon}>
-                  <Ionicons name="wallet-outline" size={18} color={colors.primary} />
+                <View style={styles.dateBadge}>
+                  <Text style={styles.dateBadgeMonth}>{parseDate(event.date).toLocaleDateString('en-BW', { month: 'short' }).toUpperCase()}</Text>
+                  <Text style={styles.dateBadgeDay}>{parseDate(event.date).getDate()}</Text>
                 </View>
-                <Text style={styles.fundOptionText}>{fund.title}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                <View style={styles.eventBody}>
+                  <View style={styles.eventTitleRow}>
+                    <Text style={styles.eventEmoji}>{event.emoji}</Text>
+                    <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+                  </View>
+                  <View style={styles.eventMetaRow}>
+                    <Ionicons name="time-outline" size={13} color={colors.textMuted} />
+                    <Text style={styles.eventMeta} numberOfLines={1}>{timeLabel(event.time)} · {event.venue}</Text>
+                  </View>
+                  <View style={styles.kindBadge}><Text style={styles.kindText}>{event.linkedFundId ? 'Event + Fund' : 'Event'}</Text></View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+        )}
+      </ScrollView>
+
+      {isLoading && !hasLoadedRef.current && <LoadingOverlay />}
     </SafeAreaView>
   )
 }
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    safe:   { flex: 1, backgroundColor: colors.background },
-    header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
-    heading: {
-      fontSize: 30,
-      fontFamily: fonts.display.bold,
-      color: colors.heading,
+    safe: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10,
     },
-
-    summaryRow: {
-      flexDirection: 'row',
-      backgroundColor: colors.surface,
-      marginHorizontal: 20,
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: 14,
+    heading: { fontSize: 28, fontFamily: fonts.display.bold, color: colors.heading },
+    headerSubtitle: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+    todayButton: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8,
     },
-    summaryItem:    { flex: 1, alignItems: 'center' },
-    summaryDivider: { width: 1, backgroundColor: colors.border },
-    summaryValue:   { fontSize: 13, fontWeight: '800', color: colors.textPrimary, marginBottom: 4 },
-    summaryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    summaryLabel:   { fontSize: 11, color: colors.textMuted },
-
-    filtersScroll: { flexGrow: 0, marginBottom: 8 },
-    filtersRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 2 },
-    chip: {
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
+    todayText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    scroll: { paddingHorizontal: 20, paddingBottom: 72 },
+    calendarCard: {
+      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 20, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 10,
+      marginBottom: 22,
     },
-    chipActive:     { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-    chipText:       { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-    chipTextActive: { color: colors.textPrimary },
-
-    list:        { flex: 1 },
-    listContent: { paddingHorizontal: 20, paddingBottom: 100 },
-    sectionHeader: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-      marginTop: 20,
-      marginBottom: 10,
-    },
-
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      gap: 12,
-    },
-    rowAvatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    rowAvatarText: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
-    rowBody:    { flex: 1 },
-    rowTopLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-    rowName:    { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    rowMeta:    { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-    fundTag:  {
-      backgroundColor: colors.primaryLight,
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      maxWidth: 130,
-    },
-    fundTagText: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
-    methodTag:   { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    methodText:  { fontSize: 11, color: colors.textMuted },
-    rowAmount: { fontSize: 14, fontWeight: '800' },
-    statusBadge: {
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-    },
-    statusText: { fontSize: 10, fontWeight: '700' },
-
-    fab: {
-      position: 'absolute',
-      right: 24,
-      bottom: 24,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-
-    backdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'flex-end',
-    },
-    pickerSheet: {
+    monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    monthButton: {
+      width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
       backgroundColor: colors.background,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      paddingHorizontal: 24,
-      paddingTop: 12,
-      paddingBottom: 48,
     },
-    pickerHandle: {
-      width: 40,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.border,
-      alignSelf: 'center',
-      marginBottom: 20,
+    monthTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+    weekdays: { flexDirection: 'row', marginBottom: 4 },
+    weekday: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 10, fontWeight: '700', color: colors.textMuted },
+    calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    dayCell: { width: `${100 / 7}%`, height: 45, alignItems: 'center', paddingTop: 2 },
+    dayNumberWrap: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+    todayCell: { borderWidth: 1, borderColor: colors.primary },
+    selectedCell: { backgroundColor: colors.primary, borderColor: colors.primary },
+    dayNumber: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
+    dayNumberMuted: { color: colors.textMuted, opacity: 0.42 },
+    todayNumber: { color: colors.primary, fontWeight: '800' },
+    selectedNumber: { color: '#FFFFFF', fontWeight: '800' },
+    dotRow: { flexDirection: 'row', gap: 2, height: 5, marginTop: 3 },
+    eventDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary },
+    fundEventDot: { backgroundColor: '#0F9F8D' },
+    legend: { flexDirection: 'row', justifyContent: 'center', gap: 18, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 9, marginTop: 3 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    legendText: { fontSize: 10, color: colors.textMuted },
+    scheduleHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 },
+    scheduleTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+    scheduleCount: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+    showMonthText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    eventList: { gap: 8 },
+    eventRow: {
+      minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10,
     },
-    pickerTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 16,
-    },
-    fundOption: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 16,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-      gap: 12,
-    },
-    fundOptionIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      backgroundColor: colors.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    fundOptionText: {
-      flex: 1,
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
+    dateBadge: { width: 42, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
+    dateBadgeMonth: { fontSize: 8, fontWeight: '800', letterSpacing: 0.5, color: colors.primary },
+    dateBadgeDay: { fontSize: 18, lineHeight: 21, fontWeight: '800', color: colors.textPrimary },
+    eventBody: { flex: 1, minWidth: 0 },
+    eventTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+    eventEmoji: { fontSize: 16 },
+    eventTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+    eventMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 5 },
+    eventMeta: { flex: 1, fontSize: 11, color: colors.textMuted },
+    kindBadge: { alignSelf: 'flex-start', backgroundColor: colors.background, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    kindText: { fontSize: 9, fontWeight: '700', color: colors.textSecondary },
+    emptyState: { alignItems: 'center', paddingVertical: 42, paddingHorizontal: 24 },
+    emptyTitle: { fontSize: 14, fontWeight: '800', color: colors.textPrimary, marginTop: 10 },
+    emptyText: { fontSize: 12, lineHeight: 17, color: colors.textMuted, textAlign: 'center', marginTop: 4 },
   })
 }

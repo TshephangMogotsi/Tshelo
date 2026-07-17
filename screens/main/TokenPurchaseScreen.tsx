@@ -2,14 +2,13 @@ import { useState } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
 type Props = {
-  navigation: NativeStackNavigationProp<MainStackParamList, 'TokenPurchase'>
+  navigation: any
+  route?: { name?: string }
 }
 
 type TokenPack = 'starter' | 'value' | 'popular' | 'power'
@@ -116,12 +115,13 @@ function PackCard({
   )
 }
 
-export default function TokenPurchaseScreen({ navigation }: Props) {
+export default function TokenPurchaseScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
   const [selectedPack, setSelectedPack] = useState<TokenPack>('popular')
   const currentBalance = 3
+  const isTab = route?.name === 'Tokens'
 
   const pack = PACKS.find(p => p.id === selectedPack)!
 
@@ -143,9 +143,11 @@ export default function TokenPurchaseScreen({ navigation }: Props) {
       >
         {/* ── Header ───────────────────────────────── */}
         <View style={styles.topRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
+          {isTab ? <View /> : (
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.balanceBadge}>
             <Text style={styles.balanceEmoji}>🪙</Text>
             <Text style={styles.balanceText}>{currentBalance} tokens</Text>

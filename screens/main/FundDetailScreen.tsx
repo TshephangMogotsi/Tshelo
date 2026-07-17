@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Share, Alert, ActivityIndicator, Clipboard } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Share, Alert, Clipboard } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp, useFocusEffect } from '@react-navigation/native'
@@ -22,7 +22,10 @@ import {
 import { ContributionRow, ExpenseRow, MemberRow, PendingRequestRow } from './fundDetail/rows'
 import FundHeader from './fundDetail/FundHeader'
 import EditExpenseModal from './fundDetail/EditExpenseModal'
+import EditContributionModal from './fundDetail/EditContributionModal'
 import ActivityLogModal from './fundDetail/ActivityLogModal'
+import FundSettingsModal from './fundDetail/FundSettingsModal'
+import LoadingOverlay from '../../components/LoadingOverlay'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'FundDetail'>
@@ -35,7 +38,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   const { userId } = useAuth()
   const styles = makeStyles(colors)
 
-  const [activeTab, setActiveTab]     = useState<Tab>('contributions')
+  const [activeTab, setActiveTab]     = useState<Tab>(route.params.tab ?? 'contributions')
   const [fund, setFund]               = useState<FundDetail | null>(null)
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [expenses, setExpenses]       = useState<Expense[]>([])
@@ -47,7 +50,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   const [isDeleting, setIsDeleting]   = useState(false)
   const [decidingId, setDecidingId]   = useState<string | null>(null)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [editingContribution, setEditingContribution] = useState<Contribution | null>(null)
   const [showActivityLog, setShowActivityLog] = useState(false)
+  const [showFundSettings, setShowFundSettings] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -61,7 +66,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         const [{ data: fundData, error: fundError }, { data: membership }] = await Promise.all([
           supabase
             .from('funds')
-            .select('id, owner_id, title, status, goal_amount, currency_code, fund_code')
+            .select('id, owner_id, title, status, goal_amount, currency_code, fund_code, linked_event_id, contribution_deadline, is_private')
             .eq('id', fundId)
             .single(),
           supabase
@@ -86,7 +91,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         const [{ data: contribData }, { data: expenseData }, { data: memberData }, { data: pendingData }, { data: profileData }] = await Promise.all([
           supabase
             .from('contributions')
-            .select('id, contributor_name, amount, payment_method, detected_via, status, is_refunded, confirmed_at, notes')
+            .select('id, contributor_name, amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, notes')
             .eq('fund_id', fundId)
             .order('confirmed_at', { ascending: false }),
           supabase
@@ -135,6 +140,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           balance:             totalContributions - totalExpenses,
           member_count:        (memberData ?? []).length,
           fund_code:           fundData.fund_code,
+          linked_event_id:     fundData.linked_event_id ?? null,
+          contribution_deadline: fundData.contribution_deadline ?? null,
+          is_private:          fundData.is_private ?? false,
         })
 
         setContributions(contribData ?? [])
@@ -280,6 +288,10 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   function handleMoreOptions() {
     Alert.alert(fund!.title, 'What would you like to do?', [
       {
+        text: 'Fund Settings',
+        onPress: () => setShowFundSettings(true),
+      },
+      {
         text: 'Delete Fund',
         style: 'destructive',
         onPress: confirmDelete,
@@ -336,20 +348,32 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     } : prev)
   }
 
+  function handleContributionSaved(updated: Contribution) {
+    setEditingContribution(null)
+    const next = contributions.map(item => item.id === updated.id ? updated : item)
+    setContributions(next)
+    const total = next
+      .filter(item => item.status === 'confirmed' && !item.is_refunded)
+      .reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
+    setFund(previous => previous ? {
+      ...previous,
+      total_contributions: total,
+      balance: total - previous.total_expenses,
+    } : previous)
+  }
+
   const TABS: { id: Tab; label: string; count: number }[] = [
     { id: 'contributions', label: 'Contributions', count: contributions.length },
     { id: 'expenses',      label: 'Expenses',      count: expenses.length },
     { id: 'members',       label: 'Members',       count: members.length },
   ]
 
-  // ── Loading ────────────────────────────────────────────
-  if (isLoading) {
+  // ── Loading (first load only — refreshes overlay the stale page) ──
+  if (isLoading && !fund) {
     return (
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <LoadingOverlay />
       </SafeAreaView>
     )
   }
@@ -375,7 +399,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
       <FundHeader
         fund={fund}
-        isOrganiser={isOrganiser}
+        isOrganiser={isOrganiser && fund.status === 'active'}
         isOwner={fund.owner_id === userId}
         isDeleting={isDeleting}
         onBack={() => navigation.goBack()}
@@ -389,6 +413,8 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           fundTitle: fund.title,
           currencyCode: fund.currency_code,
         })}
+        onViewHistory={() => setShowActivityLog(true)}
+        onViewEvent={fund.linked_event_id ? () => navigation.navigate('EventDetail', { eventId: fund.linked_event_id! }) : undefined}
         onMoreOptions={handleMoreOptions}
         onCopyCode={handleCopyCode}
         onShareInvite={handleShareInvite}
@@ -438,7 +464,12 @@ export default function FundDetailScreen({ navigation, route }: Props) {
               </View>
             ) : (
               contributions.map(c => (
-                <ContributionRow key={c.id} item={c} currencyCode={fund.currency_code} />
+                <ContributionRow
+                  key={c.id}
+                  item={c}
+                  currencyCode={fund.currency_code}
+                  onPress={isOrganiser ? () => setEditingContribution(c) : undefined}
+                />
               ))
             )}
           </>
@@ -450,16 +481,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
               <Text style={styles.summaryText}>
                 Total out: <Text style={[styles.summaryValue, { color: colors.error }]}>{formatMoney(fund.total_expenses, fund.currency_code)}</Text>
               </Text>
-              <View style={styles.summaryRight}>
-                <Text style={styles.summaryText}>
-                  {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
-                </Text>
-                {isOrganiser && (
-                  <TouchableOpacity onPress={() => setShowActivityLog(true)} activeOpacity={0.7}>
-                    <Text style={styles.historyLink}>History</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              <Text style={styles.summaryText}>
+                {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
+              </Text>
             </View>
             {expenses.length === 0 ? (
               <View style={styles.emptyTab}>
@@ -523,6 +547,13 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         onSaved={handleExpenseSaved}
       />
 
+      <EditContributionModal
+        contribution={editingContribution}
+        currencySymbol={fund.currency_code === 'BWP' ? 'P' : fund.currency_code}
+        onClose={() => setEditingContribution(null)}
+        onSaved={handleContributionSaved}
+      />
+
       <ActivityLogModal
         visible={showActivityLog}
         fundId={fund.id}
@@ -530,6 +561,21 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         memberNames={new Map(members.filter(m => m.user_id).map(m => [m.user_id as string, m.display_name]))}
         onClose={() => setShowActivityLog(false)}
       />
+
+      <FundSettingsModal
+        visible={showFundSettings}
+        fund={fund}
+        members={members}
+        onClose={() => setShowFundSettings(false)}
+        onFundSaved={changes => setFund(previous => previous ? { ...previous, ...changes } : previous)}
+        onMemberRoleChanged={(memberId, role) => setMembers(previous => previous.map(member => member.id === memberId ? { ...member, role } : member))}
+        onClosed={() => {
+          setShowFundSettings(false)
+          setFund(previous => previous ? { ...previous, status: 'closed' } : previous)
+        }}
+      />
+
+      {isLoading && <LoadingOverlay />}
     </SafeAreaView>
   )
 }

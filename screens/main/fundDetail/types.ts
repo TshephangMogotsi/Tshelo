@@ -7,6 +7,7 @@ export type Contribution = {
   contributor_name: string
   amount:          number
   payment_method:  string | null
+  reference_number: string | null
   detected_via:    string
   status:          string
   is_refunded:     boolean
@@ -54,6 +55,9 @@ export type FundDetail = {
   balance:             number
   member_count:        number
   fund_code:           string
+  linked_event_id:     string | null
+  contribution_deadline: string | null
+  is_private:          boolean
 }
 
 export const PROVIDER_COLORS: Record<string, string> = {
