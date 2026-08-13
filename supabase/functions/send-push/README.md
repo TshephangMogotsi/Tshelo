@@ -24,6 +24,11 @@ messages to your users — only the dashboard-configured webhook will know the
 secret. If you skip this, the function still requires no other auth, so
 don't skip it.
 
+> Security note: the function now fails closed with HTTP 503 if this secret is
+> missing. A previous credential was committed in the historical baseline and
+> must be rotated; deleting it from the current file does not remove it from Git
+> history.
+
 ## 3. Create the Database Webhook
 
 In the Supabase dashboard: **Database → Webhooks → Create a new hook**
@@ -41,6 +46,10 @@ automatically, in the shape:
 ```json
 { "type": "INSERT", "table": "notifications", "record": { ...the row... } }
 ```
+
+Do not recreate this integration as a SQL trigger containing a literal secret.
+The dashboard-managed webhook keeps the authentication header out of migration
+files and `pg_get_triggerdef()` output.
 
 ## 4. Test it
 

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
+import { formatFundMemberCount } from '../../lib/fundMembers'
 
 type FundStatus = 'active' | 'closed' | 'suspended'
 
@@ -144,7 +145,7 @@ export default function FundsScreen({ navigation }: { navigation: any }) {
                       <Text style={styles.categoryTagText}>{fund.category}</Text>
                     </View>
                     <Ionicons name="people-outline" size={12} color={colors.textMuted} />
-                    <Text style={styles.memberText}>{fund.member_count} members</Text>
+                    <Text style={styles.memberText}>{formatFundMemberCount(fund.member_count)}</Text>
                   </View>
                 </View>
                 <TouchableOpacity

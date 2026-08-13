@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import * as FileSystem from 'expo-file-system/legacy'
+import { Asset } from 'expo-asset'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
@@ -13,6 +14,8 @@ import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import LoadingOverlay from '../../components/LoadingOverlay'
 import { loadHomeItems } from './home/loadHomeItems'
+import { buildFundReportHtml } from './reports/buildFundReportHtml'
+import { useFundPermissions } from '../../lib/useFundPermissions'
 
 const CHART_H = 126
 const BAR_W = 11
@@ -29,8 +32,32 @@ type LedgerEntry = {
   date: string
   description: string
 }
+type PledgeEntry = {
+  id: string
+  fundId: string
+  amount: number
+  received: number
+  date: string
+  description: string
+}
 type ChartPoint = { key: string; label: string; contributions: number; expenses: number }
 type ExportRecord = { id: string; fund_id: string; export_type: string; created_at: string }
+
+type ReportQueryError = { message: string }
+
+async function fetchAllReportRows<T>(
+  loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: ReportQueryError | null }>,
+) {
+  const pageSize = 500
+  const rows: T[] = []
+  for (let from = 0; ; from += pageSize) {
+    const result = await loadPage(from, from + pageSize - 1)
+    if (result.error) throw result.error
+    const page = result.data ?? []
+    rows.push(...page)
+    if (page.length < pageSize) return rows
+  }
+}
 
 const PERIOD_MONTHS: Record<Period, number> = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 }
 
@@ -48,8 +75,20 @@ function money(amount: number, currency: string) {
   return `${symbol} ${amount.toLocaleString('en-BW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] ?? character))
+let reportLogoPromise: Promise<string | undefined> | null = null
+
+function loadReportLogoDataUri() {
+  if (!reportLogoPromise) {
+    reportLogoPromise = (async () => {
+      const asset = Asset.fromModule(require('../../assets/tshelo-icon.png'))
+      await asset.downloadAsync()
+      const uri = asset.localUri ?? asset.uri
+      if (!uri || uri.startsWith('http')) return undefined
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
+      return `data:image/png;base64,${base64}`
+    })().catch(() => undefined)
+  }
+  return reportLogoPromise
 }
 
 function BarChart({ data, colors }: { data: ChartPoint[]; colors: AppColors }) {
@@ -90,10 +129,14 @@ export default function ReportsScreen() {
   const [fundOpen, setFundOpen] = useState(false)
   const [funds, setFunds] = useState<FundOption[]>([])
   const [entries, setEntries] = useState<LedgerEntry[]>([])
+  const [pledges, setPledges] = useState<PledgeEntry[]>([])
   const [exports, setExports] = useState<ExportRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  const permissionFundId = fundId === 'all' ? null : fundId
+  const { can, isLoading: permissionsLoading } = useFundPermissions(permissionFundId)
+  const canExportSelectedFund = fundId !== 'all' && !permissionsLoading && can('export_reports')
   const hasLoadedRef = useRef(false)
   const lastLoadedAtRef = useRef(0)
   const pdfHtmlCacheRef = useRef(new Map<string, { html: string; createdAt: number }>())
@@ -124,29 +167,41 @@ export default function ReportsScreen() {
 
         if (!ids.length) {
           setEntries([])
+          setPledges([])
           setExports([])
           hasLoadedRef.current = true
           lastLoadedAtRef.current = Date.now()
           return
         }
 
-        const [contributionResult, expenseResult, exportResult] = await Promise.all([
-          supabase.from('contributions').select('id, fund_id, amount, contributor_name, confirmed_at').in('fund_id', ids).eq('status', 'confirmed').eq('is_refunded', false).order('confirmed_at', { ascending: false }),
-          supabase.from('expenses').select('id, fund_id, amount, description, vendor_name, created_at').in('fund_id', ids).is('deleted_at', null).order('created_at', { ascending: false }),
+        const [contributionResult, expenseResult, exportResult, pledgeBalanceResult] = await Promise.all([
+          supabase.from('contributions').select('id, fund_id, amount, pledged_amount, contributor_name, status, is_refunded, confirmed_at, created_at').in('fund_id', ids).order('created_at', { ascending: false }),
+          supabase.from('expenses').select('id, fund_id, amount, description, vendor_name, created_at, is_sponsored').in('fund_id', ids).is('deleted_at', null).order('created_at', { ascending: false }),
           supabase.from('fund_exports').select('id, fund_id, export_type, created_at').in('fund_id', ids).order('created_at', { ascending: false }).limit(20),
+          supabase.from('contributor_pledge_balances').select('pledge_id, fund_id, contributor_name, pledged_amount, allocated_amount, created_at').in('fund_id', ids).order('created_at', { ascending: false }),
         ])
         if (contributionResult.error) throw contributionResult.error
         if (expenseResult.error) throw expenseResult.error
         if (exportResult.error) throw exportResult.error
+        if (pledgeBalanceResult.error) throw pledgeBalanceResult.error
         if (!active) return
 
-        const contributionEntries: LedgerEntry[] = (contributionResult.data ?? []).filter(row => row.confirmed_at).map(row => ({
+        const contributionEntries: LedgerEntry[] = (contributionResult.data ?? []).filter(row => row.status === 'confirmed' && !row.is_refunded && row.confirmed_at).map(row => ({
           id: row.id, fundId: row.fund_id, type: 'contribution', amount: Number(row.amount ?? 0), date: row.confirmed_at!, description: row.contributor_name || 'Contribution',
         }))
-        const expenseEntries: LedgerEntry[] = (expenseResult.data ?? []).map(row => ({
+        const pledgeEntries: PledgeEntry[] = (pledgeBalanceResult.data ?? []).map(row => ({
+          id: row.pledge_id,
+          fundId: row.fund_id,
+          amount: Number(row.pledged_amount ?? 0),
+          received: Number(row.allocated_amount ?? 0),
+          date: row.created_at,
+          description: row.contributor_name || 'Pledge',
+        }))
+        const expenseEntries: LedgerEntry[] = (expenseResult.data ?? []).filter(row => !row.is_sponsored).map(row => ({
           id: row.id, fundId: row.fund_id, type: 'expense', amount: Number(row.amount ?? 0), date: row.created_at, description: row.description || row.vendor_name || 'Expense',
         }))
         setEntries([...contributionEntries, ...expenseEntries].sort((a, b) => b.date.localeCompare(a.date)))
+        setPledges(pledgeEntries)
         setExports((exportResult.data ?? []) as ExportRecord[])
         hasLoadedRef.current = true
         lastLoadedAtRef.current = Date.now()
@@ -167,6 +222,10 @@ export default function ReportsScreen() {
     const start = startOfPeriod(period).getTime()
     return entries.filter(entry => (fundId === 'all' || entry.fundId === fundId) && new Date(entry.date).getTime() >= start)
   }, [entries, fundId, period])
+  const filteredPledges = useMemo(() => {
+    const start = startOfPeriod(period).getTime()
+    return pledges.filter(entry => (fundId === 'all' || entry.fundId === fundId) && new Date(entry.date).getTime() >= start)
+  }, [pledges, fundId, period])
 
   const chartData = useMemo(() => {
     const now = new Date()
@@ -184,9 +243,11 @@ export default function ReportsScreen() {
   }, [filteredEntries, period])
 
   const totalContributed = filteredEntries.filter(entry => entry.type === 'contribution').reduce((sum, entry) => sum + entry.amount, 0)
+  const totalPledged = filteredPledges.reduce((sum, entry) => sum + entry.amount, 0)
+  const totalOutstanding = filteredPledges.reduce((sum, entry) => sum + Math.max(entry.amount - entry.received, 0), 0)
   const totalExpenses = filteredEntries.filter(entry => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0)
   const netBalance = totalContributed - totalExpenses
-  const activeFunds = fundId === 'all' ? new Set(filteredEntries.map(entry => entry.fundId)).size : 1
+  const activeFunds = fundId === 'all' ? new Set([...filteredEntries.map(entry => entry.fundId), ...filteredPledges.map(entry => entry.fundId)]).size : 1
   const visibleExports = exports.filter(record => fundId === 'all' || record.fund_id === fundId).slice(0, 8)
 
   useEffect(() => {
@@ -204,61 +265,73 @@ export default function ReportsScreen() {
     if (existingRequest) return existingRequest
 
     const buildRequest = (async () => {
+      const [
+        fundResult,
+        contributionResult,
+        expenseResult,
+        memberResult,
+        linkedEventResult,
+        contributorResult,
+        pledgeBalanceResult,
+        sponsorshipResult,
+        awardResult,
+        profileResult,
+        auditHistory,
+        contributionEdits,
+        expenseEdits,
+        exportHistory,
+        logoDataUri,
+      ] = await Promise.all([
+        supabase.from('funds').select('id, title, description, fund_type, fund_code, currency_code, goal_amount, status, created_at, contribution_deadline, closed_at, linked_event_id, is_private').eq('id', reportFundId).single(),
+        supabase.from('contributions').select('id, contributor_id, user_id, contributor_name, contributor_phone, amount, pledged_amount, payment_method, reference_number, status, is_refunded, confirmed_at, created_at, notes').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
+        supabase.from('expenses').select('id, description, item_name, category, amount, vendor_name, receipt_url, is_sponsored, sponsored_by_user_id, sponsored_by_name, has_open_query, created_at, updated_at, deleted_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
+        supabase.from('fund_members').select('id, user_id, invited_name, invited_phone, role, status, invited_at, joined_at, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
+        supabase.from('events').select('name, event_date, event_time, venue_name').eq('linked_fund_id', reportFundId).maybeSingle(),
+        supabase.from('fund_contributors').select('id, user_id, display_name, phone, contributor_type').eq('fund_id', reportFundId).order('display_name', { ascending: true }),
+        supabase.from('contributor_pledge_balances').select('pledge_id, contributor_id, pledged_amount, allocated_amount, outstanding_amount, pledge_state').eq('fund_id', reportFundId),
+        supabase.from('fund_sponsorship_item_progress').select('id, title, target_amount, allocated_amount, outstanding_amount, status, claimed_by_user_id, funded_at, fulfilled_at, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
+        supabase.from('rich_auntie_awards').select('id, recipient_user_id, sponsorship_item_id, reason_label, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
+        supabase.rpc('get_fund_member_profiles', { p_fund_id: reportFundId }),
+        fetchAllReportRows((from, to) => supabase.from('audit_log').select('id, user_id, action, entity_type, entity_id, old_values, new_values, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
+        fetchAllReportRows((from, to) => supabase.from('contribution_edits').select('id, contribution_id, edited_by, field_changed, old_value, new_value, reason, created_at, contribution:contributions!inner(fund_id)').eq('contribution.fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
+        fetchAllReportRows((from, to) => supabase.from('expense_edits').select('id, expense_id, edited_by, field_changed, old_value, new_value, reason, created_at, expense:expenses!inner(fund_id)').eq('expense.fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
+        fetchAllReportRows((from, to) => supabase.from('fund_exports').select('id, exported_by, export_type, was_free, tokens_spent, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
+        loadReportLogoDataUri(),
+      ])
 
-    const [fundResult, contributionResult, expenseResult, memberResult, profileResult, linkedEventResult] = await Promise.all([
-      supabase.from('funds').select('id, title, description, fund_type, fund_code, currency_code, goal_amount, status, created_at, contribution_deadline, closed_at, linked_event_id, is_private').eq('id', reportFundId).single(),
-      supabase.from('contributions').select('id, contributor_name, amount, payment_method, reference_number, status, is_refunded, confirmed_at, created_at, notes').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
-      supabase.from('expenses').select('id, description, category, amount, vendor_name, is_sponsored, sponsored_by_name, has_open_query, created_at').eq('fund_id', reportFundId).is('deleted_at', null).order('created_at', { ascending: true }),
-      supabase.from('fund_members').select('id, role, status, joined_at').eq('fund_id', reportFundId).eq('status', 'joined').order('joined_at', { ascending: true }),
-      supabase.rpc('get_fund_member_profiles', { p_fund_id: reportFundId }),
-      supabase.from('events').select('name, event_date, event_time, venue_name').eq('linked_fund_id', reportFundId).maybeSingle(),
-    ])
-    if (fundResult.error || !fundResult.data) throw fundResult.error ?? new Error('Fund details are unavailable.')
-    if (contributionResult.error) throw contributionResult.error
-    if (expenseResult.error) throw expenseResult.error
-    if (memberResult.error) throw memberResult.error
+      if (fundResult.error || !fundResult.data) throw fundResult.error ?? new Error('Fund details are unavailable.')
+      const reportErrors = [
+        contributionResult.error,
+        expenseResult.error,
+        memberResult.error,
+        linkedEventResult.error,
+        contributorResult.error,
+        pledgeBalanceResult.error,
+        sponsorshipResult.error,
+        awardResult.error,
+        profileResult.error,
+      ].filter(Boolean)
+      if (reportErrors.length) throw reportErrors[0]
 
-    const fund = fundResult.data
-    const contributions = contributionResult.data ?? []
-    const expenses = expenseResult.data ?? []
-    const members = memberResult.data ?? []
-    const profileByRow = new Map<string, { name: string; phone: string }>((profileResult.data ?? []).map((profile: any) => [profile.member_row_id, { name: profile.name, phone: profile.phone }]))
-    const linkedEvent = linkedEventResult.data
-    const reportCurrency = fund.currency_code
-    const confirmed = contributions.filter(item => item.status === 'confirmed' && !item.is_refunded)
-    const contributed = confirmed.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
-    const spent = expenses.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
-    const balance = contributed - spent
-    const goal = Number(fund.goal_amount ?? 0)
-    const progress = goal > 0 ? Math.min(Math.round(contributed / goal * 100), 999) : 0
-    const categoryTotals = new Map<string, number>()
-    expenses.forEach(item => {
-      const category = item.category ? String(item.category).replace(/_/g, ' ') : 'Uncategorised'
-      categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + Number(item.amount ?? 0))
-    })
-    const formatDate = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('en-BW', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not set'
-    const contributionRows = contributions.map(item => `<tr><td>${formatDate(item.confirmed_at ?? item.created_at)}</td><td>${escapeHtml(item.contributor_name)}</td><td>${escapeHtml(String(item.payment_method ?? 'Not specified').replace(/_/g, ' '))}</td><td>${escapeHtml(item.reference_number ?? '—')}</td><td><span class="status">${item.is_refunded ? 'Refunded' : escapeHtml(item.status)}</span></td><td class="amount">${money(Number(item.amount ?? 0), reportCurrency)}</td></tr>`).join('')
-    const expenseRows = expenses.map(item => `<tr><td>${formatDate(item.created_at)}</td><td>${escapeHtml(item.description)}</td><td>${escapeHtml(item.vendor_name ?? '—')}</td><td>${escapeHtml(item.category ? String(item.category).replace(/_/g, ' ') : 'Uncategorised')}</td><td>${item.has_open_query ? 'Queried' : item.is_sponsored ? `Sponsored${item.sponsored_by_name ? ` by ${escapeHtml(item.sponsored_by_name)}` : ''}` : 'Recorded'}</td><td class="amount expense">${money(Number(item.amount ?? 0), reportCurrency)}</td></tr>`).join('')
-    const memberRows = members.map(member => { const profile = profileByRow.get(member.id); return `<tr><td>${escapeHtml(profile?.name ?? 'Member')}</td><td>${escapeHtml(profile?.phone ?? '—')}</td><td>${escapeHtml(String(member.role))}</td><td>${formatDate(member.joined_at)}</td></tr>` }).join('')
-    const categoryRows = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]).map(([category, amount]) => `<tr><td>${escapeHtml(category)}</td><td class="amount expense">${money(amount, reportCurrency)}</td><td>${spent > 0 ? Math.round(amount / spent * 100) : 0}%</td></tr>`).join('')
-    const eventSection = linkedEvent ? `<section><h2>Linked event</h2><div class="details"><div><span>Event</span><strong>${escapeHtml(linkedEvent.name)}</strong></div><div><span>Date</span><strong>${formatDate(linkedEvent.event_date)}</strong></div><div><span>Venue</span><strong>${escapeHtml(linkedEvent.venue_name ?? 'Not set')}</strong></div></div></section>` : ''
-
-    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-      @page{margin:46px 42px}*{box-sizing:border-box}html{background:#fff}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#17151d;font-size:11px;margin:0;padding:0 18px}h1{font-size:26px;margin:0 0 4px}h2{font-size:15px;margin:0 0 12px;border-bottom:1px solid #ddd;padding-bottom:7px}.muted{color:#777}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.brand{color:#7657f0;font-weight:800;letter-spacing:1px}.code{font-size:12px;font-weight:700;background:#f2ecff;padding:7px 10px;border-radius:7px}.summary{display:flex;gap:8px;margin:18px 0}.metric{flex:1;padding:12px;background:#f5f2fa;border-radius:9px}.metric span,.details span{display:block;font-size:8px;color:#777;font-weight:700;letter-spacing:.6px;margin-bottom:4px}.metric strong{font-size:16px}.metric .positive{color:#7657f0}.metric .negative{color:#c63e49}.progress{height:7px;background:#ece8f1;border-radius:4px;overflow:hidden;margin-top:7px}.progress div{height:100%;background:#7657f0}section{margin:22px 0;page-break-inside:avoid}.details{display:flex;gap:10px;flex-wrap:wrap}.details>div{min-width:145px;padding:9px 11px;background:#faf9fb;border:1px solid #e4e0e8;border-radius:8px}.details strong{font-size:11px}table{width:100%;border-collapse:collapse;page-break-inside:auto}tr{page-break-inside:avoid}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #e6e3e8;font-size:9px}th{font-size:8px;color:#666;text-transform:uppercase;letter-spacing:.4px;background:#f7f5f9}.amount{text-align:right;font-weight:700}.expense{color:#c63e49}.status{text-transform:capitalize}.footer{margin-top:28px;padding-top:10px;border-top:1px solid #ddd;color:#888;font-size:8px}
-    </style></head><body>
-      <div class="header"><div><div class="brand">TSHELO FUND REPORT</div><h1>${escapeHtml(fund.title)}</h1><div class="muted">Generated ${formatDate(new Date().toISOString())}</div></div><div class="code">${escapeHtml(fund.fund_code)}</div></div>
-      <div class="details"><div><span>CREATED</span><strong>${formatDate(fund.created_at)}</strong></div><div><span>STATUS</span><strong>${escapeHtml(fund.status)}</strong></div><div><span>TYPE</span><strong>${escapeHtml(String(fund.fund_type).replace(/_/g, ' '))}</strong></div><div><span>DEADLINE</span><strong>${formatDate(fund.contribution_deadline)}</strong></div><div><span>VISIBILITY</span><strong>${fund.is_private ? 'Private' : 'Public'}</strong></div><div><span>MEMBERS</span><strong>${members.length}</strong></div></div>
-      ${fund.description ? `<section><h2>Purpose</h2><p>${escapeHtml(fund.description)}</p></section>` : ''}
-      <div class="summary"><div class="metric"><span>CONTRIBUTIONS</span><strong>${money(contributed, reportCurrency)}</strong></div><div class="metric"><span>SPENDING</span><strong class="negative">${money(spent, reportCurrency)}</strong></div><div class="metric"><span>BALANCE</span><strong class="positive">${money(balance, reportCurrency)}</strong></div><div class="metric"><span>GOAL</span><strong>${money(goal, reportCurrency)}</strong><div class="progress"><div style="width:${Math.min(progress, 100)}%"></div></div><small>${progress}% funded</small></div></div>
-      ${eventSection}
-      <section><h2>Spending breakdown</h2><table><thead><tr><th>Category</th><th class="amount">Amount</th><th>Share</th></tr></thead><tbody>${categoryRows || '<tr><td colspan="3">No expenses recorded.</td></tr>'}</tbody></table></section>
-      <section><h2>Contributions (${contributions.length})</h2><table><thead><tr><th>Date</th><th>Contributor</th><th>Method</th><th>Reference</th><th>Status</th><th class="amount">Amount</th></tr></thead><tbody>${contributionRows || '<tr><td colspan="6">No contributions recorded.</td></tr>'}</tbody></table></section>
-      <section><h2>Expenses (${expenses.length})</h2><table><thead><tr><th>Date</th><th>Description</th><th>Vendor</th><th>Category</th><th>Status</th><th class="amount">Amount</th></tr></thead><tbody>${expenseRows || '<tr><td colspan="6">No expenses recorded.</td></tr>'}</tbody></table></section>
-      <section><h2>Members (${members.length})</h2><table><thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead><tbody>${memberRows || '<tr><td colspan="4">No members recorded.</td></tr>'}</tbody></table></section>
-      <div class="footer">This report reflects Tshelo records at the time it was generated. Confirm supporting receipts and payment references before relying on it for formal accounting.</div>
-    </body></html>`
-    pdfHtmlCacheRef.current.set(reportFundId, { html, createdAt: Date.now() })
-    return html
+      const html = buildFundReportHtml({
+        fund: fundResult.data,
+        contributions: contributionResult.data ?? [],
+        expenses: expenseResult.data ?? [],
+        members: memberResult.data ?? [],
+        contributors: contributorResult.data ?? [],
+        pledgeBalances: pledgeBalanceResult.data ?? [],
+        linkedEvent: linkedEventResult.data,
+        sponsorshipItems: sponsorshipResult.data ?? [],
+        richAuntieAwards: awardResult.data ?? [],
+        memberProfiles: profileResult.data ?? [],
+        auditHistory,
+        contributionEdits,
+        expenseEdits,
+        exportHistory,
+        logoDataUri,
+      })
+      pdfHtmlCacheRef.current.set(reportFundId, { html, createdAt: Date.now() })
+      return html
     })()
     pdfHtmlInFlightRef.current.set(reportFundId, buildRequest)
     try {
@@ -280,6 +353,10 @@ export default function ReportsScreen() {
       Alert.alert('Select a fund', 'PDF reports are generated for one fund at a time. Choose a fund above first.')
       return
     }
+    if (!canExportSelectedFund) {
+      Alert.alert('Export access required', 'You do not have permission to export reports for this fund.')
+      return
+    }
     setIsExporting(true)
     try {
       const html = await detailedReportHtml()
@@ -294,10 +371,22 @@ export default function ReportsScreen() {
 
   async function exportCsv() {
     if (isExporting) return
+    if (fundId === 'all') {
+      Alert.alert('Select a fund', 'CSV reports are generated for one fund at a time. Choose a fund above first.')
+      return
+    }
+    if (!canExportSelectedFund) {
+      Alert.alert('Export access required', 'You do not have permission to export reports for this fund.')
+      return
+    }
     setIsExporting(true)
     try {
       const header = 'Date,Description,Type,Amount,Currency\n'
-      const csvRows = filteredEntries.map(entry => [new Date(entry.date).toISOString(), `"${entry.description.replace(/"/g, '""')}"`, entry.type, entry.amount, currency].join(',')).join('\n')
+      const csvEntries = [
+        ...filteredEntries,
+        ...filteredPledges.map(entry => ({ ...entry, type: 'pledge' as const })),
+      ].sort((a, b) => b.date.localeCompare(a.date))
+      const csvRows = csvEntries.map(entry => [new Date(entry.date).toISOString(), `"${entry.description.replace(/"/g, '""')}"`, entry.type, entry.amount, currency].join(',')).join('\n')
       const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory
       if (!directory) throw new Error('No writable export folder is available.')
       const path = `${directory}tshelo-report-${Date.now()}.csv`
@@ -311,7 +400,15 @@ export default function ReportsScreen() {
   }
 
   async function shareSummary() {
-    await Share.share({ message: `Tshelo report — ${selectedFund?.title ?? 'All funds'} (${period})\nContributions: ${money(totalContributed, currency)}\nExpenses: ${money(totalExpenses, currency)}\nNet: ${money(netBalance, currency)}` })
+    if (fundId === 'all') {
+      Alert.alert('Select a fund', 'Choose one fund before sharing its financial summary.')
+      return
+    }
+    if (!canExportSelectedFund) {
+      Alert.alert('Export access required', 'You do not have permission to share reports for this fund.')
+      return
+    }
+    await Share.share({ message: `Tshelo report - ${selectedFund?.title ?? 'All funds'} (${period})\nTotal in: ${money(totalContributed, currency)}\nTotal out: ${money(totalExpenses, currency)}\nAvailable balance: ${money(netBalance, currency)}\nPledged: ${money(totalPledged, currency)}\nOpen pledges: ${money(totalOutstanding, currency)}` })
   }
 
   return (
@@ -335,19 +432,21 @@ export default function ReportsScreen() {
           </View>
 
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}><Text style={styles.statCardLabel}>CONTRIBUTIONS</Text><Text style={styles.statCardValue}>{money(totalContributed, currency)}</Text></View>
-            <View style={styles.statCard}><Text style={styles.statCardLabel}>EXPENSES</Text><Text style={styles.statCardValue}>{money(totalExpenses, currency)}</Text></View>
-            <View style={styles.statCard}><Text style={styles.statCardLabel}>NET BALANCE</Text><Text style={[styles.statCardValue, { color: netBalance < 0 ? colors.error : colors.primary }]}>{money(netBalance, currency)}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statCardLabel}>PLEDGED</Text><Text style={styles.statCardValue}>{money(totalPledged, currency)}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statCardLabel}>TOTAL IN</Text><Text style={[styles.statCardValue, { color: colors.primary }]}>{money(totalContributed, currency)}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statCardLabel}>OPEN PLEDGES</Text><Text style={[styles.statCardValue, { color: totalOutstanding > 0 ? colors.error : colors.textPrimary }]}>{money(totalOutstanding, currency)}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statCardLabel}>TOTAL OUT</Text><Text style={styles.statCardValue}>{money(totalExpenses, currency)}</Text></View>
+            <View style={styles.statCard}><Text style={styles.statCardLabel}>AVAILABLE</Text><Text style={[styles.statCardValue, { color: netBalance < 0 ? colors.error : colors.primary }]}>{money(netBalance, currency)}</Text></View>
             <View style={styles.statCard}><Text style={styles.statCardLabel}>ACTIVE FUNDS</Text><Text style={styles.statCardValue}>{activeFunds}</Text></View>
           </View>
 
           <Text style={styles.sectionTitle}>Export report</Text>
           <View style={styles.exportRow}>
-            <TouchableOpacity style={[styles.exportBtn, fundId === 'all' && styles.exportBtnDisabled]} onPress={exportPdf} disabled={isExporting}><Ionicons name="document-text-outline" size={19} color={fundId === 'all' ? colors.textMuted : colors.primary} /><Text style={[styles.exportBtnText, fundId === 'all' && styles.exportBtnTextDisabled]}>PDF</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.exportBtn} onPress={shareSummary}><Ionicons name="share-social-outline" size={19} color={colors.primary} /><Text style={styles.exportBtnText}>Share</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.exportBtn} onPress={exportCsv} disabled={isExporting}><Ionicons name="grid-outline" size={19} color={colors.primary} /><Text style={styles.exportBtnText}>CSV</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={exportPdf} disabled={isExporting || !canExportSelectedFund}><Ionicons name="document-text-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>PDF</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={shareSummary} disabled={!canExportSelectedFund}><Ionicons name="share-social-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>Share</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={exportCsv} disabled={isExporting || !canExportSelectedFund}><Ionicons name="grid-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>CSV</Text></TouchableOpacity>
           </View>
-          {fundId === 'all' && <Text style={styles.exportHint}>Select a specific fund to generate its detailed PDF report.</Text>}
+          {!canExportSelectedFund && <Text style={styles.exportHint}>{fundId === 'all' ? 'Select a specific fund to export its report.' : permissionsLoading ? 'Checking your export permission…' : 'Ask the fund owner for report export permission.'}</Text>}
 
           <View style={styles.historyHeader}><Text style={styles.sectionTitle}>Export history</Text><Text style={styles.historyCount}>{exports.length}</Text></View>
           {visibleExports.map(record => {

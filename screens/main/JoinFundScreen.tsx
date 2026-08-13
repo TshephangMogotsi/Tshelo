@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
 import { supabase } from '../../lib/supabase'
+import { fundMemberCount } from '../../lib/fundMembers'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
@@ -44,7 +45,7 @@ export default function JoinFundScreen({ navigation, route }: Props) {
   const [error, setError]     = useState<string | null>(null)
 
   const cleanedCode = code.trim().toUpperCase()
-  const isValid     = cleanedCode.length >= 6
+  const isValid     = cleanedCode.length >= 8
 
   useHardwareBack(() => {
     // From the fund preview, back returns to code entry rather than
@@ -114,7 +115,7 @@ export default function JoinFundScreen({ navigation, route }: Props) {
       organiserName: fund.organiser_name ?? 'Unknown',
       goalAmount:    fund.goal_amount ?? 0,
       currencyCode:  fund.currency_code,
-      memberCount:   memberCount ?? 0,
+      memberCount:   fundMemberCount(memberCount),
       isPrivate:     isPrivate ?? false,
     })
     setPhase('preview')
@@ -125,16 +126,8 @@ export default function JoinFundScreen({ navigation, route }: Props) {
     if (!requireOnline()) return
     setPhase('joining')
 
-    const { error: insertError } = await supabase
-      .from('fund_members')
-      .insert({
-        fund_id:    preview.id,
-        user_id:    userId,
-        invited_by: userId,
-        role:       'member',
-        status:     preview.isPrivate ? 'pending' : 'joined',
-        ...(preview.isPrivate ? {} : { joined_at: new Date().toISOString() }),
-      })
+    const { data: joinedRows, error: insertError } = await supabase
+      .rpc('join_fund_by_code', { p_code: cleanedCode })
 
     if (insertError) {
       hapticError()
@@ -144,12 +137,13 @@ export default function JoinFundScreen({ navigation, route }: Props) {
     }
 
     hapticSuccess()
-    if (preview.isPrivate) {
+    const membership = joinedRows?.[0]
+    if (membership?.membership_status === 'pending') {
       setPhase('requested')
       return
     }
 
-    navigation.replace('FundDetail', { fundId: preview.id })
+    navigation.replace('FundDetail', { fundId: membership?.fund_id ?? preview.id })
   }
 
   const isBusy = phase === 'searching' || phase === 'joining'
@@ -224,18 +218,18 @@ export default function JoinFundScreen({ navigation, route }: Props) {
                 isValid && styles.codeInputValid,
                 phase === 'preview' && styles.codeInputLocked,
               ]}
-              placeholder="e.g. FND-A1B2C3D4"
+              placeholder="e.g. FND-A1B2C3D4E5F678901234"
               placeholderTextColor={colors.textMuted}
               value={code}
               onChangeText={handleCodeChange}
               autoCapitalize="characters"
               autoCorrect={false}
               returnKeyType="done"
-              maxLength={16}
+              maxLength={32}
               editable={!isBusy && phase !== 'preview'}
             />
             <Text style={styles.hint}>
-              Invite codes are case-insensitive. Ask the organiser for their fund's code.
+              Invite codes are case-insensitive. Paste the complete code shown by the organiser.
             </Text>
           </View>
 

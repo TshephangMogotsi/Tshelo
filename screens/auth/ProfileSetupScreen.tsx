@@ -13,6 +13,7 @@ import { useRequireOnline } from '../../context/ConnectivityContext'
 import BankPicker, { BankFormValue } from '../../components/BankPicker'
 import ProviderLogo from '../../components/ProviderLogo'
 import { detectProvider, type MobileMoneyProvider } from '../../lib/providers'
+import { openLegalDocument } from '../../lib/legalDocuments'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ProfileSetup'>
@@ -158,9 +159,15 @@ export default function ProfileSetupScreen({ navigation }: Props) {
             <Text style={styles.consentText}>
               I consent to Tshelo processing my personal data and mobile money information
               per the{' '}
-              <Text style={styles.consentLink}>Privacy Policy</Text>
+              <Text
+                style={styles.consentLink}
+                onPress={event => { event.stopPropagation(); void openLegalDocument('privacy') }}
+              >Privacy Policy</Text>
               {' '}and{' '}
-              <Text style={styles.consentLink}>Terms of Service</Text>.
+              <Text
+                style={styles.consentLink}
+                onPress={event => { event.stopPropagation(); void openLegalDocument('terms') }}
+              >Terms of Service</Text>.
             </Text>
           </TouchableOpacity>
 

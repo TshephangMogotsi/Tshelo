@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import countries from 'world-countries'
+import { TOKEN_FEATURE_PRICES } from '../../../lib/tokenPricing'
 
 export const BRAND_PURPLE = '#7657F0'
 export const BRAND_PURPLE_DARK = '#7439E0'
@@ -9,10 +10,11 @@ export const BRAND_ACCENT = '#F59E0B'
 export const BACK_HIT_SLOP = { top: 10, right: 10, bottom: 10, left: 10 }
 
 export type CreateOption = 'event' | 'fund' | 'eventFund'
-export type QuickActionId = 'join' | 'contribution' | 'expense' | 'members' | 'tokens'
+export type QuickActionId = 'joinFund' | 'joinEvent' | 'contribution' | 'expense' | 'members' | 'tokens'
 export type FundCurrency = string
 export type PickedOrganiser = {
   id: string
+  userId?: string
   name: string
   phone?: string
   initials: string
@@ -63,7 +65,8 @@ export const QUICK_ACTIONS: {
   icon: keyof typeof Ionicons.glyphMap
   needsFund: boolean
 }[] = [
-  { id: 'join',         title: 'Join',    subtitle: 'a Fund',       icon: 'link-outline',       needsFund: false },
+  { id: 'joinFund',     title: 'Join',    subtitle: 'a Fund',       icon: 'link-outline',       needsFund: false },
+  { id: 'joinEvent',    title: 'Join',    subtitle: 'an Event',     icon: 'ticket-outline',     needsFund: false },
   { id: 'contribution', title: 'Record',  subtitle: 'Contribution', icon: 'add-circle-outline', needsFund: true },
   { id: 'expense',      title: 'Record',  subtitle: 'Expense',      icon: 'receipt-outline',    needsFund: true },
   { id: 'members',      title: 'Add',     subtitle: 'Members',      icon: 'person-add-outline', needsFund: true },
@@ -82,17 +85,8 @@ export const CREATE_OPTIONS: {
   featured?: boolean
 }[] = [
   {
-    id: 'event',
-    title: 'Event only',
-    description: 'Guest list & budget tracking',
-    price: 'FREE',
-    icon: 'calendar-outline',
-    tint: BRAND_PURPLE,
-    iconBg: BRAND_LAVENDER,
-  },
-  {
     id: 'fund',
-    title: 'Fund only',
+    title: 'Create a Fund',
     description: 'Track contributions',
     price: 'FREE',
     icon: 'wallet-outline',
@@ -103,11 +97,20 @@ export const CREATE_OPTIONS: {
     id: 'eventFund',
     title: 'Event + Fund',
     description: 'Plan event & collect contributions',
-    price: '15',
+    price: `${TOKEN_FEATURE_PRICES.eventFund}`,
     icon: 'albums-outline',
     tint: BRAND_PURPLE_DARK,
-    iconBg: BRAND_PURPLE,
+    iconBg: BRAND_LAVENDER,
     featured: true,
+  },
+  {
+    id: 'event',
+    title: 'Event Only',
+    description: 'Manage invitations and RSVPs',
+    price: 'FREE',
+    icon: 'calendar-outline',
+    tint: BRAND_PURPLE,
+    iconBg: BRAND_LAVENDER,
   },
 ]
 

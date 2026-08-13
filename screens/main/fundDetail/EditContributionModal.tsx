@@ -23,6 +23,7 @@ import type { Contribution } from './types'
 type Props = {
   contribution: Contribution | null
   currencySymbol: string
+  canRefund: boolean
   onClose: () => void
   onSaved: (updated: Contribution) => void
 }
@@ -44,14 +45,14 @@ const STATUSES = [
   ['disputed', 'Disputed'],
 ] as const
 
-export default function EditContributionModal({ contribution, currencySymbol, onClose, onSaved }: Props) {
+export default function EditContributionModal({ contribution, currencySymbol, canRefund, onClose, onSaved }: Props) {
   const { colors } = useTheme()
   const { userId } = useAuth()
   const common = makeCommonStyles(colors)
   const styles = makeStyles(colors)
 
-  const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
+  const [pledgedAmount, setPledgedAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<string>('cash')
   const [reference, setReference] = useState('')
   const [status, setStatus] = useState<string>('pending')
@@ -59,15 +60,17 @@ export default function EditContributionModal({ contribution, currencySymbol, on
 
   useEffect(() => {
     if (!contribution) return
-    setName(contribution.contributor_name)
     setAmount(String(contribution.amount))
+    setPledgedAmount(contribution.pledged_amount == null ? '' : String(contribution.pledged_amount))
     setPaymentMethod(contribution.payment_method ?? 'cash')
     setReference(contribution.reference_number ?? '')
     setStatus(contribution.is_refunded ? 'refunded' : contribution.status)
   }, [contribution?.id])
 
   const parsedAmount = Number(amount)
-  const isValid = name.trim().length >= 2 && Number.isFinite(parsedAmount) && parsedAmount > 0
+  const parsedPledgedAmount = pledgedAmount.trim() === '' ? null : Number(pledgedAmount)
+  const pledgeValid = parsedPledgedAmount === null || (Number.isFinite(parsedPledgedAmount) && parsedPledgedAmount > 0)
+  const isValid = Number.isFinite(parsedAmount) && parsedAmount > 0 && pledgeValid
 
   async function handleSave() {
     if (!contribution || !isValid || isSaving) return
@@ -75,13 +78,14 @@ export default function EditContributionModal({ contribution, currencySymbol, on
     const now = new Date().toISOString()
     const isConfirmed = status === 'confirmed'
     const isRefunded = status === 'refunded'
+    const nextPledgedAmount = status === 'pledged' ? parsedAmount : parsedPledgedAmount
 
     const { data, error } = await supabase
       .from('contributions')
       .update({
-        contributor_name: name.trim(),
         amount: parsedAmount,
-        payment_method: paymentMethod,
+        pledged_amount: nextPledgedAmount,
+        payment_method: status === 'pledged' ? null : paymentMethod,
         reference_number: reference.trim() || null,
         status,
         is_refunded: isRefunded,
@@ -103,9 +107,9 @@ export default function EditContributionModal({ contribution, currencySymbol, on
     hapticSuccess()
     onSaved({
       ...contribution,
-      contributor_name: name.trim(),
       amount: parsedAmount,
-      payment_method: paymentMethod,
+      pledged_amount: nextPledgedAmount,
+      payment_method: status === 'pledged' ? null : paymentMethod,
       reference_number: reference.trim() || null,
       status,
       is_refunded: isRefunded,
@@ -122,16 +126,14 @@ export default function EditContributionModal({ contribution, currencySymbol, on
               <Text style={common.modalTitle}>Edit Contribution</Text>
 
               <Text style={styles.label}>Contributor</Text>
-              <TextInput
-                style={[common.input, styles.inputSpacing]}
-                value={name}
-                onChangeText={setName}
-                placeholder="Contributor name"
-                placeholderTextColor={colors.textMuted}
-                editable={!isSaving}
-              />
+              <View style={styles.identityCard}>
+                <Text style={styles.identityName}>{contribution?.contributor_name}</Text>
+                <Text style={styles.identityHint}>
+                  Contributor identity is kept separate from transaction corrections.
+                </Text>
+              </View>
 
-              <Text style={styles.label}>Amount ({currencySymbol})</Text>
+              <Text style={styles.label}>{status === 'pledged' ? 'Pledged amount' : 'Amount received'} ({currencySymbol})</Text>
               <TextInput
                 style={[common.input, styles.inputSpacing]}
                 value={amount}
@@ -142,8 +144,24 @@ export default function EditContributionModal({ contribution, currencySymbol, on
                 editable={!isSaving}
               />
 
-              <Text style={styles.label}>Payment method</Text>
-              <View style={styles.chipRow}>
+              {status !== 'pledged' && (
+                <>
+                  <Text style={styles.label}>Original pledge ({currencySymbol}) <Text style={styles.optional}>(optional)</Text></Text>
+                  <TextInput
+                    style={[common.input, styles.inputSpacing]}
+                    value={pledgedAmount}
+                    onChangeText={text => setPledgedAmount(text.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                    placeholder="No prior pledge"
+                    placeholderTextColor={colors.textMuted}
+                    editable={!isSaving}
+                  />
+                </>
+              )}
+
+              {status !== 'pledged' && <>
+                <Text style={styles.label}>Payment method</Text>
+                <View style={styles.chipRow}>
                 {PAYMENT_METHODS.map(([value, label]) => (
                   <TouchableOpacity
                     key={value}
@@ -154,23 +172,24 @@ export default function EditContributionModal({ contribution, currencySymbol, on
                     <Text style={[styles.chipText, paymentMethod === value && styles.chipTextActive]}>{label}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+                </View>
 
-              <Text style={styles.label}>Reference</Text>
-              <TextInput
-                style={[common.input, styles.inputSpacing]}
-                value={reference}
-                onChangeText={setReference}
-                placeholder="Transaction or receipt reference"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="characters"
-                maxLength={100}
-                editable={!isSaving}
-              />
+                <Text style={styles.label}>Reference</Text>
+                <TextInput
+                  style={[common.input, styles.inputSpacing]}
+                  value={reference}
+                  onChangeText={setReference}
+                  placeholder="Transaction or receipt reference"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="characters"
+                  maxLength={100}
+                  editable={!isSaving}
+                />
+              </>}
 
               <Text style={styles.label}>Status</Text>
               <View style={styles.chipRow}>
-                {STATUSES.map(([value, label]) => (
+                {STATUSES.filter(([value]) => value !== 'refunded' || canRefund).map(([value, label]) => (
                   <TouchableOpacity
                     key={value}
                     style={[styles.chip, status === value && styles.chipActive]}
@@ -211,6 +230,33 @@ function makeStyles(colors: AppColors) {
       textTransform: 'uppercase',
       letterSpacing: 0.5,
       marginBottom: 8,
+    },
+    optional: {
+      fontSize: 10,
+      fontWeight: '500',
+      color: colors.textMuted,
+      textTransform: 'none',
+      letterSpacing: 0,
+    },
+    identityCard: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.background,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 18,
+    },
+    identityName: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    identityHint: {
+      marginTop: 4,
+      fontSize: 11,
+      lineHeight: 16,
+      color: colors.textMuted,
     },
     inputSpacing: { marginBottom: 18 },
     chipRow: {

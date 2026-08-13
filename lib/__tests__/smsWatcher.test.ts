@@ -1,22 +1,13 @@
 // The watcher module pulls in the supabase client (native storage + env
 // vars) for its notification side effects; the pure detection logic under
 // test here doesn't need it.
-jest.mock('../supabase', () => ({ supabase: { from: jest.fn() } }))
+jest.mock('../supabase', () => ({ supabase: { rpc: jest.fn() } }))
 
-import { detectMoneyIn, describeSender } from '../smsWatcher'
+import { detectMoneyIn, describeSender, getDetectedSmsKey } from '../smsWatcher'
 
 describe('detectMoneyIn', () => {
-  it('detects the "Hello Tshelo" test trigger with the default P200', () => {
-    const detected = detectMoneyIn('+26771234567', 'Hello Tshelo')
-    expect(detected).not.toBeNull()
-    expect(detected!.amount).toBe(200)
-    expect(detected!.senderPhone).toBe('+26771234567')
-    expect(detected!.provider).toBeNull()
-  })
-
-  it('accepts a custom amount in the test trigger', () => {
-    const detected = detectMoneyIn('+26771234567', 'hello tshelo 350.50')
-    expect(detected!.amount).toBe(350.5)
+  it('does not enable the old production test trigger', () => {
+    expect(detectMoneyIn('+26771234567', 'Hello Tshelo 350.50')).toBeNull()
   })
 
   it('prefers the real parser for provider messages', () => {
@@ -28,6 +19,8 @@ describe('detectMoneyIn', () => {
     expect(detected!.amount).toBe(500)
     expect(detected!.provider).toBe('orange_money')
     expect(detected!.senderName).toBe('KGOSI MOENG')
+    expect(detected!.detectionKey).toBe(getDetectedSmsKey(detected!))
+    expect(detected).not.toHaveProperty('smsBody')
   })
 
   it('ignores money-out provider messages', () => {
@@ -40,9 +33,23 @@ describe('detectMoneyIn', () => {
   })
 })
 
+describe('getDetectedSmsKey', () => {
+  it('returns the same identity for repeat taps on the same detection', () => {
+    const detected = {
+      amount: 250,
+      senderName: 'Kgosi',
+      senderPhone: '71234567',
+      provider: 'orange_money' as const,
+      reference: 'OM123',
+      receivedAt: '2026-07-22T10:00:00.000Z',
+    }
+    expect(getDetectedSmsKey(detected)).toBe(getDetectedSmsKey({ ...detected }))
+  })
+})
+
 describe('describeSender', () => {
   it('prefers name, then phone, then a fallback', () => {
-    const base = { amount: 1, provider: null, reference: null, smsBody: '', receivedAt: '' }
+    const base = { amount: 1, provider: null, reference: null, receivedAt: '' }
     expect(describeSender({ ...base, senderName: 'Kgosi', senderPhone: '712' })).toBe('Kgosi')
     expect(describeSender({ ...base, senderName: null, senderPhone: '712' })).toBe('712')
     expect(describeSender({ ...base, senderName: null, senderPhone: null })).toBe('an unknown sender')

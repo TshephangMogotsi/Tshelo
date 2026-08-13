@@ -1,17 +1,24 @@
-export type Tab = 'contributions' | 'expenses' | 'members'
+export type Tab = 'contributions' | 'sponsorships' | 'expenses' | 'members'
 
 export type MemberRole = 'owner' | 'admin' | 'member'
 
 export type Contribution = {
   id:              string
+  contributor_id:  string
   contributor_name: string
+  contributor_type: 'member' | 'guest'
   amount:          number
+  pledged_amount:  number | null
+  allocated_amount: number
+  outstanding_amount: number | null
+  pledge_state:    'pledged' | 'partially_paid' | 'fulfilled' | null
   payment_method:  string | null
   reference_number: string | null
   detected_via:    string
   status:          string
   is_refunded:     boolean
   confirmed_at:    string | null
+  created_at:      string
   notes:           string | null
 }
 
@@ -24,6 +31,9 @@ export type Expense = {
   created_at:      string
   notes?:          string | null
   has_open_query:  boolean
+  is_sponsored:    boolean
+  sponsored_by_user_id: string | null
+  sponsored_by_name: string | null
 }
 
 export type Member = {
@@ -41,6 +51,27 @@ export type PendingRequest = {
   display_name: string
   phone:        string
   requested_at: string
+}
+
+export type SponsorshipItemStatus = 'open' | 'claimed' | 'funded' | 'fulfilled' | 'cancelled'
+
+export type SponsorshipItem = {
+  id:                     string
+  fund_id:                string
+  title:                  string
+  description:            string | null
+  category:               string | null
+  target_amount:          number
+  allocated_amount:       number
+  outstanding_amount:     number
+  status:                 SponsorshipItemStatus
+  claimed_by_user_id:     string | null
+  sponsor_name:           string | null
+  claimed_at:             string | null
+  funded_at:              string | null
+  fulfilled_at:           string | null
+  linked_expense_id:      string | null
+  created_at:             string
 }
 
 export type FundDetail = {

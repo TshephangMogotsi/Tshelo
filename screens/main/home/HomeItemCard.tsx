@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
+import { formatFundMemberCount } from '../../../lib/fundMembers'
 import { HomeItem, formatEventDate, formatMoney } from './helpers'
 
 type Props = {
@@ -17,6 +18,9 @@ export default function HomeItemCard({ item, onPress }: Props) {
   const pct     = item.goal_amount > 0 ? Math.round((item.total_contributions / item.goal_amount) * 100) : 0
   const isEvent = item.kind === 'event'
   const isEF    = item.kind === 'eventFund'
+  const budgetText = item.budget_amount !== null && item.budget_amount > 0
+    ? formatMoney(item.budget_amount, item.budget_currency_code)
+    : 'Not set'
 
   return (
     <TouchableOpacity
@@ -59,7 +63,7 @@ export default function HomeItemCard({ item, onPress }: Props) {
           </View>
         )}
 
-        {(isEvent || isEF) && (
+        {isEF && (
           <View style={styles.eventMetaCard}>
             <View style={styles.eventMetaItem}>
               <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
@@ -76,6 +80,18 @@ export default function HomeItemCard({ item, onPress }: Props) {
           </View>
         )}
 
+        {(isEvent || isEF) && (
+          <View style={styles.eventBudgetRow}>
+            <View style={styles.eventBudgetLabelRow}>
+              <Ionicons name="wallet-outline" size={15} color={colors.primary} />
+              <Text style={styles.eventBudgetLabel}>Event budget</Text>
+            </View>
+            <Text style={styles.eventBudgetValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {budgetText}
+            </Text>
+          </View>
+        )}
+
         {!isEvent && (
           <View style={styles.fundAmountsRow}>
             <View style={styles.fundAmount}>
@@ -83,8 +99,8 @@ export default function HomeItemCard({ item, onPress }: Props) {
               <Text style={styles.fundAmountValue}>{formatMoney(item.balance, item.currency_code)}</Text>
             </View>
             <View style={[styles.fundAmount, styles.fundAmountRight]}>
-              <Text style={styles.fundAmountLabel}>Goal</Text>
-              <Text style={styles.fundAmountValue}>{formatMoney(item.goal_amount, item.currency_code)}</Text>
+              <Text style={styles.fundAmountLabel}>{isEF ? 'Fund goal' : 'Fund budget'}</Text>
+              <Text style={styles.fundAmountValue}>{isEF ? formatMoney(item.goal_amount, item.currency_code) : budgetText}</Text>
             </View>
           </View>
         )}
@@ -94,7 +110,7 @@ export default function HomeItemCard({ item, onPress }: Props) {
         <Text style={styles.overviewMeta} numberOfLines={1}>
           {isEvent
             ? `${item.guest_count} invited`
-            : `${formatMoney(item.total_contributions, item.currency_code)} contributed · ${item.member_count} members`}
+            : `${formatMoney(item.total_contributions, item.currency_code)} contributed · ${formatFundMemberCount(item.member_count)}`}
         </Text>
         <Text style={styles.overviewAction}>
           {isEvent ? 'View event' : `${pct}%`}
@@ -224,6 +240,41 @@ function makeStyles(colors: AppColors) {
       lineHeight: 15,
       fontWeight: '700',
       color: colors.textSecondary,
+    },
+    eventBudgetRow: {
+      minHeight: 43,
+      marginTop: 9,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+      backgroundColor: colors.primaryLight,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 11,
+    },
+    eventBudgetLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    eventBudgetLabel: {
+      fontSize: 10,
+      lineHeight: 14,
+      fontWeight: '800',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    eventBudgetValue: {
+      flexShrink: 1,
+      fontSize: 14,
+      lineHeight: 19,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      textAlign: 'right',
     },
     overviewBottom: {
       flexDirection: 'row',

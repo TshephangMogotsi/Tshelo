@@ -1,16 +1,32 @@
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { useEffect, useState } from 'react'
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  type GestureResponderEvent,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
+import { fonts } from '../../../theme/typography'
 import FlowHeader from './FlowHeader'
-import { formatWholeAmount, parseAmount } from './format'
-import { BRAND_LAVENDER, BRAND_PURPLE, EVENT_BUDGET_PRESETS } from './constants'
+import { parseAmount } from './format'
+import { BRAND_PURPLE, EVENT_BUDGET_PRESETS } from './constants'
 
 type Props = {
   eventBudget: string
   onEventBudgetChange: (text: string) => void
   fundGoalPercent: number
+  onFundGoalPercentChange: (value: number) => void
   eventName: string
+  currencySymbol: string
   isCreating: boolean
   onCreate: (fundGoalAmount: number) => void
   onBack: () => void
@@ -20,18 +36,63 @@ export default function EventFundBudgetStep({
   eventBudget,
   onEventBudgetChange,
   fundGoalPercent,
+  onFundGoalPercentChange,
   eventName,
+  currencySymbol,
   isCreating,
   onCreate,
   onBack,
 }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
+  const [goalTrackWidth, setGoalTrackWidth] = useState(0)
+  const [percentInput, setPercentInput] = useState(String(fundGoalPercent))
 
   const budgetAmount = parseAmount(eventBudget)
   const fundGoalAmount = Math.round(budgetAmount * fundGoalPercent / 100)
-  const youPayAmount = Math.max(budgetAmount - fundGoalAmount, 0)
+  const organiserAmount = Math.max(budgetAmount - fundGoalAmount, 0)
   const canCreateEventFund = budgetAmount > 0 && eventName.trim().length >= 3
+
+  useEffect(() => {
+    setPercentInput(String(fundGoalPercent))
+  }, [fundGoalPercent])
+
+  function formatAmount(amount: number) {
+    return `${currencySymbol}${amount.toLocaleString('en-BW', { maximumFractionDigits: 0 })}`
+  }
+
+  function updateGoalFromTouch(event: GestureResponderEvent) {
+    if (goalTrackWidth <= 0) return
+    const raw = Math.round((event.nativeEvent.locationX / goalTrackWidth) * 100 / 5) * 5
+    updateGoalPercent(Math.min(100, Math.max(5, raw)))
+  }
+
+  function updateGoalPercent(value: number) {
+    const normalized = Math.min(100, Math.max(5, Math.round(value)))
+    setPercentInput(String(normalized))
+    onFundGoalPercentChange(normalized)
+  }
+
+  function changePercentInput(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 3)
+    const parsed = Number(digits)
+    if (parsed > 100) {
+      updateGoalPercent(100)
+      return
+    }
+    setPercentInput(digits)
+    if (digits && parsed >= 5 && parsed <= 100) {
+      onFundGoalPercentChange(parsed)
+    }
+  }
+
+  function commitPercentInput() {
+    if (!percentInput) {
+      setPercentInput(String(fundGoalPercent))
+      return
+    }
+    updateGoalPercent(Number(percentInput))
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -40,97 +101,145 @@ export default function EventFundBudgetStep({
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
-          contentContainerStyle={styles.budgetScroll}
+          contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.budgetTitle}>Budget &amp; Goal</Text>
-          <Text style={styles.budgetSubtitle}>Set the total budget and review the fund target.</Text>
+          <Text style={styles.pageTitle}>Budget &amp; goal</Text>
+          <Text style={styles.pageSubtitle}>Set the event budget and choose how much the fund should raise.</Text>
 
-          <View style={styles.budgetSectionTitleRow}>
-            <Text style={styles.budgetSectionIcon}>📋</Text>
-            <Text style={styles.budgetSectionTitle}>Event Budget</Text>
-          </View>
-          <Text style={styles.budgetPrompt}>How much will this event cost in total?</Text>
-
-          <View style={styles.eventBudgetInputBox}>
-            <Text style={styles.eventBudgetCurrency}>P</Text>
-            <TextInput
-              style={styles.eventBudgetInput}
-              value={eventBudget}
-              onChangeText={onEventBudgetChange}
-              keyboardType="decimal-pad"
-              placeholder="50,000"
-              placeholderTextColor={colors.textMuted}
-            />
-          </View>
-
-          <View style={styles.eventBudgetPresetRow}>
-            {EVENT_BUDGET_PRESETS.map(preset => {
-              const active = eventBudget.replace(/,/g, '') === preset.value.replace(/,/g, '')
-              return (
-                <TouchableOpacity
-                  key={preset.value}
-                  style={[styles.eventBudgetPreset, active && styles.eventBudgetPresetActive]}
-                  activeOpacity={0.84}
-                  onPress={() => onEventBudgetChange(preset.value)}
-                >
-                  <Text style={[styles.eventBudgetPresetText, active && styles.eventBudgetPresetTextActive]}>
-                    {preset.label}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-
-          <View style={styles.fundGoalHeaderRow}>
-            <Text style={styles.fundGoalIcon}>💜</Text>
-            <Text style={styles.budgetSectionTitle}>Fund Goal</Text>
-          </View>
-          <Text style={styles.budgetPrompt}>How much do you want to raise?</Text>
-
-          <Text style={styles.percentValue}>{fundGoalPercent}%</Text>
-          <Text style={styles.percentCaption}>of budget</Text>
-
-          <View style={styles.percentTrack}>
-            <View style={[styles.percentFill, { width: `${fundGoalPercent}%` as any }]} />
-            <View style={[styles.percentThumb, { left: `${fundGoalPercent}%` as any }]} />
-          </View>
-          <View style={styles.percentLabels}>
-            <Text style={styles.percentLabel}>0%</Text>
-            <Text style={styles.percentLabel}>50%</Text>
-            <Text style={styles.percentLabel}>100%</Text>
-          </View>
-
-          <View style={styles.fundGoalCard}>
-            <Text style={styles.fundGoalCardLabel}>Your fund goal</Text>
-            <Text style={styles.fundGoalCardValue}>{formatWholeAmount(fundGoalAmount)}</Text>
-          </View>
-
-          <View style={styles.budgetSummaryCard}>
-            <View style={styles.budgetSummaryItem}>
-              <Text style={styles.budgetSummaryLabel}>BUDGET</Text>
-              <Text style={styles.budgetSummaryBudget}>{formatWholeAmount(budgetAmount)}</Text>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIcon}>
+                <Ionicons name="calculator-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.cardHeading}>
+                <Text style={styles.cardEyebrow}>TOTAL EVENT BUDGET</Text>
+                <Text style={styles.cardDescription}>The estimated cost of the whole event</Text>
+              </View>
             </View>
-            <View style={styles.budgetSummaryItem}>
-              <Text style={styles.budgetSummaryLabel}>RAISE</Text>
-              <Text style={styles.budgetSummaryRaise}>{formatWholeAmount(fundGoalAmount)}</Text>
+
+            <View style={styles.amountRow}>
+              <Text style={styles.currency}>{currencySymbol}</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={eventBudget}
+                onChangeText={onEventBudgetChange}
+                keyboardType="decimal-pad"
+                placeholder="50,000"
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel="Total event budget"
+              />
             </View>
-            <View style={styles.budgetSummaryItem}>
-              <Text style={styles.budgetSummaryLabel}>YOU PAY</Text>
-              <Text style={styles.budgetSummaryPay}>{formatWholeAmount(youPayAmount)}</Text>
+
+            <Text style={styles.quickLabel}>Quick amounts</Text>
+            <View style={styles.presetRow}>
+              {EVENT_BUDGET_PRESETS.map(preset => {
+                const active = eventBudget.replace(/,/g, '') === preset.value.replace(/,/g, '')
+                return (
+                  <TouchableOpacity
+                    key={preset.value}
+                    style={[styles.preset, active && styles.presetActive]}
+                    activeOpacity={0.82}
+                    onPress={() => onEventBudgetChange(preset.value)}
+                  >
+                    <Text style={[styles.presetText, active && styles.presetTextActive]}>
+                      {currencySymbol}{preset.label.replace(/^P/, '')}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIcon}>
+                <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.cardHeading}>
+                <Text style={styles.cardEyebrow}>FUNDRAISING TARGET</Text>
+                <Text style={styles.cardDescription}>Choose the share your members will raise</Text>
+              </View>
+            </View>
+
+            <View style={styles.goalValues}>
+              <View>
+                <View style={styles.goalPercentInputRow}>
+                  <TextInput
+                    style={styles.goalPercentInput}
+                    value={percentInput}
+                    onChangeText={changePercentInput}
+                    onBlur={commitPercentInput}
+                    onSubmitEditing={commitPercentInput}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    accessibilityLabel="Fund goal percentage input"
+                  />
+                  <Text style={styles.goalPercentSuffix}>%</Text>
+                </View>
+                <Text style={styles.goalCaption}>of total budget</Text>
+              </View>
+              <View style={styles.goalAmountWrap}>
+                <Text style={styles.goalAmountLabel}>FUND GOAL</Text>
+                <Text style={styles.goalAmount}>{formatAmount(fundGoalAmount)}</Text>
+              </View>
+            </View>
+
+            <View
+              style={styles.sliderTouchArea}
+              onLayout={event => setGoalTrackWidth(event.nativeEvent.layout.width)}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={() => true}
+              onResponderGrant={updateGoalFromTouch}
+              onResponderMove={updateGoalFromTouch}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="Fund goal percentage"
+              accessibilityValue={{ min: 5, max: 100, now: fundGoalPercent, text: `${fundGoalPercent}%` }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={event => {
+                const change = event.nativeEvent.actionName === 'increment' ? 5 : -5
+                updateGoalPercent(fundGoalPercent + change)
+              }}
+            >
+              <View style={styles.sliderTrack}>
+                <View style={[styles.sliderFill, { width: `${fundGoalPercent}%` as any }]} />
+              </View>
+              <View style={[styles.sliderThumb, { left: `${fundGoalPercent}%` as any }]} />
+            </View>
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabel}>5%</Text>
+              <Text style={styles.sliderLabel}>50%</Text>
+              <Text style={styles.sliderLabel}>100%</Text>
+            </View>
+          </View>
+
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>BUDGET</Text>
+              <Text style={styles.summaryValue}>{formatAmount(budgetAmount)}</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>FUND RAISES</Text>
+              <Text style={[styles.summaryValue, styles.summaryGoal]}>{formatAmount(fundGoalAmount)}</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>REMAINDER</Text>
+              <Text style={styles.summaryValue}>{formatAmount(organiserAmount)}</Text>
             </View>
           </View>
 
           <TouchableOpacity
-            style={[styles.createEventFundButton, (!canCreateEventFund || isCreating) && styles.eventContinueDisabled]}
+            style={[styles.createButton, (!canCreateEventFund || isCreating) && styles.createButtonDisabled]}
             activeOpacity={canCreateEventFund && !isCreating ? 0.86 : 1}
-            onPress={() => {
-              if (!canCreateEventFund || isCreating) return
-              onCreate(fundGoalAmount)
-            }}
+            disabled={!canCreateEventFund || isCreating}
+            onPress={() => onCreate(fundGoalAmount)}
           >
-            <Text style={styles.createEventFundButtonText}>{isCreating ? 'Creating...' : 'Create Event + Fund'}</Text>
+            <Text style={styles.createButtonText}>{isCreating ? 'Creating…' : 'Create Event + Fund'}</Text>
+            {!isCreating ? <Ionicons name="arrow-forward" size={18} color="#FFFFFF" /> : null}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -142,237 +251,153 @@ function makeStyles(colors: AppColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
     flex: { flex: 1 },
-    budgetScroll: {
+    scroll: {
       flexGrow: 1,
-      backgroundColor: colors.background,
-      paddingHorizontal: 24,
-      paddingTop: 28,
+      paddingHorizontal: 20,
+      paddingTop: 14,
       paddingBottom: 44,
     },
-    budgetTitle: {
-      fontSize: 24,
-      lineHeight: 30,
-      fontWeight: '900',
+    pageTitle: {
+      fontSize: 22,
+      lineHeight: 28,
+      fontFamily: fonts.inter.extraBold,
+      fontWeight: '800',
       color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    pageSubtitle: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.textMuted,
+      marginBottom: 18,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      padding: 16,
       marginBottom: 12,
     },
-    budgetSubtitle: {
-      fontSize: 15,
-      lineHeight: 21,
-      color: colors.textMuted,
-      marginBottom: 28,
+    cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+    cardIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryLight,
     },
-    budgetSectionTitleRow: {
+    cardHeading: { flex: 1 },
+    cardEyebrow: {
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 0.9,
+      color: colors.textPrimary,
+      marginBottom: 3,
+    },
+    cardDescription: { fontSize: 12, lineHeight: 17, color: colors.textMuted },
+    amountRow: {
+      minHeight: 58,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
-      marginBottom: 16,
+      gap: 7,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      marginBottom: 14,
     },
-    budgetSectionIcon: {
-      fontSize: 24,
-      width: 34,
-      textAlign: 'center',
-    },
-    budgetSectionTitle: {
-      fontSize: 20,
-      lineHeight: 26,
-      fontWeight: '900',
+    currency: { fontSize: 18, fontWeight: '800', color: colors.textMuted },
+    amountInput: {
+      flex: 1,
+      paddingVertical: 0,
+      fontSize: 34,
+      lineHeight: 42,
+      fontWeight: '800',
       color: colors.textPrimary,
     },
-    budgetPrompt: {
-      fontSize: 16,
-      lineHeight: 23,
-      fontWeight: '600',
-      color: colors.textMuted,
-      marginBottom: 16,
+    quickLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 8 },
+    presetRow: { flexDirection: 'row', gap: 8 },
+    preset: {
+      flex: 1,
+      minHeight: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
     },
-    eventBudgetInputBox: {
+    presetActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+    presetText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    presetTextActive: { color: colors.primary, fontWeight: '900' },
+    goalValues: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 10 },
+    goalPercentInputRow: { flexDirection: 'row', alignItems: 'center' },
+    goalPercentInput: {
+      width: 58,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      fontSize: 32,
+      lineHeight: 38,
+      fontWeight: '900',
+      color: BRAND_PURPLE,
+    },
+    goalPercentSuffix: { fontSize: 32, lineHeight: 38, fontWeight: '900', color: BRAND_PURPLE },
+    goalCaption: { fontSize: 11, color: colors.textMuted },
+    goalAmountWrap: { alignItems: 'flex-end', paddingBottom: 2 },
+    goalAmountLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8, color: colors.textMuted, marginBottom: 3 },
+    goalAmount: { fontSize: 20, lineHeight: 25, fontWeight: '900', color: colors.textPrimary },
+    sliderTouchArea: { height: 34, justifyContent: 'center', marginHorizontal: 1 },
+    sliderTrack: { height: 7, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
+    sliderFill: { height: '100%', borderRadius: 4, backgroundColor: BRAND_PURPLE },
+    sliderThumb: {
+      position: 'absolute',
+      top: 7,
+      width: 20,
+      height: 20,
+      marginLeft: -10,
+      borderRadius: 10,
+      backgroundColor: colors.surface,
+      borderWidth: 3,
+      borderColor: BRAND_PURPLE,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.12,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -1 },
+    sliderLabel: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+    summaryCard: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      paddingVertical: 15,
+      paddingHorizontal: 8,
+      marginBottom: 18,
+    },
+    summaryItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+    summaryDivider: { width: 1, backgroundColor: colors.border },
+    summaryLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.5, color: colors.textMuted, marginBottom: 5 },
+    summaryValue: { fontSize: 14, fontWeight: '900', color: colors.textPrimary },
+    summaryGoal: { color: colors.primary },
+    createButton: {
       minHeight: 56,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      marginBottom: 14,
+      gap: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 17,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 5,
     },
-    eventBudgetCurrency: {
-      fontSize: 16,
-      fontWeight: '900',
-      color: colors.textMuted,
-      marginRight: 2,
-    },
-    eventBudgetInput: {
-      flex: 1,
-      fontSize: 16,
-      fontWeight: '400',
-      color: colors.textPrimary,
-      paddingVertical: 16,
-    },
-    eventBudgetPresetRow: {
-      flexDirection: 'row',
-      gap: 10,
-      marginBottom: 32,
-    },
-    eventBudgetPreset: {
-      flex: 1,
-      minHeight: 48,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-    },
-    eventBudgetPresetActive: {
-      backgroundColor: BRAND_PURPLE,
-    },
-    eventBudgetPresetText: {
-      fontSize: 15,
-      fontWeight: '800',
-      color: colors.textMuted,
-    },
-    eventBudgetPresetTextActive: {
-      color: '#FFFFFF',
-    },
-    fundGoalHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      marginBottom: 16,
-    },
-    fundGoalIcon: {
-      fontSize: 25,
-      width: 34,
-      textAlign: 'center',
-    },
-    percentValue: {
-      fontSize: 36,
-      lineHeight: 44,
-      fontWeight: '900',
-      color: BRAND_PURPLE,
-      textAlign: 'center',
-      marginTop: 2,
-    },
-    percentCaption: {
-      fontSize: 17,
-      lineHeight: 23,
-      fontWeight: '700',
-      color: colors.textMuted,
-      textAlign: 'center',
-      marginBottom: 20,
-    },
-    percentTrack: {
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.border,
-      marginBottom: 12,
-      overflow: 'visible',
-    },
-    percentFill: {
-      height: '100%',
-      borderRadius: 4,
-      backgroundColor: BRAND_PURPLE,
-    },
-    percentThumb: {
-      position: 'absolute',
-      top: -6,
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      marginLeft: -10,
-      backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: BRAND_PURPLE,
-    },
-    percentLabels: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 26,
-    },
-    percentLabel: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: colors.textMuted,
-    },
-    fundGoalCard: {
-      alignItems: 'center',
-      backgroundColor: BRAND_LAVENDER,
-      borderRadius: 14,
-      paddingVertical: 18,
-      marginBottom: 20,
-    },
-    fundGoalCardLabel: {
-      fontSize: 18,
-      color: BRAND_PURPLE,
-      marginBottom: 8,
-    },
-    fundGoalCardValue: {
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight: '900',
-      color: BRAND_PURPLE,
-    },
-    budgetSummaryCard: {
-      flexDirection: 'row',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      paddingVertical: 18,
-      marginBottom: 28,
-    },
-    budgetSummaryItem: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    budgetSummaryLabel: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.textMuted,
-      marginBottom: 6,
-    },
-    budgetSummaryBudget: {
-      fontSize: 19,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    budgetSummaryRaise: {
-      fontSize: 19,
-      fontWeight: '900',
-      color: BRAND_PURPLE,
-    },
-    budgetSummaryPay: {
-      fontSize: 19,
-      fontWeight: '900',
-      color: '#EF4444',
-    },
-    createEventFundButton: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: BRAND_PURPLE,
-      borderRadius: 28,
-      paddingVertical: 17,
-      shadowColor: BRAND_PURPLE,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.24,
-      shadowRadius: 14,
-      elevation: 6,
-    },
-    createEventFundButtonText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: '700',
-      textAlign: 'center',
-    },
-    eventContinueDisabled: {
-      backgroundColor: colors.disabled,
-      shadowOpacity: 0,
-      elevation: 0,
-    },
+    createButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+    createButtonDisabled: { backgroundColor: colors.disabled, shadowOpacity: 0, elevation: 0 },
   })
 }

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
-import { AuthStackParamList, MobileMoneyNumber } from '../../navigation/types'
+import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
@@ -60,9 +60,7 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   async function handleResend() {
     if (mode === 'mobile_money') {
-      setCountdown(RESEND_COUNTDOWN)
-      setDigits(Array(OTP_LENGTH).fill(''))
-      inputRefs.current[0]?.focus()
+      Alert.alert('Verification unavailable', 'Additional mobile-money verification is not available yet.')
       return
     }
 
@@ -80,19 +78,8 @@ export default function OTPScreen({ navigation, route }: Props) {
 
     if (mode === 'mobile_money' && mobileMoneyReturn) {
       setLoading(false)
-      const mobileMoneyNumbers = [
-        ...mobileMoneyReturn.mobileMoneyNumbers,
-        mobileMoneyReturn.pendingNumber,
-      ]
-      navigation.navigate('BankDetails', {
-        name: mobileMoneyReturn.name,
-        registeredPhone: mobileMoneyReturn.registeredPhone,
-        bankName: mobileMoneyReturn.bankName,
-        branchCode: mobileMoneyReturn.branchCode,
-        accountNumber: mobileMoneyReturn.accountNumber,
-        bankAccounts: mobileMoneyReturn.bankAccounts,
-        mobileMoneyNumbers,
-      })
+      Alert.alert('Verification unavailable', 'No number was added because it could not be securely verified.')
+      navigation.goBack()
       return
     }
 

@@ -1,9 +1,21 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import { FundDetail, formatMoney } from './types'
+import { fonts } from '../../../theme/typography'
+import { FundDetail } from './types'
+
+export const FUND_HEADER_PURPLE = '#E8DDFF'
 
 type Styles = ReturnType<typeof makeStyles>
+
+function formatHeaderMoney(amount: number, currencyCode: string, fractionDigits = 2) {
+  const symbol = currencyCode === 'BWP' ? 'P' : currencyCode
+  return `${symbol}${Number(amount ?? 0).toLocaleString('en-BW', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}`
+}
 
 function ProgressBar({ value, max, styles }: { value: number; max: number; styles: Styles }) {
   const pct = max > 0 ? Math.min(value / max, 1) : 0
@@ -14,133 +26,129 @@ function ProgressBar({ value, max, styles }: { value: number; max: number; style
   )
 }
 
+function MoneyMetric({
+  label,
+  amount,
+  currencyCode,
+  styles,
+}: {
+  label: string
+  amount: number
+  currencyCode: string
+  styles: Styles
+}) {
+  return (
+    <View style={styles.moneyMetric}>
+      <Text style={styles.moneyMetricLabel}>{label}</Text>
+      <Text style={styles.moneyMetricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+        {formatHeaderMoney(amount, currencyCode)}
+      </Text>
+    </View>
+  )
+}
+
 type Props = {
   fund: FundDetail
-  isOrganiser: boolean
   isOwner: boolean
   isDeleting: boolean
+  remainingToTarget: number
+  amountOverTarget: number
   onBack: () => void
-  onRecordContribution: () => void
-  onRecordExpense: () => void
   onViewHistory: () => void
   onViewEvent?: () => void
   onMoreOptions: () => void
-  onCopyCode: () => void
-  onShareInvite: () => void
 }
 
 export default function FundHeader({
   fund,
-  isOrganiser,
   isOwner,
   isDeleting,
+  remainingToTarget,
+  amountOverTarget,
   onBack,
-  onRecordContribution,
-  onRecordExpense,
   onViewHistory,
   onViewEvent,
   onMoreOptions,
-  onCopyCode,
-  onShareInvite,
 }: Props) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
 
-  const pct = fund.goal_amount > 0
-    ? Math.round((fund.total_contributions / fund.goal_amount) * 100)
-    : 0
-
   return (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={onBack}
+          activeOpacity={0.78}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="arrow-back" size={20} color="#0D0D0D" />
         </TouchableOpacity>
         <View style={styles.headerActions}>
-          {isOrganiser && (
-            <>
-              <TouchableOpacity
-                style={styles.recordBtn}
-                onPress={onRecordContribution}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.recordBtnText}>＋ Contribution</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.recordBtn, styles.recordBtnExpense]}
-                onPress={onRecordExpense}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.recordBtnText}>↑ Expense</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {isOwner && (
-            <TouchableOpacity
-              style={styles.moreBtn}
-              onPress={onMoreOptions}
-              disabled={isDeleting}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.moreBtnText}>⋯</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onMoreOptions}
+            disabled={isDeleting}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={isOwner ? 'Fund actions' : 'Membership actions'}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#0D0D0D" />
+          </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.titleRow}>
-        <Text style={styles.fundTitle}>{fund.title}</Text>
-        {fund.status !== 'active' && <Text style={styles.statusBadge}>{fund.status}</Text>}
-        <TouchableOpacity style={styles.historyBtn} onPress={onViewHistory} activeOpacity={0.8}>
-          <Text style={styles.historyIcon}>↻</Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.fundTitle} numberOfLines={2}>{fund.title}</Text>
+          {fund.status !== 'active' && <Text style={styles.statusBadge}>{fund.status}</Text>}
+        </View>
+        <TouchableOpacity style={styles.historyButton} onPress={onViewHistory} activeOpacity={0.82}>
           <Text style={styles.historyText}>History</Text>
         </TouchableOpacity>
       </View>
 
       {onViewEvent && (
-        <TouchableOpacity style={styles.linkedEventBtn} onPress={onViewEvent} activeOpacity={0.8}>
-          <Text style={styles.linkedEventIcon}>📅</Text>
+        <TouchableOpacity style={styles.linkedEventButton} onPress={onViewEvent} activeOpacity={0.8}>
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
           <Text style={styles.linkedEventText}>View linked event</Text>
-          <Text style={styles.linkedEventArrow}>↔</Text>
+          <Ionicons name="arrow-forward" size={16} color={colors.primary} />
         </TouchableOpacity>
       )}
 
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{formatMoney(fund.balance, fund.currency_code)}</Text>
-          <Text style={styles.statLabel}>Balance</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{formatMoney(fund.goal_amount, fund.currency_code)}</Text>
-          <Text style={styles.statLabel}>Goal</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.stat}>
-          <Text style={styles.statValue}>{fund.member_count}</Text>
-          <Text style={styles.statLabel}>Members</Text>
-        </View>
-      </View>
+      <ProgressBar value={fund.total_contributions} max={fund.goal_amount} styles={styles} />
 
-      <View style={styles.progressRow}>
-        <ProgressBar value={fund.total_contributions} max={fund.goal_amount} styles={styles} />
-        <Text style={styles.progressPct}>{pct}%</Text>
-      </View>
-
-      {isOrganiser && fund.fund_code ? (
-        <View style={styles.inviteRow}>
-          <View style={styles.inviteCode}>
-            <Text style={styles.inviteLabel}>Invite Code</Text>
-            <Text style={styles.inviteCodeText}>{fund.fund_code}</Text>
+      <View style={styles.detailsCard}>
+        <View style={styles.targetRow}>
+          <Text style={styles.targetLabel}>FUND TARGET</Text>
+          <View style={styles.targetPill}>
+            <Text style={styles.targetValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {formatHeaderMoney(fund.goal_amount, fund.currency_code, 0)}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.inviteAction} onPress={onCopyCode} activeOpacity={0.8}>
-            <Text style={styles.inviteActionText}>Copy</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.inviteAction} onPress={onShareInvite} activeOpacity={0.8}>
-            <Text style={styles.inviteActionText}>Share</Text>
-          </TouchableOpacity>
         </View>
-      ) : null}
+
+        <View style={styles.moneyMetrics}>
+          <MoneyMetric label="Total In" amount={fund.total_contributions} currencyCode={fund.currency_code} styles={styles} />
+          <MoneyMetric label="Total Out" amount={fund.total_expenses} currencyCode={fund.currency_code} styles={styles} />
+          <MoneyMetric label="Outstanding" amount={remainingToTarget} currencyCode={fund.currency_code} styles={styles} />
+        </View>
+
+        <View style={styles.positionRow}>
+          <Text style={styles.positionLabel}>Available balance</Text>
+          <Text style={styles.positionValue}>{formatHeaderMoney(fund.balance, fund.currency_code)}</Text>
+        </View>
+
+        {amountOverTarget > 0 && (
+          <View style={styles.overTargetBanner}>
+            <Ionicons name="trending-up" size={15} color={colors.success} />
+            <Text style={styles.overTargetText}>
+              {formatHeaderMoney(amountOverTarget, fund.currency_code)} above target
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   )
 }
@@ -149,212 +157,202 @@ function makeStyles(colors: AppColors) {
   return StyleSheet.create({
     header: {
       paddingHorizontal: 20,
-      paddingTop: 12,
+      paddingTop: 8,
       paddingBottom: 16,
+      backgroundColor: FUND_HEADER_PURPLE,
     },
     headerTop: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 16,
+      marginBottom: 10,
     },
-    backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 11,
-      backgroundColor: colors.surface,
+    iconButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 9,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: '#FFFFFF',
       borderWidth: 1,
-      borderColor: colors.border,
-    },
-    backIcon: {
-      fontSize: 20,
-      color: colors.textPrimary,
+      borderColor: '#F1F1F1',
     },
     headerActions: {
       flexDirection: 'row',
-      gap: 8,
-    },
-    recordBtn: {
-      backgroundColor: colors.surface,
-      borderRadius: 20,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    recordBtnExpense: {},
-    recordBtnText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    moreBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 11,
-      backgroundColor: colors.surface,
       alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    moreBtnText: {
-      fontSize: 18,
-      color: colors.textPrimary,
-      lineHeight: 22,
-    },
-    fundTitle: {
-      flex: 1,
-      fontSize: 22,
-      fontWeight: '800',
-      color: colors.textPrimary,
+      gap: 6,
     },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      marginBottom: 16,
+      gap: 10,
+      marginBottom: 10,
     },
-    historyBtn: {
+    titleWrap: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      borderRadius: 18,
-      paddingHorizontal: 11,
-      paddingVertical: 7,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.primary,
+      gap: 8,
+      minWidth: 0,
+    },
+    fundTitle: {
+      flexShrink: 1,
+      fontSize: 18,
+      lineHeight: 23,
+      fontFamily: fonts.inter.extraBold,
+      color: '#0D0D0D',
     },
     statusBadge: {
-      fontSize: 10,
-      fontWeight: '900',
-      color: colors.textMuted,
-      textTransform: 'uppercase',
-      borderRadius: 10,
-      paddingHorizontal: 7,
+      flexShrink: 0,
+      borderRadius: 999,
+      paddingHorizontal: 8,
       paddingVertical: 4,
-      backgroundColor: colors.border,
+      backgroundColor: '#FFFFFFAA',
+      color: '#52525B',
+      fontSize: 9,
+      fontFamily: fonts.inter.black,
+      textTransform: 'uppercase',
     },
-    historyIcon: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: colors.primary,
+    historyButton: {
+      minWidth: 76,
+      height: 34,
+      paddingHorizontal: 14,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FFFFFF',
     },
     historyText: {
       fontSize: 12,
-      fontWeight: '800',
+      fontFamily: fonts.inter.bold,
       color: colors.primary,
     },
-    linkedEventBtn: {
+    linkedEventButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      minHeight: 40,
+      paddingHorizontal: 14,
+      marginBottom: 12,
       borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      marginBottom: 12,
-      backgroundColor: colors.primaryLight,
-      borderWidth: 1,
-      borderColor: colors.primary,
+      backgroundColor: '#FFFFFFAA',
     },
-    linkedEventIcon: { fontSize: 16 },
-    linkedEventText: { flex: 1, fontSize: 13, fontWeight: '800', color: colors.primary },
-    linkedEventArrow: { fontSize: 16, fontWeight: '800', color: colors.primary },
-    statsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    stat: {
+    linkedEventText: {
       flex: 1,
-      alignItems: 'center',
-    },
-    statValue: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginBottom: 2,
-    },
-    statLabel: {
-      fontSize: 11,
-      color: colors.textMuted,
-    },
-    statDivider: {
-      width: 1,
-      height: 28,
-      backgroundColor: colors.border,
-    },
-    progressRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 14,
+      fontSize: 12,
+      fontFamily: fonts.inter.extraBold,
+      color: colors.primary,
     },
     progressTrack: {
-      flex: 1,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.border,
+      height: 4,
+      marginBottom: 12,
+      borderRadius: 999,
       overflow: 'hidden',
+      backgroundColor: '#FFFFFF',
     },
     progressFill: {
       height: '100%',
-      borderRadius: 3,
+      borderRadius: 999,
       backgroundColor: colors.primary,
     },
-    progressPct: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.primary,
-      width: 36,
-      textAlign: 'right',
+    detailsCard: {
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 14,
+      borderRadius: 15,
+      backgroundColor: '#FFFFFF',
     },
-    inviteRow: {
+    targetRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      gap: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
+      gap: 10,
+      marginBottom: 10,
     },
-    inviteCode: {
-      flex: 1,
-    },
-    inviteLabel: {
-      fontSize: 10,
-      color: colors.textMuted,
-      marginBottom: 2,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    inviteCodeText: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      letterSpacing: 1.5,
-    },
-    inviteAction: {
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      paddingVertical: 7,
-      paddingHorizontal: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    inviteActionText: {
+    targetLabel: {
       fontSize: 12,
-      fontWeight: '700',
-      color: colors.primary,
+      fontFamily: fonts.inter.bold,
+      color: '#0D0D0D',
+    },
+    targetPill: {
+      minWidth: 100,
+      maxWidth: 130,
+      height: 28,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: FUND_HEADER_PURPLE,
+      borderWidth: 1,
+      borderColor: '#D2C3F1',
+    },
+    targetValue: {
+      width: '100%',
+      fontSize: 13,
+      fontFamily: fonts.inter.bold,
+      color: '#0D0D0D',
+      textAlign: 'center',
+    },
+    moneyMetrics: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    moneyMetric: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 43,
+      paddingHorizontal: 7,
+      paddingVertical: 6,
+      borderRadius: 8,
+      justifyContent: 'center',
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#E4E4E7',
+    },
+    moneyMetricLabel: {
+      marginBottom: 2,
+      fontSize: 8,
+      color: '#A1A1AA',
+      fontFamily: fonts.inter.regular,
+    },
+    moneyMetricValue: {
+      width: '100%',
+      fontSize: 12,
+      fontFamily: fonts.inter.bold,
+      color: '#0D0D0D',
+    },
+    positionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: '#E4E4E7',
+    },
+    positionLabel: {
+      fontSize: 11,
+      fontFamily: fonts.inter.medium,
+      color: '#71717A',
+    },
+    positionValue: {
+      fontSize: 12,
+      fontFamily: fonts.inter.extraBold,
+      color: '#0D0D0D',
+    },
+    overTargetBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 9,
+      backgroundColor: colors.successLight,
+    },
+    overTargetText: {
+      fontSize: 11,
+      fontFamily: fonts.inter.bold,
+      color: colors.success,
     },
   })
 }

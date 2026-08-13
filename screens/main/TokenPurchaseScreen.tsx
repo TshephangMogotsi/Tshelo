@@ -1,71 +1,33 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
+import { buildTokenPortalUrl, TOKEN_PORTAL_URL } from '../../lib/tokenPortal'
+import {
+  TOKEN_FEATURE_PRICES,
+  TOKEN_PACKS,
+  tokenPriceLabel,
+  type TokenPack,
+  type TokenPackId,
+} from '../../lib/tokenPricing'
 
 type Props = {
   navigation: any
   route?: { name?: string }
 }
 
-type TokenPack = 'starter' | 'value' | 'popular' | 'power'
-
-type Pack = {
-  id: TokenPack
-  tokens: number
-  priceBWP: number
-  label: string
-  popular: boolean
-  perToken: string
-  description: string
-}
-
-const PACKS: Pack[] = [
-  {
-    id: 'starter',
-    tokens: 10,
-    priceBWP: 5,
-    label: 'Starter',
-    popular: false,
-    perToken: '50t/token',
-    description: 'Good for trying out the app.',
-  },
-  {
-    id: 'value',
-    tokens: 30,
-    priceBWP: 12,
-    label: 'Value',
-    popular: false,
-    perToken: '40t/token',
-    description: 'Save 20% vs Starter.',
-  },
-  {
-    id: 'popular',
-    tokens: 60,
-    priceBWP: 20,
-    label: 'Popular',
-    popular: true,
-    perToken: '33t/token',
-    description: 'Best value for active organisers.',
-  },
-  {
-    id: 'power',
-    tokens: 120,
-    priceBWP: 35,
-    label: 'Power',
-    popular: false,
-    perToken: '29t/token',
-    description: 'Maximum savings for heavy use.',
-  },
-]
-
 const TOKEN_USES = [
-  { icon: '📁', action: 'Create a fund',          cost: 1 },
-  { icon: '📄', action: 'Generate interim report', cost: 1 },
-  { icon: '🔒', action: 'Close a fund (report)',   cost: 0, note: 'Free' },
+  { icon: '✨', action: 'Create an Event + Fund', cost: TOKEN_FEATURE_PRICES.eventFund },
+  { icon: '📁', action: 'First event and first fund', cost: 0, note: 'Free' },
+  { icon: '📂', action: 'Each additional event or fund', cost: TOKEN_FEATURE_PRICES.additionalFund },
+  { icon: '📄', action: 'Interim PDF report', cost: TOKEN_FEATURE_PRICES.interimPdf },
+  { icon: '🛡️', action: 'Certified audit report', cost: TOKEN_FEATURE_PRICES.certifiedAudit },
+  { icon: '🔒', action: 'Final report when a fund closes', cost: 0, note: 'Free' },
 ]
 
 type Styles = ReturnType<typeof makeStyles>
@@ -76,7 +38,7 @@ function PackCard({
   onSelect,
   styles,
 }: {
-  pack: Pack
+  pack: TokenPack
   selected: boolean
   onSelect: () => void
   styles: Styles
@@ -96,7 +58,7 @@ function PackCard({
       <View style={styles.packTop}>
         <View>
           <Text style={styles.packLabel}>{pack.label}</Text>
-          <Text style={styles.packPerToken}>{pack.perToken}</Text>
+          <Text style={styles.packPerToken}>{tokenPriceLabel(pack.priceBWP, pack.tokens)}</Text>
         </View>
         <View style={styles.radioOuter}>
           {selected && <View style={styles.radioInner} />}
@@ -117,20 +79,34 @@ function PackCard({
 
 export default function TokenPurchaseScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
+  const { tokenBalance, refreshProfile } = useAuth()
   const styles = makeStyles(colors)
 
-  const [selectedPack, setSelectedPack] = useState<TokenPack>('popular')
-  const currentBalance = 3
+  const [selectedPack, setSelectedPack] = useState<TokenPackId>('popular')
+  const currentBalance = tokenBalance
   const isTab = route?.name === 'Tokens'
 
-  const pack = PACKS.find(p => p.id === selectedPack)!
+  const pack = TOKEN_PACKS.find(p => p.id === selectedPack)!
 
-  function handlePurchase() {
-    Alert.alert(
-      'Purchase Tokens',
-      `You're about to purchase ${pack.tokens} tokens for P${pack.priceBWP}.\n\nPayment gateway coming soon.`,
-      [{ text: 'OK' }]
-    )
+  useFocusEffect(useCallback(() => {
+    void refreshProfile()
+  }, [refreshProfile]))
+
+  async function handlePurchase() {
+    const checkoutUrl = buildTokenPortalUrl(TOKEN_PORTAL_URL, pack.id)
+    if (!checkoutUrl) {
+      Alert.alert(
+        'Web checkout coming soon',
+        'Token payments will be completed securely on the Tshelo website. No payment has been taken.',
+      )
+      return
+    }
+
+    if (!await Linking.canOpenURL(checkoutUrl)) {
+      Alert.alert('Could not open checkout', 'Please try again or visit the Tshelo website in your browser.')
+      return
+    }
+    await Linking.openURL(checkoutUrl)
   }
 
   return (
@@ -157,7 +133,7 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         <View style={styles.header}>
           <Text style={styles.heading}>Buy Tokens</Text>
           <Text style={styles.subheading}>
-            Tokens power key actions on Tshelo. They never expire.
+            Tokens are purchased credit for paid Tshelo features. They are separate from trust points.
           </Text>
         </View>
 
@@ -178,7 +154,7 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         {/* ── Pack selector ────────────────────────── */}
         <Text style={styles.sectionLabel}>Choose a Pack</Text>
         <View style={styles.packGrid}>
-          {PACKS.map(p => (
+          {TOKEN_PACKS.map(p => (
             <PackCard
               key={p.id}
               pack={p}
@@ -212,8 +188,7 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         {/* ── Payment notice ───────────────────────── */}
         <View style={styles.paymentNotice}>
           <Text style={styles.paymentNoticeText}>
-            💳 Payment via Orange Money, MyZaka, or card — coming soon.
-            Purchases are non-refundable once tokens are credited.
+            💳 Checkout opens on the secure Tshelo website. Your in-app balance updates only after the payment is confirmed.
           </Text>
         </View>
 
@@ -224,7 +199,7 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
           activeOpacity={0.85}
         >
           <Text style={styles.primaryButtonText}>
-            Purchase — P{pack.priceBWP}
+            Continue on web — P{pack.priceBWP}
           </Text>
         </TouchableOpacity>
       </ScrollView>

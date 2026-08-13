@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Linking, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../context/ThemeContext'
@@ -9,6 +9,7 @@ import FlowHeader from './FlowHeader'
 import DateTimeSheet from './DateTimeSheet'
 import { formatEventDateDisplay, formatTimeDisplay } from './format'
 import { BRAND_PURPLE, BRAND_PURPLE_DARK } from './constants'
+import { isMapsUrl, mapsSearchUrl } from '../../../lib/maps'
 
 type Props = {
   selectedEventLabel: string
@@ -20,6 +21,8 @@ type Props = {
   onEventTimeChange: (date: Date) => void
   eventVenue: string
   onEventVenueChange: (text: string) => void
+  eventVenueMapLink: string
+  onEventVenueMapLinkChange: (text: string) => void
   isStepValid: boolean
   onContinue: () => void
   onBack: () => void
@@ -35,6 +38,8 @@ export default function EventDetailsStep({
   onEventTimeChange,
   eventVenue,
   onEventVenueChange,
+  eventVenueMapLink,
+  onEventVenueMapLinkChange,
   isStepValid,
   onContinue,
   onBack,
@@ -43,6 +48,11 @@ export default function EventDetailsStep({
   const styles = makeStyles(colors)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const hasInvalidMapLink = eventVenueMapLink.trim().length > 0 && !isMapsUrl(eventVenueMapLink)
+
+  function openVenueSearch() {
+    void Linking.openURL(mapsSearchUrl(eventVenue, Platform.OS === 'ios' ? 'ios' : 'android'))
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -113,6 +123,36 @@ export default function EventDetailsStep({
               />
               <Ionicons name="location-outline" size={22} color={colors.textMuted} />
             </View>
+            <TouchableOpacity style={styles.openMapsButton} onPress={openVenueSearch} activeOpacity={0.75}>
+              <Ionicons name="map-outline" size={16} color={BRAND_PURPLE} />
+              <Text style={styles.openMapsText}>Find this venue in Maps</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.eventDetailsField}>
+            <View style={styles.mapLinkLabelRow}>
+              <Text style={styles.eventDetailsLabel}>Maps link</Text>
+              <Text style={styles.optionalLabel}>Optional</Text>
+            </View>
+            <View style={[styles.mapLinkRow, hasInvalidMapLink && styles.inputError]}>
+              <TextInput
+                style={styles.mapLinkInput}
+                placeholder="Paste a Google, Apple Maps or Waze link"
+                placeholderTextColor={colors.textMuted}
+                value={eventVenueMapLink}
+                onChangeText={onEventVenueMapLinkChange}
+                maxLength={500}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              <Ionicons name="link-outline" size={21} color={colors.textMuted} />
+            </View>
+            {hasInvalidMapLink ? (
+              <Text style={styles.mapLinkError}>Use a Google Maps, Apple Maps or Waze link.</Text>
+            ) : (
+              <Text style={styles.mapLinkHelp}>Open Maps above, share or copy the place link, then paste it here.</Text>
+            )}
           </View>
 
           <DateTimeSheet
@@ -167,6 +207,16 @@ function makeStyles(colors: AppColors) {
       color: colors.textMuted,
       marginBottom: 8,
     },
+    mapLinkLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    optionalLabel: {
+      marginBottom: 8,
+      fontSize: 11,
+      color: colors.textMuted,
+    },
     eventDetailsInput: {
       minHeight: 56,
       backgroundColor: colors.surface,
@@ -214,6 +264,39 @@ function makeStyles(colors: AppColors) {
       color: colors.textPrimary,
       paddingVertical: 16,
     },
+    openMapsButton: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 9,
+      paddingVertical: 4,
+    },
+    openMapsText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: BRAND_PURPLE,
+    },
+    mapLinkRow: {
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    mapLinkInput: {
+      flex: 1,
+      paddingVertical: 15,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    inputError: { borderColor: colors.error },
+    mapLinkHelp: { marginTop: 6, fontSize: 11, lineHeight: 16, color: colors.textMuted },
+    mapLinkError: { marginTop: 6, fontSize: 11, lineHeight: 16, color: colors.error },
     eventContinueButton: {
       alignItems: 'center',
       justifyContent: 'center',

@@ -11,11 +11,13 @@ import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { supabase } from '../../lib/supabase'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
-import { describeSender } from '../../lib/smsWatcher'
+import { describeSender, getDetectedSmsKey } from '../../lib/smsWatcher'
 import { PROVIDER_LABELS } from '../../lib/providers'
 import { HomeItem, KIND_LABELS, formatMoney } from './home/helpers'
 import { loadHomeItems } from './home/loadHomeItems'
 import type { AppColors } from '../../theme/themes'
+import { loadMyFundPermissions } from '../../lib/useFundPermissions'
+import type { FundPermission } from '../../lib/fundPermissions'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'AssignContribution'>
@@ -23,7 +25,7 @@ type Props = {
 }
 
 export default function AssignContributionScreen({ navigation, route }: Props) {
-  const { detected } = route.params
+  const { detected, notificationId } = route.params
   const { colors, isDark } = useTheme()
   const { userId } = useAuth()
   const requireOnline = useRequireOnline()
@@ -32,21 +34,58 @@ export default function AssignContributionScreen({ navigation, route }: Props) {
   const [items, setItems]           = useState<HomeItem[] | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isSaving, setIsSaving]     = useState(false)
+  const [permittedFundIds, setPermittedFundIds] = useState<Set<string>>(new Set())
 
   useFocusEffect(
     useCallback(() => {
       let active = true
       if (userId) {
         loadHomeItems(userId)
-          .then(loaded => { if (active) setItems(loaded) })
+          .then(async loaded => {
+            const fundIds = [...new Set(loaded.flatMap(item => item.fundId ? [item.fundId] : []))]
+            const capabilityRows = await Promise.all(fundIds.map(async fundId => ({
+              fundId,
+              permissions: await loadMyFundPermissions(fundId)
+                .catch(() => new Set<FundPermission>()),
+            })))
+            if (!active) return
+            setPermittedFundIds(new Set(
+              capabilityRows
+                .filter(row => row.permissions.has('record_contributions'))
+                .map(row => row.fundId),
+            ))
+            setItems(loaded)
+          })
           .catch(() => { if (active) setItems([]) })
       }
+
+      // A system notification can remain in Notification Center after the
+      // payment was assigned elsewhere. Resolve its current server state before
+      // allowing another save.
+      if (notificationId) {
+        supabase
+          .from('notifications')
+          .select('fund_id, response_action, data')
+          .eq('id', notificationId)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (!active || data?.response_action !== 'recorded') return
+            const recordedFundId = data.fund_id ?? data.data?.recordedFundId
+            if (typeof recordedFundId === 'string') {
+              navigation.replace('FundDetail', { fundId: recordedFundId })
+            }
+          })
+      }
       return () => { active = false }
-    }, [userId])
+    }, [userId, notificationId])
   )
 
   // Contributions attach to funds — events qualify only via a linked fund
-  const options = (items ?? []).filter(i => i.fundId && i.status.toLowerCase() === 'active')
+  const options = (items ?? []).filter(i =>
+    i.fundId
+    && i.status.toLowerCase() === 'active'
+    && permittedFundIds.has(i.fundId)
+  )
   const unlinkedEvents = (items ?? []).filter(i => !i.fundId)
   const selected = options.find(i => i.id === selectedId) ?? null
 
@@ -60,33 +99,26 @@ export default function AssignContributionScreen({ navigation, route }: Props) {
 
     setIsSaving(true)
     try {
-      const now = new Date().toISOString()
+      const { data, error } = await supabase
+        .rpc('record_detected_contribution', {
+          p_fund_id: selected.fundId,
+          p_detected: { ...detected, detectionKey: getDetectedSmsKey(detected) },
+          p_notification_id: notificationId ?? null,
+        })
+        .single()
 
-      const { error } = await supabase.from('contributions').insert({
-        fund_id:           selected.fundId,
-        contributor_name:  detected.senderName ?? detected.senderPhone ?? 'Unknown (SMS)',
-        contributor_phone: detected.senderPhone ?? '',
-        tagged_by:         userId,
-        amount:            detected.amount,
-        currency_code:     selected.currency_code,
-        payment_method:    detected.provider,
-        detected_via:      'sms',
-        status:            'confirmed',
-        confirmed_by:      userId,
-        confirmed_at:      now,
-        notes:             [detected.reference ? `Ref: ${detected.reference}` : null, detected.smsBody.trim()]
-          .filter(Boolean)
-          .join('\n'),
-      })
-
-      if (error) {
+      if (error || !data) {
         hapticError()
-        Alert.alert('Could not save contribution', error.message)
+        Alert.alert('Could not save contribution', error?.message ?? 'The payment could not be recorded.')
         return
       }
 
+      const result = data as { recorded_fund_id: string; already_recorded: boolean }
       hapticSuccess()
-      navigation.replace('FundDetail', { fundId: selected.fundId })
+      if (result.already_recorded) {
+        Alert.alert('Already recorded', 'This detected payment was already added to a fund.')
+      }
+      navigation.replace('FundDetail', { fundId: result.recorded_fund_id })
     } catch (e) {
       hapticError()
       Alert.alert('Could not save contribution', e instanceof Error ? e.message : 'Please try again.')
@@ -125,7 +157,7 @@ export default function AssignContributionScreen({ navigation, route }: Props) {
               </View>
             )}
           </View>
-          <Text style={styles.smsSnippet} numberOfLines={2}>“{detected.smsBody.trim()}”</Text>
+          <Text style={styles.smsPrivacyNote}>Only parsed payment details are retained.</Text>
         </View>
 
         <Text style={styles.sectionTitle}>ADD TO</Text>
@@ -134,7 +166,7 @@ export default function AssignContributionScreen({ navigation, route }: Props) {
           <ActivityIndicator color={colors.primary} style={styles.loading} />
         ) : options.length === 0 ? (
           <Text style={styles.emptyText}>
-            You have no active funds yet. Create a fund or an event with a fund first, then record this contribution from its page.
+            You have no active fund where you can record received money. Ask a fund owner for contribution access, or record your own pledge from the fund page.
           </Text>
         ) : (
           options.map(item => {
@@ -227,7 +259,7 @@ function makeStyles(colors: AppColors) {
       paddingVertical: 5,
     },
     metaChipText: { fontSize: 12, fontWeight: '600', color: colors.primary },
-    smsSnippet: {
+    smsPrivacyNote: {
       fontSize: 13,
       color: colors.textMuted,
       marginTop: 14,

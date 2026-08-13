@@ -1,11 +1,18 @@
 import Anthropic from 'npm:@anthropic-ai/sdk'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Parses a receipt photo into structured expense data using Claude vision.
 // Called from the app via supabase.functions.invoke('parse-receipt') with
-// { image: <base64 jpeg/png>, mediaType: 'image/jpeg' | 'image/png' }.
+// { fundId: <uuid>, image: <base64 jpeg/png>, mediaType: 'image/jpeg' | 'image/png' }.
 // Requires the ANTHROPIC_API_KEY function secret.
 
-const anthropic = new Anthropic({ apiKey: Deno.env.get('Tshelo_key')! })
+const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY') ?? Deno.env.get('Tshelo_key')
+const anthropic = new Anthropic({ apiKey: anthropicKey })
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+const MAX_REQUEST_BYTES = 7_000_000
+const MAX_IMAGE_BYTES = 5_000_000
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Mirrors CATEGORIES in screens/main/recordExpense/categories.ts
 const CATEGORY_VALUES = [
@@ -86,21 +93,55 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  let image: string, mediaType: string
+  if (!anthropicKey || !supabaseUrl || !supabaseAnonKey) {
+    return json({ error: 'Receipt parsing is not configured' }, 503)
+  }
+
+  const contentLength = Number(req.headers.get('content-length') ?? 0)
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    return json({ error: 'Image is too large' }, 413)
+  }
+
+  const authorization = req.headers.get('authorization')
+  if (!authorization?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
+
+  const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authorization } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const { data: { user }, error: authError } = await callerClient.auth.getUser()
+  if (authError || !user) return json({ error: 'Unauthorized' }, 401)
+
+  let image: string, mediaType: string, fundId: string
   try {
     const body = await req.json()
     image = body.image
     mediaType = body.mediaType ?? 'image/jpeg'
+    fundId = body.fundId
   } catch {
     return json({ error: 'Invalid JSON' }, 400)
   }
 
+  if (typeof fundId !== 'string' || !UUID_PATTERN.test(fundId)) {
+    return json({ error: 'Invalid fund' }, 400)
+  }
   if (typeof image !== 'string' || image.length === 0) {
     return json({ error: 'Missing image' }, 400)
+  }
+  if (image.startsWith('data:') || Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) {
+    return json({ error: 'Image is too large' }, 413)
   }
   if (mediaType !== 'image/jpeg' && mediaType !== 'image/png') {
     return json({ error: 'Unsupported media type' }, 400)
   }
+
+  const { data: allowed, error: allowanceError } = await callerClient
+    .rpc('begin_receipt_parse', { p_fund_id: fundId })
+  if (allowanceError) {
+    console.error('receipt allowance check failed', allowanceError.code)
+    return json({ error: 'Could not authorize receipt scan' }, 503)
+  }
+  if (!allowed) return json({ error: 'Receipt scan limit reached or fund access denied' }, 429)
 
   try {
     const response = await anthropic.messages.create({

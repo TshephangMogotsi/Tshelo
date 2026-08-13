@@ -7,6 +7,7 @@ import { useTheme, ThemePreference } from '../../context/ThemeContext'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { MainStackParamList } from '../../navigation/types'
+import { openLegalDocument } from '../../lib/legalDocuments'
 
 type RowProps = {
   icon: keyof typeof Ionicons.glyphMap
@@ -133,9 +134,9 @@ export default function SettingsScreen() {
         {/* App */}
         <Text style={[s.sectionTitle, { color: colors.textMuted }]}>App</Text>
         <View style={[s.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SettingsRow icon="wallet-outline"           label="Buy tokens"       onPress={() => {}} />
-          <SettingsRow icon="document-text-outline"    label="Terms of Service" onPress={() => {}} />
-          <SettingsRow icon="shield-checkmark-outline" label="Privacy Policy"   onPress={() => {}} />
+          <SettingsRow icon="wallet-outline"           label="Buy tokens"       onPress={() => navigation.navigate('TokenPurchase')} />
+          <SettingsRow icon="document-text-outline"    label="Terms of Service" onPress={() => { void openLegalDocument('terms') }} />
+          <SettingsRow icon="shield-checkmark-outline" label="Privacy Policy"   onPress={() => { void openLegalDocument('privacy') }} />
           <SettingsRow icon="help-circle-outline"      label="Help & Support"   onPress={() => navigation.navigate('Support')} last />
         </View>
 

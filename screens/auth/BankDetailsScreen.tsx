@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView, Modal } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -9,7 +9,7 @@ import { AuthStackParamList, BankAccount, MobileMoneyNumber } from '../../naviga
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
 import ProviderLogo from '../../components/ProviderLogo'
-import { PROVIDER_LABELS, detectProviderOrUnknown as detectProvider } from '../../lib/providers'
+import { PROVIDER_LABELS } from '../../lib/providers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'BankDetails'>
@@ -129,26 +129,10 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
   function handleAddMobileMoney() {
     const digits = mobileNumber.replace(/\D/g, '').replace(/^267/, '')
     if (digits.length < 8) return
-    const phone = `+267${digits.slice(-8)}`
-    const pendingNumber: MobileMoneyNumber = {
-      id: `${Date.now()}`,
-      phone,
-      provider: detectProvider(phone),
-    }
-    navigation.navigate('OTP', {
-      phone,
-      mode: 'mobile_money',
-      mobileMoneyReturn: {
-        name: route.params?.name,
-        registeredPhone,
-        bankName: hasBankDetails ? selectedBank?.name ?? '' : '',
-        branchCode,
-        accountNumber: hasBankDetails ? accountNumber : '',
-        bankAccounts,
-        mobileMoneyNumbers,
-        pendingNumber,
-      },
-    })
+    Alert.alert(
+      'Verification required',
+      'Additional mobile-money numbers cannot be added until provider-backed verification is available. Your sign-in number remains verified.'
+    )
   }
 
   const canAddMobileMoney = mobileNumber.replace(/\D/g, '').replace(/^267/, '').length >= 8

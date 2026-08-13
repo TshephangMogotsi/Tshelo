@@ -5,6 +5,8 @@ import {
   formatDateISO,
   formatTimeISO,
   getInitials,
+  shouldSyncSuggestedFundName,
+  suggestedEventFundName,
 } from '../format'
 
 describe('sanitizeAmountInput', () => {
@@ -60,5 +62,20 @@ describe('getInitials', () => {
   it('falls back to ? for empty input', () => {
     expect(getInitials('')).toBe('?')
     expect(getInitials('   ')).toBe('?')
+  })
+})
+
+describe('Event + Fund name suggestion', () => {
+  it('uses the complete event name followed by Fund', () => {
+    expect(suggestedEventFundName('Kefilwe Birthday', 'Birthday')).toBe('Kefilwe Birthday Fund')
+  })
+
+  it('keeps syncing while the user types the event name', () => {
+    expect(shouldSyncSuggestedFundName('K Fund', 'K', 'Wedding')).toBe(true)
+    expect(suggestedEventFundName('Kgotla Wedding', 'Wedding')).toBe('Kgotla Wedding Fund')
+  })
+
+  it('does not overwrite a custom fund name', () => {
+    expect(shouldSyncSuggestedFundName('Family Contributions', 'Kgotla Wedding', 'Wedding')).toBe(false)
   })
 })

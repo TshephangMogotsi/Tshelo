@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -23,6 +23,7 @@ type NotificationRow = {
   body:       string
   data:       Record<string, any> | null
   is_read:    boolean
+  response_action: string | null
   created_at: string
 }
 
@@ -35,6 +36,11 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   contribution_added: 'cash-outline',
   expense_added:      'receipt-outline',
   sms_detected:       'chatbubble-ellipses-outline',
+  rich_auntie_tagged: 'ribbon-outline',
+  event_announcement: 'megaphone-outline',
+  reward_earned:       'trophy-outline',
+  trust_level_changed: 'shield-checkmark-outline',
+  tokens_purchased:    'wallet-outline',
 }
 
 function timeAgo(iso: string): string {
@@ -57,6 +63,7 @@ export default function NotificationsScreen({ navigation }: Props) {
   const [items, setItems]         = useState<NotificationRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [respondingTo, setRespondingTo] = useState<string | null>(null)
 
   useFocusEffect(
     useCallback(() => {
@@ -69,7 +76,7 @@ export default function NotificationsScreen({ navigation }: Props) {
 
         const { data, error } = await supabase
           .from('notifications')
-          .select('id, fund_id, type, title, body, data, is_read, created_at')
+          .select('id, fund_id, type, title, body, data, is_read, response_action, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(100)
@@ -108,14 +115,74 @@ export default function NotificationsScreen({ navigation }: Props) {
   function handlePress(item: NotificationRow) {
     if (!item.is_read) markRead([item.id])
 
+    if (item.data?.kind === 'reward_earned' || item.data?.kind === 'trust_level_changed') {
+      navigation.navigate('Rewards')
+      return
+    }
+
+    if (item.data?.kind === 'tokens_purchased') {
+      navigation.navigate('TokenPurchase')
+      return
+    }
+
+    if (item.data?.kind === 'event_announcement' && typeof item.data.eventId === 'string') {
+      navigation.navigate('EventDetail', { eventId: item.data.eventId, tab: 'announcements' })
+      return
+    }
+
+    if (item.data?.kind === 'rich_auntie_award' && typeof item.data.awardId === 'string') {
+      navigation.navigate('RichAuntieCelebration', {
+        awardId: item.data.awardId,
+        recipientView: true,
+      })
+      return
+    }
+
     const detected = item.data?.detectedSms
-    if (detected && typeof detected.amount === 'number' && typeof detected.smsBody === 'string') {
-      navigation.navigate('AssignContribution', { detected })
+    if (detected && typeof detected.amount === 'number' && typeof detected.receivedAt === 'string') {
+      if (item.response_action === 'recorded') {
+        const recordedFundId = item.fund_id ?? item.data?.recordedFundId
+        if (typeof recordedFundId === 'string') {
+          navigation.navigate('FundDetail', { fundId: recordedFundId })
+        } else {
+          Alert.alert('Contribution recorded', 'This payment has already been recorded.')
+        }
+        return
+      }
+      navigation.navigate('AssignContribution', { detected, notificationId: item.id })
       return
     }
 
     const fundId = item.fund_id ?? item.data?.fundId
     if (fundId) navigation.navigate('FundDetail', { fundId })
+  }
+
+  async function respondToOrganiserInvite(item: NotificationRow, accept: boolean) {
+    const inviteId = item.data?.organiserInviteId
+    if (typeof inviteId !== 'string' || respondingTo) return
+    setRespondingTo(item.id)
+    const { data, error } = await supabase
+      .rpc('respond_to_event_fund_organiser_invite', { p_invite_id: inviteId, p_accept: accept })
+      .single()
+    setRespondingTo(null)
+
+    if (error || !data) {
+      Alert.alert('Could not respond', error?.message ?? 'The invitation is no longer available.')
+      return
+    }
+
+    const response = data as { fund_id: string }
+    setItems(previous => previous.map(notification => notification.id === item.id
+      ? { ...notification, is_read: true, response_action: accept ? 'accepted' : 'declined' }
+      : notification
+    ))
+
+    if (accept) {
+      Alert.alert('Invitation accepted', 'You can now manage both the event and its fund.', [
+        { text: 'Open fund', onPress: () => navigation.navigate('FundDetail', { fundId: response.fund_id }) },
+        { text: 'OK' },
+      ])
+    }
   }
 
   return (
@@ -149,7 +216,7 @@ export default function NotificationsScreen({ navigation }: Props) {
           <Text style={styles.emptyEmoji}>🔔</Text>
           <Text style={styles.emptyTitle}>No notifications yet</Text>
           <Text style={styles.emptyText}>
-            Join requests, contributions, and expenses in your funds will show up here.
+            Event announcements, join requests, contributions, and expenses will show up here.
           </Text>
         </View>
       ) : (
@@ -176,6 +243,34 @@ export default function NotificationsScreen({ navigation }: Props) {
                   <Text style={styles.rowTime}>{timeAgo(item.created_at)}</Text>
                 </View>
                 <Text style={styles.rowText} numberOfLines={2}>{item.body}</Text>
+                {item.type === 'sms_detected' && item.response_action === 'recorded' && (
+                  <View style={styles.recordedStatus}>
+                    <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+                    <Text style={styles.recordedStatusText}>Contribution recorded</Text>
+                  </View>
+                )}
+                {item.data?.kind === 'event_fund_organiser_invite' && (
+                  item.response_action ? (
+                    <Text style={styles.responseStatus}>Invitation {item.response_action}</Text>
+                  ) : (
+                    <View style={styles.inviteActions}>
+                      <TouchableOpacity
+                        style={[styles.inviteButton, styles.declineButton]}
+                        onPress={() => respondToOrganiserInvite(item, false)}
+                        disabled={respondingTo === item.id}
+                      >
+                        <Text style={styles.declineText}>Decline</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.inviteButton, styles.acceptButton]}
+                        onPress={() => respondToOrganiserInvite(item, true)}
+                        disabled={respondingTo === item.id}
+                      >
+                        <Text style={styles.acceptText}>{respondingTo === item.id ? 'Saving…' : 'Accept'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )
+                )}
               </View>
               {!item.is_read && <View style={styles.unreadDot} />}
             </TouchableOpacity>
@@ -320,6 +415,46 @@ function makeStyles(colors: AppColors) {
       fontSize: 13,
       lineHeight: 18,
       color: colors.textSecondary,
+    },
+    inviteActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 8,
+      marginTop: 12,
+    },
+    inviteButton: {
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderWidth: 1,
+    },
+    declineButton: {
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    acceptButton: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    declineText: { fontSize: 12, fontWeight: '800', color: colors.textSecondary },
+    acceptText: { fontSize: 12, fontWeight: '800', color: '#FFFFFF' },
+    responseStatus: {
+      marginTop: 9,
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.primary,
+      textTransform: 'capitalize',
+    },
+    recordedStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 9,
+    },
+    recordedStatusText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.success,
     },
     unreadDot: {
       width: 8,

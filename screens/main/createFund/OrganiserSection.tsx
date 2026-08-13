@@ -12,6 +12,9 @@ type Props = {
   creatorName: string
   search: string
   onSearchChange: (text: string) => void
+  connectionResults: PickedOrganiser[]
+  isSearchingConnections: boolean
+  onAddConnection: (person: PickedOrganiser) => void
   pickedOrganisers: PickedOrganiser[]
   onAddFromContacts: () => void
   onRemoveOrganiser: (id: string) => void
@@ -25,6 +28,9 @@ export default function OrganiserSection({
   creatorName,
   search,
   onSearchChange,
+  connectionResults,
+  isSearchingConnections,
+  onAddConnection,
   pickedOrganisers,
   onAddFromContacts,
   onRemoveOrganiser,
@@ -65,6 +71,32 @@ export default function OrganiserSection({
           returnKeyType="search"
         />
       </View>
+
+      {search.trim().length >= 2 && (
+        <View style={styles.searchResults}>
+          {isSearchingConnections ? (
+            <Text style={styles.searchMessage}>Searching your connections…</Text>
+          ) : connectionResults.length === 0 ? (
+            <Text style={styles.searchMessage}>No previous connections found.</Text>
+          ) : connectionResults.map(person => (
+            <TouchableOpacity
+              key={person.id}
+              style={styles.searchResultRow}
+              onPress={() => onAddConnection(person)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.contactAvatar}>
+                <Text style={styles.organiserAvatarText}>{person.initials}</Text>
+              </View>
+              <View style={styles.organiserBody}>
+                <Text style={styles.organiserName}>{person.name}</Text>
+                <Text style={styles.organiserPhone}>{person.phone}</Text>
+              </View>
+              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.organisersSectionTitle}>ORGANISERS ({count})</Text>
 
@@ -199,6 +231,29 @@ function makeStyles(colors: AppColors) {
       fontWeight: '900',
       color: colors.textMuted,
       marginBottom: 12,
+    },
+    searchResults: {
+      marginTop: -12,
+      marginBottom: 20,
+      gap: 8,
+    },
+    searchMessage: {
+      fontSize: 13,
+      color: colors.textMuted,
+      paddingHorizontal: 4,
+      paddingVertical: 8,
+    },
+    searchResultRow: {
+      minHeight: 66,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
     },
     organiserCard: {
       minHeight: 72,

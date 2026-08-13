@@ -5,8 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Image,
-  Alert,
   ActivityIndicator,
   Modal,
   ScrollView,
@@ -17,7 +15,6 @@ import type { AppColors } from '../../../theme/themes'
 import { makeCommonStyles } from './common'
 import CategoryPickerModal from './CategoryPickerModal'
 import { CATEGORIES, CategoryOption, categoryColor, MAX_EXPENSE_BWP } from './categories'
-import { pickFromLibrary, takePhoto } from './receipt'
 
 export type PayerOption = { id: string; userId: string | null; name: string }
 
@@ -40,8 +37,6 @@ type Props = {
   parsedAmount: number
   paidBy: string
   onPaidByChange: (id: string) => void
-  receiptUri: string | null
-  onReceiptChange: (uri: string | null) => void
   isValid: boolean
   onSave: () => void
 }
@@ -65,8 +60,6 @@ export default function ManualEntryStep({
   parsedAmount,
   paidBy,
   onPaidByChange,
-  receiptUri,
-  onReceiptChange,
   isValid,
   onSave,
 }: Props) {
@@ -78,14 +71,6 @@ export default function ManualEntryStep({
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
 
   const amountValid = !isNaN(parsedAmount) && parsedAmount > 0 && parsedAmount <= MAX_EXPENSE_BWP
-
-  function handleReceiptOptions() {
-    Alert.alert('Attach Receipt', 'Choose a source', [
-      { text: 'Take Photo',          onPress: async () => { const uri = await takePhoto(); if (uri) onReceiptChange(uri) } },
-      { text: 'Choose from Library', onPress: async () => { const uri = await pickFromLibrary(); if (uri) onReceiptChange(uri) } },
-      { text: 'Cancel', style: 'cancel' },
-    ])
-  }
 
   return (
     <>
@@ -249,33 +234,6 @@ export default function ManualEntryStep({
         </TouchableOpacity>
       </Modal>
 
-      <View style={common.field}>
-        <Text style={common.label}>Receipt <Text style={common.optional}>(optional)</Text></Text>
-
-        {receiptUri ? (
-          <View style={styles.receiptPreview}>
-            <Image source={{ uri: receiptUri }} style={styles.receiptImage} resizeMode="cover" />
-            <TouchableOpacity
-              style={styles.removeReceiptBtn}
-              onPress={() => !isSaving && onReceiptChange(null)}
-            >
-              <Text style={styles.removeReceiptText}>✕ Remove</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.receiptUploadBox}
-            onPress={handleReceiptOptions}
-            activeOpacity={0.8}
-            disabled={isSaving}
-          >
-            <Text style={styles.receiptUploadEmoji}>📷</Text>
-            <Text style={styles.receiptUploadTitle}>Add receipt photo</Text>
-            <Text style={styles.receiptUploadHint}>Photo or from library</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
       <View style={styles.auditCard}>
         <Text style={styles.auditText}>
           🔒 This expense will be recorded in the fund's audit log with your name and a timestamp. It cannot be deleted.
@@ -396,49 +354,6 @@ function makeStyles(colors: AppColors) {
       fontSize: 12,
       color: colors.error,
       marginTop: 4,
-    },
-    receiptUploadBox: {
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderStyle: 'dashed',
-      borderRadius: 16,
-      paddingVertical: 28,
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      gap: 6,
-    },
-    receiptUploadEmoji: {
-      fontSize: 32,
-      marginBottom: 4,
-    },
-    receiptUploadTitle: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    receiptUploadHint: {
-      fontSize: 12,
-      color: colors.textMuted,
-    },
-    receiptPreview: {
-      borderRadius: 14,
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    receiptImage: {
-      width: '100%',
-      height: 200,
-    },
-    removeReceiptBtn: {
-      backgroundColor: colors.errorLight,
-      padding: 12,
-      alignItems: 'center',
-    },
-    removeReceiptText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.error,
     },
     charCount: {
       fontSize: 11,

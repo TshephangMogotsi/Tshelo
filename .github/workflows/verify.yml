@@ -1,0 +1,55 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - name: Reject high-severity dependency advisories
+        run: npm audit --audit-level=high
+
+  permission-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.113.0
+      - name: Initialize disposable Supabase configuration
+        run: supabase init
+      - name: Start migrated disposable database
+        run: supabase start
+      - name: Run granular admin permission matrix
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql
+          --host 127.0.0.1
+          --port 54322
+          --username postgres
+          --dbname postgres
+          --set ON_ERROR_STOP=1
+          --file supabase/tests/fund_admin_permission_matrix.sql
+      - name: Stop disposable database
+        if: always()
+        run: supabase stop --no-backup

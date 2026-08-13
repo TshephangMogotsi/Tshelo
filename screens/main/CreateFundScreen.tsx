@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, Share } from 'react-native'
 import * as Contacts from 'expo-contacts'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -9,6 +9,8 @@ import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import { supabase } from '../../lib/supabase'
+import { normalizeMapsUrl } from '../../lib/maps'
+import { TOKEN_FEATURE_PRICES } from '../../lib/tokenPricing'
 import { HomeItem } from './home/helpers'
 import { loadHomeItems } from './home/loadHomeItems'
 import {
@@ -34,14 +36,24 @@ import EventFundTypeStep from './createFund/EventFundTypeStep'
 import EventFundDetailsStep from './createFund/EventFundDetailsStep'
 import EventFundOrganisersStep from './createFund/EventFundOrganisersStep'
 import EventFundBudgetStep from './createFund/EventFundBudgetStep'
+import { useFundPermissions } from '../../lib/useFundPermissions'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'CreateFund'>
   route:      RouteProp<MainStackParamList, 'CreateFund'>
 }
 
+function readableError(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) return error.message
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message?: unknown }).message ?? '').trim()
+    if (message) return message
+  }
+  return fallback
+}
+
 export default function CreateFundScreen({ navigation }: Props) {
-  const { userId } = useAuth()
+  const { userId, tokenBalance, refreshProfile } = useAuth()
   const requireOnline = useRequireOnline()
 
   const [name,           setName]           = useState('')
@@ -66,15 +78,19 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [eventFundOrganisersDone, setEventFundOrganisersDone] = useState(false)
   const [organiserSearch, setOrganiserSearch] = useState('')
   const [pickedOrganisers, setPickedOrganisers] = useState<PickedOrganiser[]>([])
+  const [connectionResults, setConnectionResults] = useState<PickedOrganiser[]>([])
+  const [isSearchingConnections, setIsSearchingConnections] = useState(false)
   const [eventBudget, setEventBudget] = useState('50,000')
-  const [fundGoalPercent] = useState(65)
+  const [fundGoalPercent, setFundGoalPercent] = useState(65)
   const [eventName,      setEventName]      = useState('')
   const [eventDate,      setEventDate]      = useState<Date | null>(null)
   const [eventTime,      setEventTime]      = useState<Date | null>(null)
   const [eventVenue,     setEventVenue]     = useState('')
+  const [eventVenueMapLink, setEventVenueMapLink] = useState('')
   const [isCreatingFund, setIsCreatingFund] = useState(false)
   const [isPrivate,      setIsPrivate]      = useState(false)
   const [firstFundItem,  setFirstFundItem]  = useState<HomeItem | null>(null)
+  const { can: canUseFundAction } = useFundPermissions(firstFundItem?.fundId)
 
   useFocusEffect(
     useCallback(() => {
@@ -91,9 +107,52 @@ export default function CreateFundScreen({ navigation }: Props) {
     }, [userId])
   )
 
+  useEffect(() => {
+    let active = true
+    const query = organiserSearch.trim()
+    if (query.length < 2) {
+      setConnectionResults([])
+      setIsSearchingConnections(false)
+      return () => { active = false }
+    }
+
+    setIsSearchingConnections(true)
+    const timeout = setTimeout(async () => {
+      const { data, error } = await supabase.rpc('search_my_connections', { p_query: query })
+      if (!active) return
+      if (error) {
+        setConnectionResults([])
+      } else {
+        setConnectionResults((data ?? []).map((person: any) => ({
+          id: `connection:${person.user_id}`,
+          userId: person.user_id,
+          name: person.name,
+          phone: person.phone,
+          initials: getInitials(person.name),
+        })).filter((person: PickedOrganiser) => !pickedOrganisers.some(picked =>
+          picked.userId === person.userId || normalizePhone(picked.phone) === normalizePhone(person.phone)
+        )))
+      }
+      setIsSearchingConnections(false)
+    }, 300)
+
+    return () => {
+      active = false
+      clearTimeout(timeout)
+    }
+  }, [organiserSearch, pickedOrganisers])
+
+  function normalizePhone(value?: string) {
+    return (value ?? '').replace(/\D/g, '').slice(-8)
+  }
+
   function handleQuickAction(id: QuickActionId) {
-    if (id === 'join') {
+    if (id === 'joinFund') {
       navigation.navigate('JoinFund')
+      return
+    }
+    if (id === 'joinEvent') {
+      navigation.navigate('JoinEvent')
       return
     }
     if (id === 'tokens') {
@@ -114,9 +173,11 @@ export default function CreateFundScreen({ navigation }: Props) {
           fundId,
           fundTitle:    fund.title,
           currencyCode: fund.currency_code,
+          initialMode: canUseFundAction('record_contributions') ? 'received' : 'pledge',
         })
         break
       case 'expense':
+        if (!canUseFundAction('record_expenses')) return
         navigation.navigate('RecordExpense', {
           fundId,
           fundTitle:    fund.title,
@@ -124,13 +185,19 @@ export default function CreateFundScreen({ navigation }: Props) {
         })
         break
       case 'members':
+        if (!canUseFundAction('manage_members')) return
         navigation.navigate('FundDetail', { fundId })
         break
     }
   }
 
   const isValid = name.trim().length >= 3
-  const eventDetailsValid = eventName.trim().length >= 3 && eventDate !== null && eventTime !== null && eventVenue.trim().length >= 3
+  const eventVenueMapLinkValid = !eventVenueMapLink.trim() || normalizeMapsUrl(eventVenueMapLink) !== null
+  const eventDetailsValid = eventName.trim().length >= 3
+    && eventDate !== null
+    && eventTime !== null
+    && eventVenue.trim().length >= 3
+    && eventVenueMapLinkValid
   const isOtherEvent = eventType.id === 'other'
   const selectedEventLabel = isOtherEvent ? customEventType.trim() || 'Other' : eventType.label
   const selectedEventEmoji = isOtherEvent ? customEventEmoji : eventType.emoji
@@ -162,8 +229,13 @@ export default function CreateFundScreen({ navigation }: Props) {
         || 'Selected contact'
       const phone = contact.phoneNumbers?.find(item => item.number)?.number
 
+      if (!phone || normalizePhone(phone).length < 7) {
+        Alert.alert('Phone number required', 'Choose a contact with a valid phone number so they can receive the organiser invitation.')
+        return
+      }
+
       setPickedOrganisers(previous => {
-        if (previous.some(item => item.id === contact.id)) return previous
+        if (previous.some(item => item.id === contact.id || normalizePhone(item.phone) === normalizePhone(phone))) return previous
 
         return [
           ...previous,
@@ -184,8 +256,23 @@ export default function CreateFundScreen({ navigation }: Props) {
     setPickedOrganisers(previous => previous.filter(item => item.id !== id))
   }
 
+  function addConnectedOrganiser(person: PickedOrganiser) {
+    setPickedOrganisers(previous => {
+      if (previous.some(item => item.userId === person.userId || normalizePhone(item.phone) === normalizePhone(person.phone))) return previous
+      return [...previous, person]
+    })
+    setOrganiserSearch('')
+  }
+
   type CreatedEvent = { id: string; share_code: string | null }
   type CreatedFund  = { id: string; fund_code: string | null }
+  type CreatedEventFundResult = {
+    event_id: string
+    fund_id: string
+    fund_code: string | null
+    event_share_code: string | null
+    remaining_tokens: number
+  }
 
   // Inserts the event + pending organiser invites. Alerts and returns
   // null on failure; a missing organiser row is non-fatal.
@@ -202,6 +289,7 @@ export default function CreateFundScreen({ navigation }: Props) {
         event_date: formatDateISO(eventDate),
         event_time: formatTimeISO(eventTime),
         venue_name: eventVenue.trim(),
+        venue_address: normalizeMapsUrl(eventVenueMapLink) ?? normalizeMapsUrl(eventVenue),
         currency_code: currency,
       })
       .select('id, share_code')
@@ -239,7 +327,8 @@ export default function CreateFundScreen({ navigation }: Props) {
     return event
   }
 
-  // Inserts the fund + owner membership, and links the event when given.
+  // Inserts the fund and links the event when given. The database creates the
+  // owner's joined membership in the same transaction as the fund.
   // Alerts and returns null on failure.
   async function insertFund(opts: {
     title: string
@@ -267,21 +356,6 @@ export default function CreateFundScreen({ navigation }: Props) {
     if (fundError || !fund) {
       hapticError()
       Alert.alert('Could not create fund', fundError?.message ?? 'Please try again.')
-      return null
-    }
-
-    const { error: memberError } = await supabase.from('fund_members').insert({
-      fund_id:    fund.id,
-      user_id:    userId,
-      invited_by: userId,
-      role:       'owner',
-      status:     'joined',
-      joined_at:  new Date().toISOString(),
-    })
-
-    if (memberError) {
-      hapticError()
-      Alert.alert('Could not create fund', memberError.message)
       return null
     }
 
@@ -389,44 +463,72 @@ export default function CreateFundScreen({ navigation }: Props) {
       Alert.alert('Sign in required', 'Please sign in again before creating an event fund.')
       return
     }
+    if (tokenBalance < TOKEN_FEATURE_PRICES.eventFund) {
+      Alert.alert(
+        'Not enough tokens',
+        `Event + Fund costs ${TOKEN_FEATURE_PRICES.eventFund} tokens. Your current balance is ${tokenBalance}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Go to Tokens', onPress: () => navigation.navigate('TokenPurchase') },
+        ]
+      )
+      return
+    }
 
     setIsCreatingFund(true)
     try {
-      let event = createdEvent
-      if (!event) {
-        event = await insertEventWithOrganisers()
-        if (!event) return
-        setCreatedEvent(event)
+      const budgetAmount = parseAmount(eventBudget)
+      const fundTitle = name.trim() || `${eventName.trim()} Fund`
+      const { data, error } = await supabase.rpc('create_event_fund', {
+        p_event_name: eventName.trim(),
+        p_event_type: isOtherEvent ? customEventType.trim() : eventType.id,
+        p_event_emoji: selectedEventEmoji,
+        p_event_date: formatDateISO(eventDate),
+        p_event_time: formatTimeISO(eventTime),
+        p_event_venue: eventVenue.trim(),
+        p_fund_title: fundTitle,
+        p_currency_code: currency,
+        p_budget: budgetAmount,
+        p_goal_percentage: fundGoalPercent,
+        p_is_private: isPrivate,
+        p_organisers: pickedOrganisers.map(person => ({
+          name: person.name.trim(),
+          phone: person.phone?.trim() ?? '',
+        })),
+      }).single()
+
+      if (error || !data) {
+        if (error?.message.includes('INSUFFICIENT_TOKENS')) {
+          await refreshProfile()
+          Alert.alert(
+            'Not enough tokens',
+            error.message.replace('INSUFFICIENT_TOKENS: ', ''),
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Go to Tokens', onPress: () => navigation.navigate('TokenPurchase') },
+            ]
+          )
+          return
+        }
+        throw error ?? new Error('The Event + Fund could not be created.')
       }
 
-      const fundTitle = name.trim() || `${eventName.trim()} Fund`
-      const fund = await insertFund({
-        title:       fundTitle,
-        goalAmount:  fundGoalAmount,
-        deadline:    formatDateISO(eventDate),
-        linkedEvent: event,
-      })
-      if (!fund) return
+      const created = data as CreatedEventFundResult
+      const venueMapLink = normalizeMapsUrl(eventVenueMapLink) ?? normalizeMapsUrl(eventVenue)
+      if (venueMapLink) {
+        const { error: venueLinkError } = await supabase
+          .from('events')
+          .update({ venue_address: venueMapLink })
+          .eq('id', created.event_id)
 
-      // The event and fund already exist at this point, so a budget error
-      // must not leave the user on a retry path that creates duplicates.
-      const budgetAmount = parseAmount(eventBudget)
-      if (budgetAmount > 0) {
-        const { error: budgetError } = await supabase.from('event_budgets').insert({
-          event_id:             event.id,
-          total_budget:         budgetAmount,
-          currency_code:        currency,
-          fund_goal_percentage: fundGoalPercent,
-          fund_goal_amount:     fundGoalAmount,
-        })
-        if (budgetError) {
+        if (venueLinkError) {
           Alert.alert(
-            'Event and fund created',
-            'The budget could not be saved. You can add it from the event details.'
+            'Event + Fund created',
+            'Your event was created, but its Maps link could not be saved. You can still find the venue by name.',
           )
         }
       }
-
+      await refreshProfile()
       hapticSuccess()
       navigation.replace('FundCreated', {
         fundName:   fundTitle,
@@ -436,11 +538,11 @@ export default function CreateFundScreen({ navigation }: Props) {
         currencyCode: selectedCurrency.code,
         currencySymbol: selectedCurrency.symbol,
         targetDate: formatDateISO(eventDate),
-        shareCode:  fund.fund_code ?? undefined,
-        fundId:     fund.id,
+        shareCode:  created.fund_code ?? undefined,
+        fundId:     created.fund_id,
       })
     } catch (error) {
-      Alert.alert('Could not create event fund', error instanceof Error ? error.message : 'Please try again.')
+      Alert.alert('Could not create event fund', readableError(error, 'Please try again.'))
     } finally {
       setIsCreatingFund(false)
     }
@@ -490,7 +592,20 @@ export default function CreateFundScreen({ navigation }: Props) {
   })
 
   if (!createOption) {
-    return <CreateOptionChooser onSelect={setCreateOption} onQuickAction={handleQuickAction} onBack={handleBack} />
+    return (
+      <CreateOptionChooser
+        onSelect={setCreateOption}
+        onQuickAction={handleQuickAction}
+        onBack={handleBack}
+        visibleQuickActions={new Set<QuickActionId>([
+          'joinFund',
+          'joinEvent',
+          'contribution',
+          ...(canUseFundAction('record_expenses') ? ['expense' as const] : []),
+          ...(canUseFundAction('manage_members') ? ['members' as const] : []),
+        ])}
+      />
+    )
   }
 
   if (createOption === 'eventFund' && eventFundTypeDone && !eventFundDetailsDone) {
@@ -508,6 +623,8 @@ export default function CreateFundScreen({ navigation }: Props) {
         onEventTimeChange={setEventTime}
         eventVenue={eventVenue}
         onEventVenueChange={setEventVenue}
+        eventVenueMapLink={eventVenueMapLink}
+        onEventVenueMapLinkChange={setEventVenueMapLink}
         onContinue={derivedFundName => {
           if (!name.trim()) setName(derivedFundName)
           setEventFundDetailsDone(true)
@@ -522,6 +639,9 @@ export default function CreateFundScreen({ navigation }: Props) {
       <EventFundOrganisersStep
         organiserSearch={organiserSearch}
         onOrganiserSearchChange={setOrganiserSearch}
+        connectionResults={connectionResults}
+        isSearchingConnections={isSearchingConnections}
+        onAddConnection={addConnectedOrganiser}
         pickedOrganisers={pickedOrganisers}
         onAddFromContacts={handleAddFromContacts}
         onRemoveOrganiser={removePickedOrganiser}
@@ -537,7 +657,9 @@ export default function CreateFundScreen({ navigation }: Props) {
         eventBudget={eventBudget}
         onEventBudgetChange={text => setEventBudget(sanitizeAmountInput(text))}
         fundGoalPercent={fundGoalPercent}
+        onFundGoalPercentChange={setFundGoalPercent}
         eventName={eventName}
+        currencySymbol={selectedCurrency.symbol}
         isCreating={isCreatingFund}
         onCreate={handleCreateEventFund}
         onBack={handleBack}
@@ -550,6 +672,18 @@ export default function CreateFundScreen({ navigation }: Props) {
       <EventFundTypeStep
         eventType={eventType}
         onSelectType={setEventType}
+        isOtherEvent={isOtherEvent}
+        customEventType={customEventType}
+        onCustomEventTypeChange={setCustomEventType}
+        customEventEmoji={customEventEmoji}
+        onCustomEventEmojiChange={setCustomEventEmoji}
+        showEmojiDialog={showCustomEmojiDialog}
+        onShowEmojiDialog={setShowCustomEmojiDialog}
+        emojiSearch={emojiSearch}
+        onEmojiSearchChange={setEmojiSearch}
+        emojiCategory={emojiCategory}
+        onEmojiCategoryChange={setEmojiCategory}
+        isStepValid={eventTypeStepValid}
         onContinue={() => {
           setSelectedEmoji({ id: eventType.id, label: selectedEventLabel, emoji: selectedEventEmoji })
           setEventFundTypeDone(true)
@@ -586,6 +720,9 @@ export default function CreateFundScreen({ navigation }: Props) {
         <EventOrganisersStep
           organiserSearch={organiserSearch}
           onOrganiserSearchChange={setOrganiserSearch}
+          connectionResults={connectionResults}
+          isSearchingConnections={isSearchingConnections}
+          onAddConnection={addConnectedOrganiser}
           pickedOrganisers={pickedOrganisers}
           onAddFromContacts={handleAddFromContacts}
           onRemoveOrganiser={removePickedOrganiser}
@@ -608,6 +745,8 @@ export default function CreateFundScreen({ navigation }: Props) {
           onEventTimeChange={setEventTime}
           eventVenue={eventVenue}
           onEventVenueChange={setEventVenue}
+          eventVenueMapLink={eventVenueMapLink}
+          onEventVenueMapLinkChange={setEventVenueMapLink}
           isStepValid={eventDetailsValid}
           onContinue={() => setEventStep(3)}
           onBack={handleBack}

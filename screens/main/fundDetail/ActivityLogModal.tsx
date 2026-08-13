@@ -49,6 +49,7 @@ const FIELD_LABELS: Record<string, string> = {
   description: 'Item',
   vendor_name: 'Vendor',
   amount:      'Amount',
+  pledged_amount: 'Pledged amount',
   category:    'Category',
   contributor_name: 'Contributor',
   payment_method: 'Payment method',
@@ -104,7 +105,7 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
 
   function formatValue(field: string, value: unknown): string {
     if (value === null || value === undefined || value === '') return '—'
-    if (field === 'amount' || field === 'goal_amount') return formatMoney(Number(value), currencyCode)
+    if (field === 'amount' || field === 'goal_amount' || field === 'pledged_amount') return formatMoney(Number(value), currencyCode)
     if (field === 'is_private') return value ? 'Private' : 'Public'
     if (field === 'is_refunded') return value ? 'Yes' : 'No'
     if (field === 'category') {

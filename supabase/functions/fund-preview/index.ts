@@ -22,7 +22,9 @@ Deno.serve(async (req) => {
     .eq('fund_id', fund.id)
     .not('status', 'in', '(left,removed,declined)')
 
-  const memberCount = count ?? 0
+  // The organiser is always the fund's first member, including for legacy
+  // funds whose owner membership row has not yet been repaired.
+  const memberCount = Math.max(1, count ?? 0)
 
   const symbol  = fund.currency_code === 'BWP' ? 'P' : fund.currency_code
   const goalStr = fund.goal_amount

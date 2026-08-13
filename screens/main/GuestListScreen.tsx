@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, TextInput } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, TextInput, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -9,6 +9,10 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
+import { loadMyFundPermissions } from '../../lib/useFundPermissions'
+import type { FundPermission } from '../../lib/fundPermissions'
+import LoadingOverlay from '../../components/LoadingOverlay'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'GuestList'>
@@ -23,42 +27,109 @@ type Guest = {
   name: string
   initials: string
   status: GuestStatus
+  partySize: number
   note: string
   color: string
 }
 
 export default function GuestListScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
+  const { userId } = useAuth()
   const styles = makeStyles(colors)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
   const [guests, setGuests] = useState<Guest[]>([])
+  const [canManageGuests, setCanManageGuests] = useState<boolean | null>(null)
+  const permissionAlerted = useRef(false)
 
   useFocusEffect(useCallback(() => {
     let active = true
-    supabase
-      .from('event_guests')
-      .select('id, guest_name, guest_phone, rsvp_status, plus_ones')
-      .eq('event_id', route.params.eventId)
-      .order('invited_at', { ascending: false })
-      .then(({ data }) => {
-        if (!active) return
-        setGuests((data ?? []).map(row => {
-          const name: string = String(row.guest_name?.trim() || row.guest_phone?.trim() || 'Guest')
-          const status: GuestStatus = row.rsvp_status === 'confirmed' ? 'yes' : row.rsvp_status === 'declined' ? 'no' : 'pending'
-          const plusOnes = Math.max(0, Number(row.plus_ones ?? 0))
-          return {
-            id: row.id,
-            name,
-            initials: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(),
-            status,
-            note: status === 'yes' ? (plusOnes ? `+${plusOnes} guest${plusOnes === 1 ? '' : 's'}` : 'Confirmed') : status === 'no' ? "Can't make it" : "Hasn't responded",
-            color: status === 'yes' ? '#16A34A' : status === 'no' ? '#EF4444' : '#F59E0B',
-          }
-        }))
-      })
+    permissionAlerted.current = false
+    setCanManageGuests(null)
+
+    async function load() {
+      const [eventResult, organiserResult] = await Promise.all([
+        supabase
+          .from('events')
+          .select('creator_id, linked_fund_id')
+          .eq('id', route.params.eventId)
+          .single(),
+        userId
+          ? supabase
+            .from('event_organisers')
+            .select('id')
+            .eq('event_id', route.params.eventId)
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      if (!active) return
+      if (eventResult.error || !eventResult.data) {
+        setCanManageGuests(false)
+        Alert.alert(
+          'Guest list unavailable',
+          eventResult.error?.message ?? 'This event could not be loaded.',
+          [{ text: 'Go back', onPress: () => navigation.goBack() }],
+        )
+        return
+      }
+
+      const permissions = eventResult.data?.linked_fund_id
+        ? await loadMyFundPermissions(eventResult.data.linked_fund_id)
+          .catch(() => new Set<FundPermission>())
+        : new Set<FundPermission>()
+      if (!active) return
+
+      const allowed = Boolean(
+        eventResult.data
+        && (eventResult.data.creator_id === userId
+          || organiserResult.data
+          || permissions.has('manage_event_guests')),
+      )
+      setCanManageGuests(allowed)
+      if (!allowed) {
+        if (!permissionAlerted.current) {
+          permissionAlerted.current = true
+          Alert.alert(
+            'Guest access required',
+            'You do not have permission to manage this event guest list.',
+            [{ text: 'Go back', onPress: () => navigation.goBack() }],
+          )
+        }
+        return
+      }
+
+      const { data } = await supabase
+        .from('event_guests')
+        .select('id, guest_name, guest_phone, rsvp_status, plus_ones')
+        .eq('event_id', route.params.eventId)
+        .order('invited_at', { ascending: false })
+      if (!active) return
+
+      setGuests((data ?? []).map(row => {
+        const name: string = String(row.guest_name?.trim() || row.guest_phone?.trim() || 'Guest')
+        const status: GuestStatus = row.rsvp_status === 'yes' || row.rsvp_status === 'confirmed'
+          ? 'yes'
+          : row.rsvp_status === 'no' || row.rsvp_status === 'declined'
+            ? 'no'
+            : 'pending'
+        const plusOnes = Math.max(0, Number(row.plus_ones ?? 0))
+        return {
+          id: row.id,
+          name,
+          initials: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(),
+          status,
+          partySize: 1 + plusOnes,
+          note: status === 'yes' ? (plusOnes ? `+${plusOnes} guest${plusOnes === 1 ? '' : 's'}` : 'Confirmed') : status === 'no' ? "Can't make it" : "Hasn't responded",
+          color: status === 'yes' ? '#16A34A' : status === 'no' ? '#EF4444' : '#F59E0B',
+        }
+      }))
+    }
+
+    void load()
     return () => { active = false }
-  }, [route.params.eventId]))
+  }, [navigation, route.params.eventId, userId]))
 
   const visibleGuests = guests.filter(guest => {
     const matchesFilter = filter === 'all' || guest.status === filter
@@ -67,10 +138,11 @@ export default function GuestListScreen({ navigation, route }: Props) {
   })
 
   const counts = {
-    confirmed: guests.filter(guest => guest.status === 'yes').length,
+    confirmed: guests.filter(guest => guest.status === 'yes').reduce((sum, guest) => sum + guest.partySize, 0),
     pending: guests.filter(guest => guest.status === 'pending').length,
     declined: guests.filter(guest => guest.status === 'no').length,
   }
+  const invitedPeople = guests.reduce((sum, guest) => sum + guest.partySize, 0)
 
   function statusLabel(status: GuestStatus) {
     if (status === 'yes') return 'Yes'
@@ -92,7 +164,7 @@ export default function GuestListScreen({ navigation, route }: Props) {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.introRow}>
-          <View><Text style={styles.pageTitle}>Guest list</Text><Text style={styles.pageSubtitle}>{guests.length} invited</Text></View>
+          <View><Text style={styles.pageTitle}>Guest list</Text><Text style={styles.pageSubtitle}>{invitedPeople} people invited</Text></View>
         </View>
 
         <View style={styles.statsRow}>
@@ -171,6 +243,7 @@ export default function GuestListScreen({ navigation, route }: Props) {
           ))}
         </View>
       </ScrollView>
+      {canManageGuests === null ? <LoadingOverlay /> : null}
     </SafeAreaView>
   )
 }

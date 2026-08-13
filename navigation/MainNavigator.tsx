@@ -16,6 +16,7 @@ import ProfileScreen  from '../screens/main/ProfileScreen'
 // Stack screens
 import CreateFundScreen         from '../screens/main/CreateFundScreen'
 import JoinFundScreen           from '../screens/main/JoinFundScreen'
+import JoinEventScreen          from '../screens/main/JoinEventScreen'
 import FundDetailScreen         from '../screens/main/FundDetailScreen'
 import EventDetailScreen        from '../screens/main/EventDetailScreen'
 import GuestListScreen          from '../screens/main/GuestListScreen'
@@ -28,6 +29,11 @@ import SettingsScreen           from '../screens/main/SettingsScreen'
 import NotificationsScreen      from '../screens/main/NotificationsScreen'
 import SupportScreen            from '../screens/support/SupportScreen'
 import FundCreatedScreen        from '../screens/main/FundCreatedScreen'
+import MemberDetailsScreen      from '../screens/main/MemberDetailsScreen'
+import AwardRichAuntieScreen    from '../screens/main/AwardRichAuntieScreen'
+import RichAuntieCelebrationScreen from '../screens/main/RichAuntieCelebrationScreen'
+import RichAuntieStatusScreen   from '../screens/main/RichAuntieStatusScreen'
+import RewardsScreen            from '../screens/main/RewardsScreen'
 
 // ── Custom tab bar ────────────────────────────────────────────
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -150,6 +156,7 @@ export default function MainNavigator() {
       <Stack.Screen name="Tabs"               component={TabNavigator}            />
       <Stack.Screen name="CreateFund"         component={CreateFundScreen}        />
       <Stack.Screen name="JoinFund"           component={JoinFundScreen}          />
+      <Stack.Screen name="JoinEvent"          component={JoinEventScreen}         />
       <Stack.Screen name="FundDetail"         component={FundDetailScreen}        />
       <Stack.Screen name="EventDetail"        component={EventDetailScreen}       />
       <Stack.Screen name="GuestList"          component={GuestListScreen}         />
@@ -160,6 +167,11 @@ export default function MainNavigator() {
       <Stack.Screen name="TokenPurchase"      component={TokenPurchaseScreen}     />
       <Stack.Screen name="Settings"           component={SettingsScreen}          />
       <Stack.Screen name="Notifications"      component={NotificationsScreen}     />
+      <Stack.Screen name="MemberDetails"      component={MemberDetailsScreen}     />
+      <Stack.Screen name="AwardRichAuntie"    component={AwardRichAuntieScreen}   />
+      <Stack.Screen name="RichAuntieCelebration" component={RichAuntieCelebrationScreen} />
+      <Stack.Screen name="RichAuntieStatus"   component={RichAuntieStatusScreen}  />
+      <Stack.Screen name="Rewards"            component={RewardsScreen}           />
       <Stack.Screen name="Support"            component={SupportScreen}           />
       <Stack.Screen name="FundCreated"        component={FundCreatedScreen}       />
     </Stack.Navigator>

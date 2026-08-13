@@ -8,16 +8,26 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { supabase } from '../../lib/supabase'
-import { HomeItem, HomeItemKind, KIND_LABELS, initials } from './home/helpers'
+import {
+  HomeItem,
+  HomeItemKind,
+  HomeSortOrder,
+  HomeStatusFilter,
+  KIND_LABELS,
+  initials,
+  matchesHomeStatus,
+  sortHomeItems,
+} from './home/helpers'
 import { loadHomeItems } from './home/loadHomeItems'
 import HomeItemCard from './home/HomeItemCard'
+import HomeSortMenu from './home/HomeSortMenu'
 import WelcomeOverlay from './home/WelcomeOverlay'
 
 // persists for the current app session; resets on app restart (= "show every login")
 let _welcomeDismissed = false
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
-  const { userName, userId } = useAuth()
+  const { userName, userId, tokenBalance, refreshProfile } = useAuth()
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
@@ -25,21 +35,25 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [homeItems,      setHomeItems]      = useState<HomeItem[]>([])
   const [isLoading,      setIsLoading]      = useState(false)
   const [loadError,      setLoadError]      = useState<string | null>(null)
-  const [activeFilter,   setActiveFilter]   = useState<string>('all')
+  const [kindFilter,     setKindFilter]     = useState<'all' | HomeItemKind>('all')
+  const [statusFilter,   setStatusFilter]   = useState<HomeStatusFilter>('all')
+  const [sortOrder,      setSortOrder]      = useState<HomeSortOrder>('newest')
   const [unreadCount,    setUnreadCount]    = useState(0)
   const [searchOpen,     setSearchOpen]     = useState(false)
   const [searchQuery,    setSearchQuery]    = useState('')
   const hasLoadedRef = useRef(false)
-  const lastLoadedAtRef = useRef(0)
 
   useFocusEffect(
     useCallback(() => {
       let active = true
 
+      // Token grants and paid actions happen on other screens. Refresh the
+      // shared profile state whenever Home regains focus so this header always
+      // reflects the server-owned balance rather than a stale session value.
+      void refreshProfile()
+
       async function load() {
         if (!userId) return
-        const now = Date.now()
-        if (hasLoadedRef.current && now - lastLoadedAtRef.current < 30_000) return
         if (!hasLoadedRef.current) setIsLoading(true)
         setLoadError(null)
 
@@ -48,7 +62,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           if (active) {
             setHomeItems(items)
             hasLoadedRef.current = true
-            lastLoadedAtRef.current = Date.now()
           }
         } catch (err) {
           if (active) {
@@ -86,14 +99,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const userInitials   = userName ? initials(userName) : '?'
 
   const presentKinds   = Array.from(new Set(homeItems.map(i => i.kind)))
-  const showFilters    = presentKinds.length > 1
   const normalizedSearch = searchQuery.trim().toLowerCase()
-  const filteredItems  = homeItems.filter(item => {
-    const matchesKind = activeFilter === 'all' || item.kind === activeFilter
+  const filteredItems  = sortHomeItems(homeItems.filter(item => {
+    const matchesKind = kindFilter === 'all' || item.kind === kindFilter
+    const matchesStatus = matchesHomeStatus(item, statusFilter)
     const matchesSearch = !normalizedSearch || [item.title, item.category, item.venue_name]
       .some(value => value?.toLowerCase().includes(normalizedSearch))
-    return matchesKind && matchesSearch
-  })
+    return matchesKind && matchesStatus && matchesSearch
+  }), sortOrder)
+  const selectedFilterLabel = [
+    statusFilter === 'all' ? '' : statusFilter,
+    kindFilter === 'all' ? '' : KIND_LABELS[kindFilter],
+  ].filter(Boolean).join(' ')
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -119,12 +136,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 style={styles.tokenPill}
                 onPress={() => navigation.navigate('TokenPurchase')}
                 activeOpacity={0.85}
-                accessibilityLabel="25 tokens"
+                accessibilityLabel={`${tokenBalance} tokens`}
               >
                 <View style={styles.tokenIcon}>
                   <View style={styles.tokenIconDot} />
                 </View>
-                <Text style={styles.tokenCount}>25</Text>
+                <Text style={styles.tokenCount}>{tokenBalance}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -186,33 +203,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         <View style={styles.sectionTitleRow}>
           <Text style={styles.homeSectionTitle}>YOUR ITEMS</Text>
+          <HomeSortMenu
+            sortOrder={sortOrder}
+            statusFilter={statusFilter}
+            kindFilter={kindFilter}
+            availableKinds={presentKinds}
+            onSortChange={setSortOrder}
+            onStatusChange={setStatusFilter}
+            onKindChange={setKindFilter}
+          />
         </View>
-
-        {showFilters && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-            style={styles.filterScroll}
-          >
-            {(['all', ...presentKinds] as const).map(opt => {
-              const isActive = activeFilter === opt
-              const label    = opt === 'all' ? 'All' : KIND_LABELS[opt as HomeItemKind]
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.filterChip, isActive && styles.filterChipActive]}
-                  onPress={() => setActiveFilter(opt)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </ScrollView>
-        )}
 
         <View style={styles.fundsList}>
           {isLoading && homeItems.length === 0 && (
@@ -231,7 +231,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           {!isLoading && !loadError && homeItems.length === 0 && (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>Nothing here yet</Text>
-              <Text style={styles.emptyText}>Create your own fund or join one with an invite code.</Text>
+              <Text style={styles.emptyText}>Create something new, or join a fund or event with an invite code.</Text>
               <View style={styles.emptyActions}>
                 <TouchableOpacity
                   style={styles.emptyPrimaryBtn}
@@ -239,7 +239,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   onPress={() => navigation.navigate('CreateFund')}
                 >
                   <Ionicons name="add" size={16} color="#FFFFFF" />
-                  <Text style={styles.emptyPrimaryBtnText}>Create Fund</Text>
+                  <Text style={styles.emptyPrimaryBtnText}>Create</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.emptySecondaryBtn}
@@ -249,13 +249,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   <Ionicons name="link-outline" size={16} color={colors.primary} />
                   <Text style={styles.emptySecondaryBtnText}>Join Fund</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.emptySecondaryBtn}
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('JoinEvent')}
+                >
+                  <Ionicons name="ticket-outline" size={16} color={colors.primary} />
+                  <Text style={styles.emptySecondaryBtnText}>Join Event</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
 
           {!isLoading && !loadError && homeItems.length > 0 && filteredItems.length === 0 && (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>{normalizedSearch ? 'No results' : `No ${activeFilter === 'all' ? '' : KIND_LABELS[activeFilter as HomeItemKind]} items`}</Text>
+              <Text style={styles.emptyTitle}>{normalizedSearch ? 'No results' : `No ${selectedFilterLabel} items`}</Text>
               <Text style={styles.emptyText}>{normalizedSearch ? `Nothing matches “${searchQuery.trim()}”.` : 'Nothing matches this filter.'}</Text>
             </View>
           )}
@@ -432,35 +440,6 @@ function makeStyles(colors: AppColors) {
       fontWeight: '900',
       letterSpacing: 2,
       color: colors.textMuted,
-    },
-    filterScroll: {
-      marginBottom: 14,
-      marginHorizontal: -20,
-    },
-    filterRow: {
-      paddingHorizontal: 20,
-      gap: 8,
-      flexDirection: 'row',
-    },
-    filterChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    filterChipActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    filterChipText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.textSecondary,
-    },
-    filterChipTextActive: {
-      color: '#FFFFFF',
     },
     fundsList: {
       gap: 16,

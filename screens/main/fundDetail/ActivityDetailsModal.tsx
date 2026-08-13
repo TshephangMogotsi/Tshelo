@@ -17,6 +17,7 @@ type RelatedRecord = Record<string, unknown> | null
 
 const LABELS: Record<string, string> = {
   contributor_name: 'Contributor', description: 'Item', vendor_name: 'Vendor', amount: 'Amount',
+  pledged_amount: 'Pledged amount',
   category: 'Category', payment_method: 'Payment method', reference_number: 'Reference',
   receipt_number: 'Receipt number', receipt_url: 'Receipt', status: 'Status', is_refunded: 'Refunded',
   role: 'Role', name: 'Member', title: 'Fund name', goal_amount: 'Goal',
@@ -42,7 +43,7 @@ export default function ActivityDetailsModal({ entry, actorName, currencyCode, o
     let active = true
     setIsLoading(true)
     const query = entry.entity_type === 'contribution'
-      ? supabase.from('contributions').select('contributor_name, amount, payment_method, reference_number, receipt_number, status, is_refunded, notes').eq('id', entry.entity_id).maybeSingle()
+      ? supabase.from('contributions').select('contributor_name, amount, pledged_amount, payment_method, reference_number, receipt_number, status, is_refunded, notes').eq('id', entry.entity_id).maybeSingle()
       : supabase.from('expenses').select('description, vendor_name, amount, category, receipt_url, related_contribution_id, related_expense_id, notes').eq('id', entry.entity_id).maybeSingle()
     query.then(({ data }) => {
       if (!active) return
@@ -59,7 +60,7 @@ export default function ActivityDetailsModal({ entry, actorName, currencyCode, o
 
   function value(key: string, raw: unknown) {
     if (raw === null || raw === undefined || raw === '') return '—'
-    if (key === 'amount' || key === 'goal_amount') return formatMoney(Number(raw), currencyCode)
+    if (key === 'amount' || key === 'goal_amount' || key === 'pledged_amount') return formatMoney(Number(raw), currencyCode)
     if (typeof raw === 'boolean') return raw ? 'Yes' : 'No'
     return String(raw)
   }

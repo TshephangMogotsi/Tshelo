@@ -50,3 +50,19 @@ export function getInitials(value: string) {
 
   return initials || '?'
 }
+
+export function suggestedEventFundName(eventName: string, eventTypeLabel: string): string {
+  const trimmedEventName = eventName.trim()
+  const fallbackEventName = `${eventTypeLabel.trim() || 'Event'} Event`
+  return `${trimmedEventName || fallbackEventName} Fund`
+}
+
+export function shouldSyncSuggestedFundName(
+  currentFundName: string,
+  previousEventName: string,
+  eventTypeLabel: string,
+): boolean {
+  const trimmedFundName = currentFundName.trim()
+  return !trimmedFundName
+    || trimmedFundName === suggestedEventFundName(previousEventName, eventTypeLabel)
+}

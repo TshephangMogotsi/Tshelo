@@ -15,42 +15,36 @@ export type DetectedSms = {
   senderPhone: string | null
   provider:    MobileMoneyProvider | null
   reference:   string | null
-  smsBody:     string
   receivedAt:  string        // ISO timestamp
+  detectionKey?: string      // stable identity used to prevent double-recording
 }
 
-// ⚠️ Test scaffold alongside the real parser: "Hello Tshelo" (optionally
-// "Hello Tshelo 350") simulates a received payment — P200 by default —
-// so the flow can be exercised without a real mobile-money SMS.
-const TEST_TRIGGER = /hello\s+tshelo(?:\s+(\d+(?:\.\d{1,2})?))?/i
+export function getDetectedSmsKey(detected: DetectedSms): string {
+  if (detected.detectionKey) return detected.detectionKey
+  return [
+    'sms',
+    detected.receivedAt,
+    detected.provider ?? 'unknown',
+    detected.reference ?? 'no-reference',
+    detected.senderPhone ?? detected.senderName ?? 'unknown-sender',
+    detected.amount.toFixed(2),
+  ].map(encodeURIComponent).join('|')
+}
 
 export function detectMoneyIn(sender: string, body: string): DetectedSms | null {
   const receivedAt = new Date().toISOString()
 
   const parsed = parseMobileMoneySms(body, sender)
   if (parsed && parsed.direction === 'received') {
-    return {
+    const detected: DetectedSms = {
       amount:      parsed.amount,
       senderName:  parsed.counterpartyName,
       senderPhone: parsed.counterpartyPhone,
       provider:    parsed.provider,
       reference:   parsed.reference,
-      smsBody:     body,
       receivedAt,
     }
-  }
-
-  const test = body.match(TEST_TRIGGER)
-  if (test) {
-    return {
-      amount:      test[1] ? parseFloat(test[1]) : 200,
-      senderName:  null,
-      senderPhone: sender || null,
-      provider:    null,
-      reference:   null,
-      smsBody:     body,
-      receivedAt,
-    }
+    return { ...detected, detectionKey: getDetectedSmsKey(detected) }
   }
 
   return null
@@ -61,23 +55,28 @@ export function describeSender(detected: DetectedSms) {
 }
 
 async function notifyDetected(detected: DetectedSms, userId: string) {
+  if (!userId) return
+  const normalized = { ...detected, detectionKey: getDetectedSmsKey(detected) }
   const via = detected.provider ? ` via ${PROVIDER_LABELS[detected.provider]}` : ''
   const title = `P${detected.amount.toLocaleString('en-BW')} received 💰`
   const body  = `From ${describeSender(detected)}${via}. Tap to add it to a fund or event.`
 
-  await Notifications.scheduleNotificationAsync({
-    content: { title, body, data: { detectedSms: detected } },
-    trigger: null, // fire immediately
+  // Create the in-app row through a server-owned function first, so both the
+  // system notification and Notifications screen carry the same record ID.
+  const { data: notificationId } = await supabase.rpc('create_sms_detected_notification', {
+    p_detected: normalized,
   })
 
-  // Also land in the in-app notifications list for anyone who missed the
-  // banner. suppress_push tells send-push not to notify a second time.
-  await supabase.from('notifications').insert({
-    user_id: userId,
-    type:    'sms_detected',
-    title,
-    body,
-    data:    { detectedSms: detected, suppress_push: true },
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      data: {
+        detectedSms: normalized,
+        ...(typeof notificationId === 'string' ? { notificationId } : {}),
+      },
+    },
+    trigger: null, // fire immediately
   })
 }
 

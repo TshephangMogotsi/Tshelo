@@ -19,11 +19,15 @@
       "bundleIdentifier": "com.datasentinels.tshelo",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCalendarsUsageDescription": "Allow Tshelo to open your calendar so you can review and add event dates.",
+        "NSCalendarsFullAccessUsageDescription": "Allow Tshelo to open your calendar so you can review and add event dates.",
+        "NSRemindersUsageDescription": "Tshelo does not access reminders; this declaration is required by the system calendar editor.",
+        "NSRemindersFullAccessUsageDescription": "Tshelo does not access reminders; this declaration is required by the system calendar editor."
       }
     },
     "android": {
-      "googleServicesFile": "./googlnge e-services.json",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"

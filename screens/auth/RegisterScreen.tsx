@@ -10,6 +10,7 @@ import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../context/ThemeContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
+import { openLegalDocument } from '../../lib/legalDocuments'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
@@ -167,9 +168,15 @@ export default function RegisterScreen({ navigation, route }: Props) {
             </View>
             <Text style={[styles.consentText, { color: mutedCol }]}>
               I agree to Tshelo's{' '}
-              <Text style={styles.consentLink}>Terms of Service</Text>
+              <Text
+                style={styles.consentLink}
+                onPress={event => { event.stopPropagation(); void openLegalDocument('terms') }}
+              >Terms of Service</Text>
               {' '}and{' '}
-              <Text style={styles.consentLink}>Privacy Policy</Text>
+              <Text
+                style={styles.consentLink}
+                onPress={event => { event.stopPropagation(); void openLegalDocument('privacy') }}
+              >Privacy Policy</Text>
               , and consent to processing of my mobile money information.
             </Text>
           </TouchableOpacity>

@@ -23,3 +23,41 @@ the baseline.
 `supabase/seed.sql` holds reference/config rows (`event_type_config`,
 `token_products`) so a rebuilt database is usable, not just structurally
 correct.
+
+## Security hardening deployment (2026-07-22)
+
+`20260722090000_security_hardening.sql` closes client-side membership and
+profile escalation paths, privatizes receipt storage, and disables the old
+push trigger whose credential was committed historically.
+
+Before deploying it:
+
+1. Confirm `supabase migration list` is aligned. The historical timestamp drift
+   was reconciled on 2026-07-22 against the migration SQL stored in production.
+2. Rotate `PUSH_WEBHOOK_SECRET` and deploy the hardened `send-push` and
+   `parse-receipt` functions.
+3. For the internal beta, validate the SQL inside a rolled-back transaction
+   against the live schema, then deploy it in a controlled backend-first window.
+   Use a separate branch/environment later when preparing for public testing.
+4. Recreate `send-push` as a dashboard-managed Database Webhook using the new
+   secret. The migration deliberately drops the insecure SQL trigger.
+5. Verify public/private joins, owner/admin/member permissions, receipt scans,
+   receipt access, and push delivery end to end.
+
+## Granular fund administration deployment (2026-08-12)
+
+The granular administration sequence is:
+
+- `20260812155000_fund_admin_permission_foundation.sql`
+- `20260812160000_enforce_fund_admin_permissions.sql`
+- `20260812170000_retire_legacy_fund_admin_authorization.sql`
+
+All three are deployed to the linked project. A post-deployment dry run reported
+the remote database up to date. Aggregate inspection showed 11 active permission
+definitions and 22 grant rows, matching two backward-compatible full-admin
+grant sets at rollout time.
+
+The final migration keeps `admin` as a relationship label and grant
+qualification, but removes it as a standalone operational authorization path.
+See `docs/granular-admin-rollout.md` for smoke tests, audit queries, and rollback
+posture.

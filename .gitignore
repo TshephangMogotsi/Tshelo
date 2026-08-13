@@ -49,3 +49,8 @@ yarn-error.*
 
 # Supabase CLI temp files
 supabase/.temp/
+
+# Local reports, renders, and native module build artifacts
+/output/
+/tmp/
+/modules/sms-listener/android/build/

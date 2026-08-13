@@ -1,4 +1,4 @@
-import { Image } from 'react-native'
+import { Image, View } from 'react-native'
 
 const LOGOS: Record<string, number> = {
   orange_money: require('../assets/mobile_money_providers_logos/orange_money_logo.png'),
@@ -27,12 +27,28 @@ type Props = {
   width?: number
   // kept for call-site compatibility — logos are always rendered bare now
   plain?: boolean
+  variant?: 'wordmark' | 'mark'
 }
 
-export default function ProviderLogo({ provider, size = 34, width }: Props) {
+export default function ProviderLogo({ provider, size = 34, width, variant = 'wordmark' }: Props) {
   if (!provider || !(provider in LOGOS)) return null
 
   const ratio = ASPECT_RATIO[provider]
+  if (variant === 'mark') {
+    const markBackground = provider === 'myzaka' ? '#FFE100' : '#FFFFFF'
+    const imageStyle = provider === 'smega'
+      ? { width: size * ratio, height: size, left: 0, top: 0 }
+      : provider === 'orange_money'
+        ? { width: size * 1.88, height: size * 0.5, left: 0, top: size * 0.25 }
+        : { width: size * 0.84, height: size * 0.28, left: size * 0.08, top: size * 0.36 }
+
+    return (
+      <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: markBackground }}>
+        <Image source={LOGOS[provider]} style={[{ position: 'absolute' }, imageStyle]} resizeMode="contain" />
+      </View>
+    )
+  }
+
   // Precompute both dimensions as plain numbers rather than leaning on the
   // `aspectRatio` layout property with only one side pinned — that combo is
   // unreliable inside a flex row (the derived side can resolve before the

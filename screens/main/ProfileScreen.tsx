@@ -24,7 +24,7 @@ function initials(name: string) {
 
 export default function ProfileScreen({ navigation }: { navigation: any }) {
   const { colors, isDark, preference, setPreference } = useTheme()
-  const { userId, tokenBalance, refreshProfile, signOut } = useAuth()
+  const { userId, tokenBalance, trustScore, refreshProfile, signOut } = useAuth()
   const styles = makeStyles(colors)
 
   const [profile,     setProfile]     = useState<ProfileData>({ name: '', email: '', phone: '' })
@@ -173,7 +173,9 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <Text style={styles.sectionLabel}>Account</Text>
         <View style={styles.section}>
           <SettingsRow icon="person-outline"            label="Edit Profile"   onPress={openEdit} />
-          <SettingsRow icon="cash-outline"              label="Buy Tokens"     onPress={() => navigation.navigate('TokenPurchase')} />
+          <SettingsRow icon="shield-checkmark-outline"  label="Trust & Achievements" value={`${trustScore}/100`} onPress={() => navigation.navigate('Rewards')} />
+          <SettingsRow icon="ribbon-outline"            label="Rich Auntie Status" onPress={() => navigation.navigate('RichAuntieStatus')} />
+          <SettingsRow icon="cash-outline"              label="Buy Tokens" value={`${tokenBalance} tokens`} onPress={() => navigation.navigate('TokenPurchase')} />
           <SettingsRow icon="shield-checkmark-outline"  label="Security"       onPress={() => {}} />
         </View>
 

@@ -3175,7 +3175,8 @@ CREATE TRIGGER trg_notify_fund_member_update AFTER UPDATE ON public.fund_members
 CREATE TRIGGER tr_funds_create_allowances AFTER INSERT ON public.funds FOR EACH ROW EXECUTE FUNCTION trigger_create_fund_allowances();
 CREATE TRIGGER tr_funds_generate_code BEFORE INSERT ON public.funds FOR EACH ROW EXECUTE FUNCTION trigger_generate_fund_code();
 CREATE TRIGGER tr_funds_updated_at BEFORE UPDATE ON public.funds FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER "send-push" AFTER INSERT ON public.notifications FOR EACH ROW EXECUTE FUNCTION supabase_functions.http_request('https://albihofmlafjzbusancu.supabase.co/functions/v1/send-push', 'POST', '{"Content-type":"application/json","x-webhook-secret":"0ed4ae7b5b6b08ed6bc386dc8e7db8e3493e36dccaeaa17a"}', '{}', '5000');
+-- The production push webhook is dashboard-managed. Never embed its shared
+-- secret in a migration or database trigger definition.
 CREATE TRIGGER tr_organizations_updated_at BEFORE UPDATE ON public.organizations FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER tr_recurring_groups_updated_at BEFORE UPDATE ON public.recurring_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER tr_support_tickets_number BEFORE INSERT ON public.support_tickets FOR EACH ROW EXECUTE FUNCTION trigger_generate_ticket_number();

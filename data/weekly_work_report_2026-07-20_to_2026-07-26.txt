@@ -1,0 +1,230 @@
+TSHELO WEEKLY WORK REPORT — 2026-07-20 TO 2026-07-26
+=====================================================
+
+Prepared: Monday, 2026-07-27
+Reporting period: Monday, 2026-07-20 to Sunday, 2026-07-26
+
+EXECUTIVE SUMMARY
+-----------------
+
+The week focused on strengthening Tshelo's financial integrity and security,
+then building the next layer of member-facing fund functionality.
+
+Eight dated database migrations were authored across 22-24 July. The work
+introduced secure pledge tracking, stable contributor identities, atomic
+Event + Fund creation, duplicate-safe SMS contribution recording, controlled
+event deletion, member pledge notifications, and the Rich Auntie sponsorship
+and recognition flow.
+
+The mobile application was updated alongside the database so organisers and
+members can use the new workflows. Reporting, notifications, receipt parsing,
+token balances, home sorting, and sponsored-expense accounting were also
+updated to match the new backend rules.
+
+Important history note: no Git commits were created during this reporting
+period. The work is evidenced by the dated migration files and the current
+working tree, but it remains mixed with other uncommitted changes.
+
+
+1. SECURITY HARDENING AND DELIVERY CONTROLS
+-------------------------------------------
+
+- Closed global fund-discovery and membership-management paths that could
+  expose funds or allow unsafe client-side state changes.
+- Restricted server-owned user profile, token ledger, notification, and
+  financial fields from direct client mutation.
+- Increased fund invitation-code entropy and routed joins through authorised
+  server functions.
+- Made receipt storage private and added authenticated, fund-scoped receipt
+  access.
+- Added receipt-parsing rate limits and request/image-size validation.
+- Hardened the push-notification function so it fails closed when its webhook
+  secret is missing, rejects unexpected webhook events, limits payload sizes,
+  and validates notification content.
+- Migrated persisted native authentication sessions from AsyncStorage to
+  iOS Keychain/Android Keystore through Expo SecureStore, while preserving a
+  one-time migration path for existing sessions.
+- Added a GitHub Actions verification workflow for typechecking, tests, and
+  high-severity dependency audits.
+- Added Dependabot coverage for npm packages and GitHub Actions.
+- Added automated security-invariant tests covering the migrations and
+  sensitive application flows.
+
+Primary migration:
+  20260722090000_security_hardening.sql
+
+
+2. PLEDGE TRACKING AND CONTRIBUTOR IDENTITY
+-------------------------------------------
+
+- Separated the amount promised from the amount ultimately received by adding
+  a preserved pledged amount to contribution records.
+- Added separate "Pledge" and "Received" entry modes.
+- Restricted members to recording their own pledges while fund owners/admins
+  remain responsible for confirming received money.
+- Added partial-payment support and pledge balances showing pledged, received,
+  outstanding, and fulfilled states.
+- Introduced stable, fund-scoped contributor profiles for both members and
+  guests without granting guest contributors access to the fund.
+- Added payment-to-pledge allocations, including safe automatic matching when
+  there is one unambiguous open pledge.
+- Added organiser reconciliation support when more than one pledge could
+  receive a payment.
+- Updated fund detail rows, contribution editing, reports, CSV/PDF output,
+  activity views, and fund summaries to show pledge and payment state.
+- Updated notifications so pledges are clearly described as promises rather
+  than cash already received.
+
+Primary migrations:
+  20260722143000_pledge_tracking.sql
+  20260722220000_pledge_member_notifications.sql
+  20260722230000_contributor_identity_and_pledge_allocations.sql
+
+
+3. ATOMIC EVENT + FUND CREATION AND TOKEN ACCOUNTING
+----------------------------------------------------
+
+- Replaced the incomplete Event + Fund client flow with a server-owned
+  transaction that creates the event, creates the fund, links both records,
+  stores the event budget, records organiser invitations, and charges the
+  immutable token ledger together.
+- Added rollback protection so partial Event + Fund records are not left
+  behind if any step fails.
+- Added one-time beta token grants and surfaced the real server-owned token
+  balance in the app.
+- Added organiser invitation responses through a controlled server function.
+- Updated the notification screen so invited organisers can accept or decline
+  invitations and open the resulting fund.
+- Updated event/fund UI to show budgets separately from fund goals.
+- Refreshed the Home token balance whenever the screen regains focus.
+
+Primary migration:
+  20260722170000_event_fund_transaction_and_beta_tokens.sql
+
+
+4. DUPLICATE-SAFE SMS CONTRIBUTION RECORDING
+--------------------------------------------
+
+- Added a stable detection key for SMS-detected payments.
+- Enforced database uniqueness so the same detected payment can be recorded
+  at most once.
+- Moved contribution recording and notification-response updates into one
+  server-owned transaction.
+- Updated notification deep links to detect already-recorded payments and
+  route users to the correct fund instead of offering to record them again.
+- Removed raw SMS-body persistence from the financial record; message text is
+  used only for on-device review and provider detection.
+- Expanded SMS watcher tests and notification state handling.
+
+Primary migration:
+  20260722190000_sms_contribution_idempotency.sql
+
+
+5. SAFE EVENT DELETION
+----------------------
+
+- Added creator-only soft deletion for standalone events.
+- Prevented linked Event + Fund records from being deleted through the
+  standalone event path.
+- Kept event, fund, ledger, reports, and relationship records from becoming
+  orphaned.
+- Updated the Event Detail screen so the delete action is shown only when the
+  current user and event type satisfy the server rules.
+
+Primary migration:
+  20260722203000_event_only_deletion.sql
+
+
+6. RICH AUNTIE SPONSORSHIP AND RECOGNITION
+------------------------------------------
+
+- Added organiser-created sponsorship items that divide an existing fund goal
+  into specific needs such as catering, outfits, transport, or a tent.
+- Allowed one joined fund member to claim an available item.
+- Added instalment support by allocating confirmed, non-refunded payments to
+  the claimed item until its full value is funded.
+- Added a direct-purchase path for cases where the member buys the item instead
+  of paying money into the fund.
+- Kept direct sponsored purchases visible without incorrectly reducing the
+  fund's cash balance.
+- Added server checks for fund limits, claim ownership, payment ownership,
+  allocation totals, release eligibility, and completion state.
+- Added organiser award reasons, custom recognition text, optional links to
+  completed sponsored items, and optional member notification.
+- Added Member Details, Award Rich Auntie, celebration, status, and sponsorship
+  board screens.
+- Added notification deep links from an award to the celebration and status
+  experience.
+- Added shareable status, award history, cash/funds-helped statistics, and
+  automatic Consistent Contributor recognition.
+
+Primary migration:
+  20260724120000_rich_auntie_sponsorship_flow.sql
+
+Deployment note:
+  The feature was developed during the reporting period. Its migration was
+  deployed and confirmed in the linked Supabase project on Monday 2026-07-27
+  during final release-readiness work.
+
+
+7. HOME, REPORTING, AND ACCOUNTING IMPROVEMENTS
+-----------------------------------------------
+
+- Added newest/oldest sorting on the Home screen.
+- Included event budgets and creation timestamps in Home items.
+- Removed sponsored direct purchases from fund cash-expense totals while
+  retaining them in the activity history.
+- Updated reports to distinguish pledged, received, outstanding, expenses,
+  and net balance.
+- Included pledges and contributor identity in CSV/PDF reporting.
+- Updated contribution and expense rows to show sponsored and pledge-related
+  context.
+- Improved error handling and refresh behaviour across Home, Reports,
+  Notifications, contribution entry, and fund detail.
+
+
+8. VALIDATION STATUS
+--------------------
+
+At the end-of-week code state:
+
+- TypeScript validation passed.
+- All 66 existing automated tests passed.
+- Security, provider, SMS parser/watcher, Home helper, and create-fund format
+  suites were green.
+- Database changes through 20260722230000 were present in remote migration
+  history.
+- The Rich Auntie migration was ready locally and was deployed the following
+  Monday.
+
+Following Monday's Rich Auntie completion work increased the suite to 71
+passing tests and produced a successful production iOS bundle export.
+
+
+9. OUTSTANDING FOLLOW-UP / DELIVERY RISKS
+-----------------------------------------
+
+- The week's work is not represented by Git commits and is mixed into a large
+  uncommitted working tree. It should be separated and committed carefully
+  without sweeping unrelated files into one commit.
+- Run a final two-account physical-device test covering organiser/member
+  permissions, pledge allocation, direct sponsorship purchases, Rich Auntie
+  awards, and notification deep links.
+- Confirm the hardened send-push and parse-receipt Edge Functions are deployed
+  with the required production secrets.
+- Confirm the dashboard-managed notifications webhook uses the rotated
+  PUSH_WEBHOOK_SECRET and delivers real push notifications.
+- Continue validating Orange Money, MyZaka, and Smega parsing rules against
+  real provider messages before treating every SMS format as production-final.
+
+
+CLIENT-FACING SUMMARY
+---------------------
+
+This week moved Tshelo from basic fund record-keeping toward a more controlled
+and complete contribution platform. Members can now make pledges, organisers
+can track partial and completed payments accurately, Event + Fund creation is
+transaction-safe, detected payments cannot be recorded twice, and sponsored
+items can be tracked from commitment through purchase. The Rich Auntie feature
+adds a celebratory recognition layer without weakening the underlying
+accounting controls.

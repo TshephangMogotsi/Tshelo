@@ -1,0 +1,195 @@
+diff --git a/node_modules/confetti-cannon-burst-rn-expo/lib/ConfettiBurst.js b/node_modules/confetti-cannon-burst-rn-expo/lib/ConfettiBurst.js
+index b49171e..c663ce6 100644
+--- a/node_modules/confetti-cannon-burst-rn-expo/lib/ConfettiBurst.js
++++ b/node_modules/confetti-cannon-burst-rn-expo/lib/ConfettiBurst.js
+@@ -23,7 +23,6 @@ export function ConfettiBurst({ id, count, colors, shapes, minSize, maxSize, min
+             const fall = rand(minFallDuration, maxFallDuration);
+             const total = rise + fall;
+             const delay = rand(0, maxDelay);
+-            const holdDuration = Math.max(0, total - 120 - fadeDuration);
+             return Animated.sequence([
+                 Animated.delay(delay),
+                 Animated.parallel([
+@@ -56,26 +55,6 @@ export function ConfettiBurst({ id, count, colors, shapes, minSize, maxSize, min
+                         easing: Easing.linear,
+                         useNativeDriver: true,
+                     }),
+-                    // Fade in → hold → fade out
+-                    Animated.sequence([
+-                        Animated.timing(p.opacity, {
+-                            toValue: 1,
+-                            duration: 120,
+-                            easing: Easing.out(Easing.ease),
+-                            useNativeDriver: true,
+-                        }),
+-                        Animated.timing(p.opacity, {
+-                            toValue: 1,
+-                            duration: holdDuration,
+-                            useNativeDriver: true,
+-                        }),
+-                        Animated.timing(p.opacity, {
+-                            toValue: 0,
+-                            duration: fadeDuration,
+-                            easing: Easing.in(Easing.ease),
+-                            useNativeDriver: true,
+-                        }),
+-                    ]),
+                 ]),
+             ]);
+         });
+diff --git a/node_modules/confetti-cannon-burst-rn-expo/lib/PieceView.js b/node_modules/confetti-cannon-burst-rn-expo/lib/PieceView.js
+index 1f31c16..9593a00 100644
+--- a/node_modules/confetti-cannon-burst-rn-expo/lib/PieceView.js
++++ b/node_modules/confetti-cannon-burst-rn-expo/lib/PieceView.js
+@@ -1,10 +1,8 @@
+ import React from 'react';
+ import { Animated, StyleSheet, View } from 'react-native';
+-import Svg, { Circle, Polygon, Rect } from 'react-native-svg';
+ const AnimatedView = Animated.createAnimatedComponent(View);
+ export function PieceView({ piece }) {
+     const s = piece.size;
+-    const sz = s * 3;
+     const rotateStr = piece.rotate.interpolate({
+         inputRange: [0, 1],
+         outputRange: ['0deg', '720deg'],
+@@ -12,6 +10,10 @@ export function PieceView({ piece }) {
+     return (React.createElement(AnimatedView, { style: [
+             styles.piece,
+             {
++                width: s * 2.2,
++                height: s * 0.75,
++                borderRadius: 1,
++                backgroundColor: piece.color,
+                 opacity: piece.opacity,
+                 transform: [
+                     { translateX: piece.translateX },
+@@ -19,11 +21,7 @@ export function PieceView({ piece }) {
+                     { rotate: rotateStr },
+                 ],
+             },
+-        ] },
+-        React.createElement(Svg, { width: sz, height: sz },
+-            piece.shape === 'rect' && (React.createElement(Rect, { x: 0, y: s * 0.6, width: s * 2.2, height: s * 0.75, fill: piece.color, rx: 1 })),
+-            piece.shape === 'circle' && (React.createElement(Circle, { cx: s, cy: s, r: s * 0.8, fill: piece.color })),
+-            piece.shape === 'triangle' && (React.createElement(Polygon, { points: `${s},0 ${s * 2.2},${s * 1.8} 0,${s * 1.8}`, fill: piece.color })))));
++        ] }));
+ }
+ const styles = StyleSheet.create({
+     piece: {
+diff --git a/node_modules/confetti-cannon-burst-rn-expo/lib/utils.js b/node_modules/confetti-cannon-burst-rn-expo/lib/utils.js
+index 67b2d7c..3fd551f 100644
+--- a/node_modules/confetti-cannon-burst-rn-expo/lib/utils.js
++++ b/node_modules/confetti-cannon-burst-rn-expo/lib/utils.js
+@@ -17,7 +17,7 @@ export function buildPieces(count, colors, shapes, minSize, maxSize, screenWidth
+             translateX: new Animated.Value(spawnX),
+             translateY: new Animated.Value(screenHeight),
+             rotate: new Animated.Value(0),
+-            opacity: new Animated.Value(0),
++            opacity: new Animated.Value(1),
+         };
+     });
+ }
+diff --git a/node_modules/confetti-cannon-burst-rn-expo/src/ConfettiBurst.tsx b/node_modules/confetti-cannon-burst-rn-expo/src/ConfettiBurst.tsx
+index 6d1b2fb..1478843 100644
+--- a/node_modules/confetti-cannon-burst-rn-expo/src/ConfettiBurst.tsx
++++ b/node_modules/confetti-cannon-burst-rn-expo/src/ConfettiBurst.tsx
+@@ -45,7 +45,6 @@ export function ConfettiBurst({
+       const fall = rand(minFallDuration, maxFallDuration);
+       const total = rise + fall;
+       const delay = rand(0, maxDelay);
+-      const holdDuration = Math.max(0, total - 120 - fadeDuration);
+
+       return Animated.sequence([
+         Animated.delay(delay),
+@@ -79,26 +78,6 @@ export function ConfettiBurst({
+             easing: Easing.linear,
+             useNativeDriver: true,
+           }),
+-          // Fade in → hold → fade out
+-          Animated.sequence([
+-            Animated.timing(p.opacity, {
+-              toValue: 1,
+-              duration: 120,
+-              easing: Easing.out(Easing.ease),
+-              useNativeDriver: true,
+-            }),
+-            Animated.timing(p.opacity, {
+-              toValue: 1,
+-              duration: holdDuration,
+-              useNativeDriver: true,
+-            }),
+-            Animated.timing(p.opacity, {
+-              toValue: 0,
+-              duration: fadeDuration,
+-              easing: Easing.in(Easing.ease),
+-              useNativeDriver: true,
+-            }),
+-          ]),
+         ]),
+       ]);
+     });
+diff --git a/node_modules/confetti-cannon-burst-rn-expo/src/PieceView.tsx b/node_modules/confetti-cannon-burst-rn-expo/src/PieceView.tsx
+index 4205ada..ff2ccd9 100644
+--- a/node_modules/confetti-cannon-burst-rn-expo/src/PieceView.tsx
++++ b/node_modules/confetti-cannon-burst-rn-expo/src/PieceView.tsx
+@@ -1,6 +1,5 @@
+ import React from 'react';
+ import { Animated, StyleSheet, View } from 'react-native';
+-import Svg, { Circle, Polygon, Rect } from 'react-native-svg';
+ import { Piece } from './types';
+
+ const AnimatedView = Animated.createAnimatedComponent(View);
+@@ -11,8 +10,6 @@ interface Props {
+
+ export function PieceView({ piece }: Props) {
+   const s = piece.size;
+-  const sz = s * 3;
+-
+   const rotateStr = piece.rotate.interpolate({
+     inputRange: [0, 1],
+     outputRange: ['0deg', '720deg'],
+@@ -23,6 +20,10 @@ export function PieceView({ piece }: Props) {
+       style={[
+         styles.piece,
+         {
++          width: s * 2.2,
++          height: s * 0.75,
++          borderRadius: 1,
++          backgroundColor: piece.color,
+           opacity: piece.opacity,
+           transform: [
+             { translateX: piece.translateX },
+@@ -31,19 +32,7 @@ export function PieceView({ piece }: Props) {
+           ],
+         },
+       ]}
+-    >
+-      <Svg width={sz} height={sz}>
+-        {piece.shape === 'rect' && (
+-          <Rect x={0} y={s * 0.6} width={s * 2.2} height={s * 0.75} fill={piece.color} rx={1} />
+-        )}
+-        {piece.shape === 'circle' && (
+-          <Circle cx={s} cy={s} r={s * 0.8} fill={piece.color} />
+-        )}
+-        {piece.shape === 'triangle' && (
+-          <Polygon points={`${s},0 ${s * 2.2},${s * 1.8} 0,${s * 1.8}`} fill={piece.color} />
+-        )}
+-      </Svg>
+-    </AnimatedView>
++    />
+   );
+ }
+
+diff --git a/node_modules/confetti-cannon-burst-rn-expo/src/utils.ts b/node_modules/confetti-cannon-burst-rn-expo/src/utils.ts
+index e71cbf3..e080f58 100644
+--- a/node_modules/confetti-cannon-burst-rn-expo/src/utils.ts
++++ b/node_modules/confetti-cannon-burst-rn-expo/src/utils.ts
+@@ -29,7 +29,7 @@ export function buildPieces(
+       translateX: new Animated.Value(spawnX),
+       translateY: new Animated.Value(screenHeight),
+       rotate: new Animated.Value(0),
+-      opacity: new Animated.Value(0),
++      opacity: new Animated.Value(1),
+     };
+   });
+ }

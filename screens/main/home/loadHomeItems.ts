@@ -1,13 +1,15 @@
 import { supabase } from '../../../lib/supabase'
+import { fundMemberCount } from '../../../lib/fundMembers'
 import { HomeItem, MemberRole, labelFromValue } from './helpers'
 
 // Loads every fund/event card for the home screen. Throws on any query error.
 export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
-  // Get fund memberships, owned funds, and event co-organiser roles in parallel
+  // Get fund memberships, owned funds, and every event role in parallel.
   const [
     { data: myMemberships,     error: membershipsErr },
     { data: myOwnedFunds,      error: ownedFundsErr },
     { data: myEventOrgRows,    error: eventOrgErr },
+    { data: myEventGuestRows,  error: eventGuestErr },
   ] = await Promise.all([
     supabase
       .from('fund_members')
@@ -24,11 +26,16 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
       .select('event_id')
       .eq('user_id', userId)
       .not('status', 'in', '(left,removed)'),
+    supabase
+      .from('event_guests')
+      .select('event_id')
+      .eq('user_id', userId),
   ])
 
   if (membershipsErr) throw membershipsErr
   if (ownedFundsErr)  throw ownedFundsErr
   if (eventOrgErr)    throw eventOrgErr
+  if (eventGuestErr)  throw eventGuestErr
 
   // Merge member fund IDs + owned fund IDs (owned funds always visible even if fund_members row is missing)
   const memberFundIds  = new Set((myMemberships ?? []).map(m => m.fund_id))
@@ -44,10 +51,13 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
   })
 
   const coOrgEventIds  = (myEventOrgRows ?? []).map(r => r.event_id)
+  const guestEventIds  = (myEventGuestRows ?? []).map(r => r.event_id)
+  const relatedEventIds = [...new Set([...coOrgEventIds, ...guestEventIds])]
+  const coOrgEventIdSet = new Set(coOrgEventIds)
 
-  // Build event filter: events the user created OR is a co-organiser of
-  const eventFilter = coOrgEventIds.length > 0
-    ? `creator_id.eq.${userId},id.in.(${coOrgEventIds.join(',')})`
+  // Build event filter: events the user created, organises, or joined as a guest.
+  const eventFilter = relatedEventIds.length > 0
+    ? `creator_id.eq.${userId},id.in.(${relatedEventIds.join(',')})`
     : `creator_id.eq.${userId}`
 
   const [
@@ -65,7 +75,7 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
       : Promise.resolve({ data: [] as any[], error: null }),
     supabase
       .from('events')
-      .select('id, name, status, event_type, event_emoji, event_date, venue_name, linked_fund_id, created_at')
+      .select('id, creator_id, name, status, event_type, event_emoji, event_date, venue_name, linked_fund_id, created_at')
       .or(eventFilter)
       .is('deleted_at', null)
       .order('created_at', { ascending: false }),
@@ -83,14 +93,15 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
   const eventIds = (events ?? []).map(e => e.id)
 
   let contributions: { fund_id: string; amount: number | string }[] = []
-  let expenses:      { fund_id: string; amount: number | string }[] = []
+  let expenses:      { fund_id: string; amount: number | string; is_sponsored: boolean | null }[] = []
   let fundMembers:   { fund_id: string }[]                          = []
   let eventGuests:   { event_id: string; plus_ones: number | null }[] = []
+  let eventBudgets:  { event_id: string; total_budget: number | string; currency_code: string | null }[] = []
 
   if (fundIds.length > 0) {
     const [contribRes, expenseRes, memberRes] = await Promise.all([
       supabase.from('contributions').select('fund_id, amount').in('fund_id', fundIds).eq('status', 'confirmed').eq('is_refunded', false),
-      supabase.from('expenses').select('fund_id, amount').in('fund_id', fundIds).is('deleted_at', null),
+      supabase.from('expenses').select('fund_id, amount, is_sponsored').in('fund_id', fundIds).is('deleted_at', null),
       supabase.from('fund_members').select('fund_id').in('fund_id', fundIds).not('status', 'in', '(left,removed,declined,pending)'),
     ])
     if (contribRes.error) throw contribRes.error
@@ -102,16 +113,26 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
   }
 
   if (eventIds.length > 0) {
-    const guestRes = await supabase.from('event_guests').select('event_id, plus_ones').in('event_id', eventIds)
+    const [guestRes, budgetRes] = await Promise.all([
+      supabase.from('event_guests').select('event_id, plus_ones').in('event_id', eventIds),
+      supabase.from('event_budgets').select('event_id, total_budget, currency_code').in('event_id', eventIds),
+    ])
     if (guestRes.error) throw guestRes.error
-    eventGuests = guestRes.data ?? []
+    if (budgetRes.error) throw budgetRes.error
+    eventGuests  = guestRes.data  ?? []
+    eventBudgets = budgetRes.data ?? []
   }
 
   const contribByFund  = new Map<string, number>()
   contributions.forEach(c => contribByFund.set(c.fund_id, (contribByFund.get(c.fund_id) ?? 0) + Number(c.amount ?? 0)))
 
   const expenseByFund  = new Map<string, number>()
-  expenses.forEach(e => expenseByFund.set(e.fund_id, (expenseByFund.get(e.fund_id) ?? 0) + Number(e.amount ?? 0)))
+  expenses
+    .filter(expense => !expense.is_sponsored)
+    .forEach(expense => expenseByFund.set(
+      expense.fund_id,
+      (expenseByFund.get(expense.fund_id) ?? 0) + Number(expense.amount ?? 0),
+    ))
 
   const membersByFund  = new Map<string, number>()
   fundMembers.forEach(m => membersByFund.set(m.fund_id, (membersByFund.get(m.fund_id) ?? 0) + 1))
@@ -121,6 +142,8 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
     const size = 1 + Math.max(0, Number(g.plus_ones ?? 0))
     guestsByEvent.set(g.event_id, (guestsByEvent.get(g.event_id) ?? 0) + size)
   })
+
+  const budgetByEvent = new Map(eventBudgets.map(b => [b.event_id, b]))
 
   const eventById = new Map((events ?? []).map(e => [e.id, e]))
   const linkedEventByFundId = new Map<string, string>()
@@ -137,6 +160,8 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
     const kind   = linkedEvent ? 'eventFund' : 'fund'
     const total  = contribByFund.get(fund.id) ?? 0
     const spent  = expenseByFund.get(fund.id) ?? 0
+    const eventBudget = linkedEvent ? budgetByEvent.get(linkedEvent.id) : null
+    const fundGoal = Number(fund.goal_amount ?? 0)
 
     return {
       id:                  kind === 'eventFund' ? `eventFund-${linkedEvent!.id}-${fund.id}` : fund.id,
@@ -145,10 +170,14 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
       kind,
       title:               linkedEvent?.name ?? fund.title,
       status:              fund.status ?? 'active',
-      goal_amount:         Number(fund.goal_amount ?? 0),
+      goal_amount:         fundGoal,
+      budget_amount:       linkedEvent
+        ? eventBudget ? Number(eventBudget.total_budget) : null
+        : fundGoal > 0 ? fundGoal : null,
+      budget_currency_code: eventBudget?.currency_code ?? fund.currency_code ?? 'BWP',
       total_contributions: total,
       balance:             total - spent,
-      member_count:        membersByFund.get(fund.id) ?? 0,
+      member_count:        fundMemberCount(membersByFund.get(fund.id)),
       guest_count:         linkedEvent ? guestsByEvent.get(linkedEvent.id) ?? 0 : 0,
       role:                roleByFundId.get(fund.id) ?? 'member',
       event_date:          linkedEvent?.event_date ?? '',
@@ -156,29 +185,38 @@ export async function loadHomeItems(userId: string): Promise<HomeItem[]> {
       category:            kind === 'eventFund' ? 'Event + Fund' : labelFromValue(fund.fund_type),
       emoji:               linkedEvent?.event_emoji ?? fund.fund_emoji ?? '💜',
       currency_code:       fund.currency_code ?? 'BWP',
+      created_at:          linkedEvent?.created_at ?? fund.created_at,
     } as HomeItem
   })
 
   const eventItems: HomeItem[] = (events ?? [])
     .filter(e => !renderedEventIds.has(e.id))
-    .map(e => ({
-      id:                  e.id,
-      eventId:             e.id,
-      kind:                'event',
-      title:               e.name,
-      status:              e.status ?? 'active',
+    .map(e => {
+      const budget = budgetByEvent.get(e.id)
+      return {
+        id:                  e.id,
+        eventId:             e.id,
+        kind:                'event',
+        title:               e.name,
+        status:              e.status ?? 'active',
       goal_amount:         0,
-      total_contributions: 0,
-      balance:             0,
-      member_count:        0,
-      guest_count:         guestsByEvent.get(e.id) ?? 0,
-      role:                'organiser',
-      event_date:          e.event_date ?? '',
-      venue_name:          e.venue_name ?? '',
-      category:            labelFromValue(e.event_type),
-      emoji:               e.event_emoji ?? '🎉',
-      currency_code:       'BWP',
-    } as HomeItem))
+      // Event-only records focus on invitations and RSVPs. Legacy budgets stay
+      // in storage but are no longer presented as active event accounting.
+      budget_amount:       null,
+        budget_currency_code: budget?.currency_code ?? 'BWP',
+        total_contributions: 0,
+        balance:             0,
+        member_count:        0,
+        guest_count:         guestsByEvent.get(e.id) ?? 0,
+        role:                e.creator_id === userId || coOrgEventIdSet.has(e.id) ? 'organiser' : 'member',
+        event_date:          e.event_date ?? '',
+        venue_name:          e.venue_name ?? '',
+        category:            labelFromValue(e.event_type),
+        emoji:               e.event_emoji ?? '🎉',
+        currency_code:       budget?.currency_code ?? 'BWP',
+        created_at:          e.created_at,
+      } as HomeItem
+    })
 
   return [...fundItems, ...eventItems]
 }

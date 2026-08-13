@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Text, StyleSheet, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -17,6 +17,8 @@ import { parseReceipt, pickFromLibrary, takePhoto, uploadReceipt, type ParsedRec
 import ChooseMethodStep from './recordExpense/ChooseMethodStep'
 import ManualEntryStep, { PayerOption } from './recordExpense/ManualEntryStep'
 import ReviewStep, { ReviewItem } from './recordExpense/ReviewStep'
+import { useFundPermissions } from '../../lib/useFundPermissions'
+import LoadingOverlay from '../../components/LoadingOverlay'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'RecordExpense'>
@@ -31,7 +33,15 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   const requireOnline = useRequireOnline()
   const styles = makeStyles(colors)
 
-  const { fundId, fundTitle, currencyCode } = route.params
+  const {
+    fundId,
+    fundTitle,
+    currencyCode,
+    sponsorshipItemId,
+    sponsorshipItemTitle,
+    sponsorshipTargetAmount,
+    sponsorUserId,
+  } = route.params
   const currencySymbol = currencyCode === 'BWP' ? 'P' : currencyCode
 
   const [step, setStep]               = useState<Step>('choose')
@@ -45,9 +55,25 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   const [vendor, setVendor]           = useState('')
   const [category, setCategory]       = useState<CategoryOption | null>(null)
   const [location, setLocation]       = useState('')
-  const [description, setDescription] = useState('')
-  const [amountBWP, setAmountBWP]     = useState('')
-  const [paidBy, setPaidBy]           = useState('self')
+  const [description, setDescription] = useState(sponsorshipItemTitle ?? '')
+  const [amountBWP, setAmountBWP]     = useState(sponsorshipTargetAmount ? String(sponsorshipTargetAmount) : '')
+  const [paidBy, setPaidBy]           = useState(sponsorUserId ?? 'self')
+  const { can, isLoading: permissionsLoading } = useFundPermissions(fundId)
+  const canRecordExpense = can('record_expenses')
+  const canCompleteSponsorship = !sponsorshipItemId || can('manage_sponsorships')
+  const permissionAlerted = useRef(false)
+
+  useEffect(() => {
+    if (permissionsLoading || (canRecordExpense && canCompleteSponsorship) || permissionAlerted.current) return
+    permissionAlerted.current = true
+    Alert.alert(
+      'Expense access required',
+      sponsorshipItemId
+        ? 'You need expense and sponsorship permissions to record this purchase.'
+        : 'You do not have permission to record expenses for this fund.',
+      [{ text: 'Go back', onPress: () => navigation.goBack() }],
+    )
+  }, [canCompleteSponsorship, canRecordExpense, navigation, permissionsLoading, sponsorshipItemId])
 
   useEffect(() => {
     let active = true
@@ -72,10 +98,13 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
         }))
 
       setPayers(others)
+      if (sponsorUserId && others.some(payer => payer.userId === sponsorUserId)) {
+        setPaidBy(sponsorUserId)
+      }
     }
     loadPayers()
     return () => { active = false }
-  }, [fundId, userId])
+  }, [fundId, sponsorUserId, userId])
 
   const parsedAmount = parseFloat(amountBWP.replace(/,/g, ''))
   const amountValid  = !isNaN(parsedAmount) && parsedAmount > 0 && parsedAmount <= MAX_EXPENSE_BWP
@@ -100,7 +129,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
     setParsedReceipt(null)
     setStep('review')
     setIsParsing(true)
-    parseReceipt(uri)
+    parseReceipt(uri, fundId)
       .then(setParsedReceipt)
       .finally(() => setIsParsing(false))
   }
@@ -121,17 +150,28 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
     return true
   })
 
+  async function completeSponsorshipItem(expenseId: string | undefined) {
+    if (!sponsorshipItemId || !expenseId) return null
+    if (!can('manage_sponsorships')) return new Error('Sponsorship permission is required.')
+    const { error } = await supabase
+      .from('fund_sponsorship_items')
+      .update({
+        status: 'fulfilled',
+        linked_expense_id: expenseId,
+        fulfilled_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sponsorshipItemId)
+      .eq('fund_id', fundId)
+    return error
+  }
+
   async function handleSaveManual() {
-    if (!isManualValid || isSaving || !userId) return
+    if (!canRecordExpense || !canCompleteSponsorship || !isManualValid || isSaving || !userId) return
     if (!requireOnline()) return
     setIsSaving(true)
 
     try {
-      let receiptUrl: string | null = null
-      if (receiptUri) {
-        receiptUrl = await uploadReceipt(fundId, userId, receiptUri)
-      }
-
       const baseDescription = description.trim() || vendor.trim()
       const finalDescription = location.trim()
         ? `${baseDescription} · ${location.trim()}`
@@ -139,21 +179,35 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
 
       const payer = paidBy !== 'self' ? payers.find(p => p.id === paidBy) : null
 
-      const { error } = await supabase.from('expenses').insert({
-        fund_id:       fundId,
-        added_by:      userId,
-        description:   finalDescription,
-        vendor_name:   vendor.trim(),
-        amount:        parsedAmount,
-        currency_code: currencyCode,
-        ...(category   ? { category: category.value } : {}),
-        ...(receiptUrl ? { receipt_url: receiptUrl }  : {}),
-        ...(payer      ? { is_sponsored: true, sponsored_by_user_id: payer.userId, sponsored_by_name: payer.name } : {}),
-      })
+      const { data: savedExpense, error } = await supabase
+        .from('expenses')
+        .insert({
+          fund_id:       fundId,
+          added_by:      userId,
+          description:   finalDescription,
+          vendor_name:   vendor.trim(),
+          amount:        parsedAmount,
+          currency_code: currencyCode,
+          ...(category   ? { category: category.value } : {}),
+          ...(payer      ? { is_sponsored: true, sponsored_by_user_id: payer.userId, sponsored_by_name: payer.name } : {}),
+        })
+        .select('id')
+        .single()
 
       if (error) {
         hapticError()
         Alert.alert('Could not save expense', error.message)
+        return
+      }
+
+      const sponsorshipError = await completeSponsorshipItem(savedExpense?.id)
+      if (sponsorshipError) {
+        hapticError()
+        Alert.alert(
+          'Expense saved',
+          'The expense was recorded, but the sponsorship item could not be marked complete. Please try again from the fund.',
+        )
+        navigation.goBack()
         return
       }
 
@@ -168,7 +222,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   }
 
   async function handleSaveReview(shopName: string, includedItems: ReviewItem[]) {
-    if (isSaving || !userId) return
+    if (!canRecordExpense || !canCompleteSponsorship || isSaving || !userId) return
     setIsSaving(true)
 
     try {
@@ -177,6 +231,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
         receiptUrl = await uploadReceipt(fundId, userId, receiptUri)
       }
 
+      const payer = sponsorUserId ? payers.find(option => option.userId === sponsorUserId) : null
       const rows = includedItems.map(item => ({
         fund_id:       fundId,
         added_by:      userId,
@@ -189,13 +244,29 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
         currency_code: currencyCode,
         ...(item.category ? { category: item.category.value } : {}),
         ...(receiptUrl    ? { receipt_url: receiptUrl }        : {}),
+        ...(payer ? {
+          is_sponsored: true,
+          sponsored_by_user_id: payer.userId,
+          sponsored_by_name: payer.name,
+        } : {}),
       }))
 
-      const { error } = await supabase.from('expenses').insert(rows)
+      const { data: savedExpenses, error } = await supabase.from('expenses').insert(rows).select('id')
 
       if (error) {
         hapticError()
         Alert.alert('Could not save expense', error.message)
+        return
+      }
+
+      const sponsorshipError = await completeSponsorshipItem(savedExpenses?.[0]?.id)
+      if (sponsorshipError) {
+        hapticError()
+        Alert.alert(
+          'Expenses saved',
+          'The receipt was recorded, but the sponsorship item could not be marked complete. Please try again from the fund.',
+        )
+        navigation.goBack()
         return
       }
 
@@ -255,8 +326,6 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
               parsedAmount={parsedAmount}
               paidBy={paidBy}
               onPaidByChange={setPaidBy}
-              receiptUri={receiptUri}
-              onReceiptChange={setReceiptUri}
               isValid={isManualValid}
               onSave={handleSaveManual}
             />
@@ -275,6 +344,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      {permissionsLoading && <LoadingOverlay />}
     </SafeAreaView>
   )
 }

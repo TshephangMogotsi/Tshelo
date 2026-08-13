@@ -2,12 +2,20 @@ import { useEffect, useState } from 'react'
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFonts } from 'expo-font'
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
+import { Inter_400Regular_Italic } from '@expo-google-fonts/inter/400Regular_Italic'
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium'
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold'
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold'
+import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold'
+import { Inter_900Black } from '@expo-google-fonts/inter/900Black'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Notifications from 'expo-notifications'
 import * as SplashScreen from 'expo-splash-screen'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConnectivityProvider } from './context/ConnectivityContext'
+import { RewardsProvider } from './context/RewardsContext'
 import OfflineBanner from './components/OfflineBanner'
 import ErrorBoundary from './components/ErrorBoundary'
 import AuthNavigator from './navigation/AuthNavigator'
@@ -15,6 +23,8 @@ import MainNavigator from './navigation/MainNavigator'
 import OnboardingScreen from './screens/onboarding/OnboardingScreen'
 import { registerForPushNotificationsAsync } from './lib/pushNotifications'
 import { startSmsWatcher } from './lib/smsWatcher'
+import { supabase } from './lib/supabase'
+import { appLinking } from './navigation/linking'
 import type { MainStackParamList } from './navigation/types'
 
 const ONBOARDING_KEY = 'tshelo_onboarded_v1'
@@ -25,11 +35,36 @@ SplashScreen.setOptions({ fade: true, duration: 300 })
 
 export const navigationRef = createNavigationContainerRef<MainStackParamList>()
 
-function navigateFromNotificationData(data: Record<string, any> | undefined) {
+function openRewards() {
+  if (navigationRef.isReady()) navigationRef.navigate('Rewards')
+}
+
+async function navigateFromNotificationData(data: Record<string, any> | undefined) {
   if (!navigationRef.isReady()) return
+  if (data?.kind === 'reward_earned' || data?.kind === 'trust_level_changed') {
+    navigationRef.navigate('Rewards')
+    return
+  }
+  if (data?.kind === 'event_announcement' && typeof data.eventId === 'string') {
+    navigationRef.navigate('EventDetail', { eventId: data.eventId, tab: 'announcements' })
+    return
+  }
   const detected = data?.detectedSms
-  if (detected && typeof detected.amount === 'number' && typeof detected.smsBody === 'string') {
-    navigationRef.navigate('AssignContribution', { detected })
+  if (detected && typeof detected.amount === 'number' && typeof detected.receivedAt === 'string') {
+    const notificationId = typeof data?.notificationId === 'string' ? data.notificationId : undefined
+    if (notificationId) {
+      const { data: notification } = await supabase
+        .from('notifications')
+        .select('fund_id, response_action, data')
+        .eq('id', notificationId)
+        .maybeSingle()
+      const recordedFundId = notification?.fund_id ?? notification?.data?.recordedFundId
+      if (notification?.response_action === 'recorded' && typeof recordedFundId === 'string') {
+        if (navigationRef.isReady()) navigationRef.navigate('FundDetail', { fundId: recordedFundId })
+        return
+      }
+    }
+    if (navigationRef.isReady()) navigationRef.navigate('AssignContribution', { detected, notificationId })
     return
   }
   const fundId = data?.fundId
@@ -59,11 +94,11 @@ function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'Co
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then(response => {
-      if (response) navigateFromNotificationData(response.notification.request.content.data as any)
+      if (response) void navigateFromNotificationData(response.notification.request.content.data as any)
     })
 
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      navigateFromNotificationData(response.notification.request.content.data as any)
+      void navigateFromNotificationData(response.notification.request.content.data as any)
     })
 
     return () => subscription.remove()
@@ -78,6 +113,13 @@ export default function App() {
     'Fraunces-Regular':  require('./assets/fonts/Fraunces_72pt-Regular.ttf'),
     'Fraunces-SemiBold': require('./assets/fonts/Fraunces_72pt-SemiBold.ttf'),
     'Fraunces-Bold':     require('./assets/fonts/Fraunces_72pt-Bold.ttf'),
+    'Inter-Regular':      Inter_400Regular,
+    'Inter-Italic':       Inter_400Regular_Italic,
+    'Inter-Medium':       Inter_500Medium,
+    'Inter-SemiBold':     Inter_600SemiBold,
+    'Inter-Bold':         Inter_700Bold,
+    'Inter-ExtraBold':    Inter_800ExtraBold,
+    'Inter-Black':        Inter_900Black,
   })
 
   const [hasOnboarded,    setHasOnboarded]    = useState<boolean | null>(null)
@@ -116,23 +158,16 @@ export default function App() {
     )
   }
 
-  const linking = {
-    prefixes: ['tshelo://'],
-    config: {
-      screens: {
-        JoinFund: 'join/:code',
-      },
-    },
-  }
-
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <SafeAreaProvider>
           <ConnectivityProvider>
             <AuthProvider>
-              <NavigationContainer ref={navigationRef} linking={linking}>
-                <RootNavigator initialAuthRoute={initialAuthRoute} />
+              <NavigationContainer ref={navigationRef} linking={appLinking}>
+                <RewardsProvider onOpenRewards={openRewards}>
+                  <RootNavigator initialAuthRoute={initialAuthRoute} />
+                </RewardsProvider>
               </NavigationContainer>
               <OfflineBanner />
             </AuthProvider>

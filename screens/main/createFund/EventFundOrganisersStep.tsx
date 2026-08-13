@@ -9,6 +9,9 @@ import { BRAND_PURPLE, BRAND_PURPLE_DARK, PickedOrganiser } from './constants'
 type Props = {
   organiserSearch: string
   onOrganiserSearchChange: (text: string) => void
+  connectionResults: PickedOrganiser[]
+  isSearchingConnections: boolean
+  onAddConnection: (person: PickedOrganiser) => void
   pickedOrganisers: PickedOrganiser[]
   onAddFromContacts: () => void
   onRemoveOrganiser: (id: string) => void
@@ -19,6 +22,9 @@ type Props = {
 export default function EventFundOrganisersStep({
   organiserSearch,
   onOrganiserSearchChange,
+  connectionResults,
+  isSearchingConnections,
+  onAddConnection,
   pickedOrganisers,
   onAddFromContacts,
   onRemoveOrganiser,
@@ -46,6 +52,9 @@ export default function EventFundOrganisersStep({
             creatorName="You"
             search={organiserSearch}
             onSearchChange={onOrganiserSearchChange}
+            connectionResults={connectionResults}
+            isSearchingConnections={isSearchingConnections}
+            onAddConnection={onAddConnection}
             pickedOrganisers={pickedOrganisers}
             onAddFromContacts={onAddFromContacts}
             onRemoveOrganiser={onRemoveOrganiser}

@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView,
   StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
-import { useAuth } from '../../../context/AuthContext'
 import type { AppColors } from '../../../theme/themes'
 import { supabase } from '../../../lib/supabase'
 import { hapticError, hapticSuccess } from '../../../lib/haptics'
+import { FUND_PERMISSION_KEYS, type FundPermission } from '../../../lib/fundPermissions'
 import { makeCommonStyles } from '../recordExpense/common'
+import { isFundReadOnly } from './finance'
 import type { FundDetail, Member, MemberRole } from './types'
+import AdminPermissionEditorModal from './AdminPermissionEditorModal'
 
 type EditableFund = Pick<FundDetail, 'title' | 'goal_amount' | 'contribution_deadline' | 'is_private' | 'status'>
 
@@ -35,7 +37,6 @@ export default function FundSettingsModal({
   visible, fund, members, onClose, onFundSaved, onMemberRoleChanged, onClosed,
 }: Props) {
   const { colors } = useTheme()
-  const { userId } = useAuth()
   const common = makeCommonStyles(colors)
   const styles = makeStyles(colors)
   const [title, setTitle] = useState('')
@@ -43,7 +44,11 @@ export default function FundSettingsModal({
   const [deadline, setDeadline] = useState('')
   const [isPrivate, setIsPrivate] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [changingMemberId, setChangingMemberId] = useState<string | null>(null)
+  const [permissionMember, setPermissionMember] = useState<Member | null>(null)
+  const [permissionRows, setPermissionRows] = useState<Record<string, FundPermission[]>>({})
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
+  const [permissionLoadError, setPermissionLoadError] = useState<string | null>(null)
+  const readOnly = isFundReadOnly(fund.status)
 
   useEffect(() => {
     if (!visible) return
@@ -53,12 +58,43 @@ export default function FundSettingsModal({
     setIsPrivate(fund.is_private)
   }, [visible, fund.id])
 
+  const loadAdminPermissions = useCallback(async () => {
+    if (!visible) return
+    setIsLoadingPermissions(true)
+    setPermissionLoadError(null)
+    const { data, error } = await supabase.rpc('get_fund_admin_permissions', { p_fund_id: fund.id })
+    if (error) {
+      setIsLoadingPermissions(false)
+      setPermissionLoadError(error.message)
+      setPermissionMember(null)
+      Alert.alert('Could not load admin permissions', error.message)
+      return
+    }
+    const next: Record<string, FundPermission[]> = {}
+    for (const row of data ?? []) {
+      if (!row.member_id || !row.permission_key || !FUND_PERMISSION_KEYS.includes(row.permission_key as FundPermission)) continue
+      const current = next[row.member_id] ?? []
+      current.push(row.permission_key as FundPermission)
+      next[row.member_id] = current
+    }
+    setPermissionRows(next)
+    setIsLoadingPermissions(false)
+  }, [visible, fund.id])
+
+  useEffect(() => {
+    if (!visible) {
+      setPermissionMember(null)
+      return
+    }
+    void loadAdminPermissions()
+  }, [visible, loadAdminPermissions])
+
   const parsedGoal = goal ? Number(goal) : 0
   const isValid = title.trim().length >= 3 && Number.isFinite(parsedGoal) && parsedGoal >= 0 && validDate(deadline)
   const manageableMembers = members.filter(member => member.role !== 'owner')
 
   async function saveFund() {
-    if (!isValid || isSaving) return
+    if (!isValid || isSaving || readOnly) return
     setIsSaving(true)
     const changes = {
       title: title.trim(),
@@ -79,35 +115,36 @@ export default function FundSettingsModal({
     Alert.alert('Settings saved', 'The fund details have been updated.')
   }
 
-  async function changeRole(member: Member, role: MemberRole) {
-    if (changingMemberId) return
-    setChangingMemberId(member.id)
-    const { data, error } = await supabase.from('fund_members').update({
-      role,
-      promoted_by: role === 'admin' ? userId : null,
-      promoted_to_admin_at: role === 'admin' ? new Date().toISOString() : null,
-    }).eq('id', member.id).select('id')
-    setChangingMemberId(null)
-    if (error || !data?.length) {
-      Alert.alert('Could not change role', error?.message ?? 'Only the fund owner can manage admins.')
+  function openPermissionEditor(member: Member) {
+    if (readOnly) return
+    if (permissionLoadError) {
+      Alert.alert(
+        'Permissions unavailable',
+        'Reload the current permissions before making changes.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry', onPress: () => { void loadAdminPermissions() } },
+        ],
+      )
       return
     }
-    hapticSuccess()
-    onMemberRoleChanged(member.id, role)
+    setPermissionMember(member)
   }
 
-  function confirmRoleChange(member: Member) {
-    const nextRole: MemberRole = member.role === 'admin' ? 'member' : 'admin'
-    Alert.alert(
-      nextRole === 'admin' ? 'Make admin?' : 'Remove admin access?',
-      nextRole === 'admin'
-        ? `${member.display_name} will be able to record and edit contributions and expenses, and manage members.`
-        : `${member.display_name} will return to normal member access.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: nextRole === 'admin' ? 'Make Admin' : 'Remove Admin', onPress: () => changeRole(member, nextRole) },
-      ]
-    )
+  function handlePermissionsSaved(memberId: string, permissions: FundPermission[]) {
+    setPermissionRows(previous => ({ ...previous, [memberId]: permissions }))
+    onMemberRoleChanged(memberId, 'admin')
+    setPermissionMember(null)
+  }
+
+  function handleAdminRemoved(memberId: string) {
+    setPermissionRows(previous => {
+      const next = { ...previous }
+      delete next[memberId]
+      return next
+    })
+    onMemberRoleChanged(memberId, 'member')
+    setPermissionMember(null)
   }
 
   function confirmCloseFund() {
@@ -146,9 +183,14 @@ export default function FundSettingsModal({
               <TouchableOpacity onPress={onClose} style={styles.closeButton}><Text style={styles.closeText}>×</Text></TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {readOnly && (
+                <View style={styles.readOnlyNotice}>
+                  <Text style={styles.readOnlyNoticeText}>This fund is closed. Its settings and membership are read-only.</Text>
+                </View>
+              )}
               <Text style={styles.sectionTitle}>Fund details</Text>
               <Text style={styles.label}>Fund name</Text>
-              <TextInput style={[common.input, styles.inputSpacing]} value={title} onChangeText={setTitle} editable={!isSaving} maxLength={200} />
+              <TextInput style={[common.input, styles.inputSpacing]} value={title} onChangeText={setTitle} editable={!isSaving && !readOnly} maxLength={200} />
 
               <Text style={styles.label}>Goal amount</Text>
               <TextInput
@@ -158,7 +200,7 @@ export default function FundSettingsModal({
                 keyboardType="decimal-pad"
                 placeholder="0.00"
                 placeholderTextColor={colors.textMuted}
-                editable={!isSaving}
+                editable={!isSaving && !readOnly}
               />
 
               <Text style={styles.label}>Contribution deadline</Text>
@@ -170,7 +212,7 @@ export default function FundSettingsModal({
                 placeholderTextColor={colors.textMuted}
                 keyboardType="numbers-and-punctuation"
                 maxLength={10}
-                editable={!isSaving}
+                editable={!isSaving && !readOnly}
               />
 
               <View style={styles.privacyRow}>
@@ -178,29 +220,34 @@ export default function FundSettingsModal({
                   <Text style={styles.privacyTitle}>Private fund</Text>
                   <Text style={styles.privacyDescription}>Only approved members can view fund records.</Text>
                 </View>
-                <Switch value={isPrivate} onValueChange={setIsPrivate} disabled={isSaving} trackColor={{ true: colors.primary }} />
+                <Switch value={isPrivate} onValueChange={setIsPrivate} disabled={isSaving || readOnly} trackColor={{ true: colors.primary }} />
               </View>
 
               <TouchableOpacity
-                style={[common.primaryButton, styles.saveButton, isValid && !isSaving && common.buttonActive]}
+                style={[common.primaryButton, styles.saveButton, isValid && !isSaving && !readOnly && common.buttonActive]}
                 onPress={saveFund}
-                disabled={!isValid || isSaving}
+                disabled={!isValid || isSaving || readOnly}
               >
-                {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[common.primaryButtonText, isValid && common.primaryButtonTextActive]}>Save Fund Details</Text>}
+                {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[common.primaryButtonText, isValid && !readOnly && common.primaryButtonTextActive]}>{readOnly ? 'Fund details locked' : 'Save Fund Details'}</Text>}
               </TouchableOpacity>
 
-              <Text style={styles.sectionTitle}>Admins</Text>
+              <Text style={styles.sectionTitle}>Admins & permissions</Text>
+              <Text style={styles.adminIntro}>Choose a role preset or give each admin only the abilities they need.</Text>
               {manageableMembers.length === 0 ? <Text style={styles.emptyText}>No other members to manage.</Text> : manageableMembers.map(member => (
                 <View key={member.id} style={styles.memberRow}>
                   <View style={styles.memberBody}>
                     <Text style={styles.memberName}>{member.display_name}</Text>
-                    <Text style={styles.memberRole}>{member.role === 'admin' ? 'Admin' : 'Member'}</Text>
+                    <Text style={styles.memberRole}>{member.role === 'admin'
+                      ? isLoadingPermissions
+                        ? 'Loading permissions…'
+                        : `${permissionRows[member.id]?.length ?? 0} admin permissions`
+                      : 'Member'}</Text>
                   </View>
-                  {changingMemberId === member.id ? <ActivityIndicator color={colors.primary} /> : (
-                    <TouchableOpacity style={styles.roleButton} onPress={() => confirmRoleChange(member)}>
-                      <Text style={styles.roleButtonText}>{member.role === 'admin' ? 'Remove admin' : 'Make admin'}</Text>
+                  {!readOnly ? (
+                    <TouchableOpacity style={styles.roleButton} onPress={() => openPermissionEditor(member)}>
+                      <Text style={styles.roleButtonText}>{member.role === 'admin' ? 'Manage' : 'Make admin'}</Text>
                     </TouchableOpacity>
-                  )}
+                  ) : null}
                 </View>
               ))}
 
@@ -212,6 +259,15 @@ export default function FundSettingsModal({
           </View>
         </View>
       </KeyboardAvoidingView>
+      <AdminPermissionEditorModal
+        visible={Boolean(permissionMember)}
+        member={permissionMember}
+        initialPermissions={permissionMember ? permissionRows[permissionMember.id] ?? [] : []}
+        isLoading={isLoadingPermissions}
+        onClose={() => setPermissionMember(null)}
+        onSaved={handlePermissionsSaved}
+        onRemoved={handleAdminRemoved}
+      />
     </Modal>
   )
 }
@@ -221,6 +277,8 @@ function makeStyles(colors: AppColors) {
     flex: { flex: 1 },
     sheet: { maxHeight: '92%', minHeight: '70%' },
     header: { position: 'relative' },
+    readOnlyNotice: { borderRadius: 12, padding: 12, marginBottom: 16, backgroundColor: colors.background },
+    readOnlyNoticeText: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: colors.textSecondary },
     closeButton: { position: 'absolute', right: 0, top: -8, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
     closeText: { fontSize: 28, color: colors.textMuted },
     sectionTitle: { fontSize: 12, fontWeight: '900', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.7, marginTop: 8, marginBottom: 14 },
@@ -232,6 +290,7 @@ function makeStyles(colors: AppColors) {
     privacyTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
     privacyDescription: { marginTop: 3, fontSize: 12, color: colors.textMuted },
     saveButton: { marginBottom: 24 },
+    adminIntro: { marginTop: -7, marginBottom: 8, fontSize: 12, lineHeight: 17, color: colors.textMuted },
     memberRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     memberBody: { flex: 1 },
     memberName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },

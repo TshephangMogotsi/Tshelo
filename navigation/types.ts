@@ -78,16 +78,57 @@ export type MainStackParamList = {
   Tabs:                undefined
   CreateFund:          { isFirst?: boolean } | undefined
   JoinFund:            { code?: string } | undefined
-  FundDetail:          { fundId: string; tab?: 'contributions' | 'expenses' | 'members' }
-  EventDetail:         { eventId: string }
+  JoinEvent:           { code?: string } | undefined
+  FundDetail:          { fundId: string; tab?: 'contributions' | 'sponsorships' | 'expenses' | 'members' }
+  EventDetail:         {
+    eventId: string
+    tab?: 'guests' | 'announcements' | 'budget'
+    workspace?: 'event' | 'fund'
+    fundTab?: 'contributions' | 'sponsorships' | 'expenses' | 'members'
+  }
   GuestList:           { eventId: string }
   EventBudget:         { eventId: string }
-  RecordContribution:  { fundId: string; fundTitle: string; currencyCode: string }
-  AssignContribution:  { detected: import('../lib/smsWatcher').DetectedSms }
-  RecordExpense:       { fundId: string; fundTitle: string; currencyCode: string }
+  RecordContribution:  {
+    fundId: string
+    fundTitle: string
+    currencyCode: string
+    initialMode?: 'pledge' | 'received'
+    sponsorshipItemId?: string
+    sponsorUserId?: string
+  }
+  AssignContribution:  { detected: import('../lib/smsWatcher').DetectedSms; notificationId?: string }
+  RecordExpense:       {
+    fundId: string
+    fundTitle: string
+    currencyCode: string
+    sponsorshipItemId?: string
+    sponsorshipItemTitle?: string
+    sponsorshipTargetAmount?: number
+    sponsorUserId?: string
+  }
   TokenPurchase:       undefined
   Support:             undefined
   Settings:            undefined
   Notifications:       undefined
+  MemberDetails:       {
+    fundId: string
+    fundTitle: string
+    currencyCode: string
+    memberId: string
+    memberUserId: string
+    memberName: string
+    memberPhone: string
+    canAward: boolean
+  }
+  AwardRichAuntie:     {
+    fundId: string
+    fundTitle: string
+    currencyCode: string
+    memberUserId: string
+    memberName: string
+  }
+  RichAuntieCelebration: { awardId: string; recipientView?: boolean }
+  RichAuntieStatus:    undefined
+  Rewards:             undefined
   FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; currencyCode?: string; currencySymbol?: string; targetDate?: string; shareCode?: string; fundId?: string }
 }

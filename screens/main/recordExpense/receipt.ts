@@ -41,7 +41,7 @@ export async function takePhoto(): Promise<string | null> {
 
 // Downscales the photo and sends it to the parse-receipt edge function.
 // Returns null on any failure — the review screen falls back to manual entry.
-export async function parseReceipt(uri: string): Promise<ParsedReceipt | null> {
+export async function parseReceipt(uri: string, fundId: string): Promise<ParsedReceipt | null> {
   try {
     const resized = await ImageManipulator.manipulateAsync(
       uri,
@@ -51,7 +51,7 @@ export async function parseReceipt(uri: string): Promise<ParsedReceipt | null> {
     if (!resized.base64) return null
 
     const { data, error } = await supabase.functions.invoke('parse-receipt', {
-      body: { image: resized.base64, mediaType: 'image/jpeg' },
+      body: { fundId, image: resized.base64, mediaType: 'image/jpeg' },
     })
 
     if (error || !data || data.error || data.is_receipt === false) return null
@@ -68,19 +68,25 @@ export async function parseReceipt(uri: string): Promise<ParsedReceipt | null> {
 
 export async function uploadReceipt(fundId: string, userId: string, uri: string): Promise<string | null> {
   try {
-    const response = await fetch(uri)
+    // Re-encode to a bounded JPEG before upload. Besides normalising HEIC/PNG
+    // inputs, this avoids retaining camera metadata in the stored document.
+    const normalised = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1800 } }],
+      { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+    )
+    const response = await fetch(normalised.uri)
     const blob     = await response.blob()
-    const ext      = uri.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const path     = `${fundId}/${userId}/${Date.now()}.${ext}`
+    const path     = `${fundId}/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
 
     const { error } = await supabase.storage
       .from('receipts')
-      .upload(path, blob, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+      .upload(path, blob, { contentType: 'image/jpeg' })
 
     if (error) return null
-
-    const { data } = supabase.storage.from('receipts').getPublicUrl(path)
-    return data.publicUrl
+    // Store the private object path. Views that display the document should
+    // request a short-lived signed URL after their membership check succeeds.
+    return path
   } catch {
     return null
   }

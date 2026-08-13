@@ -10,6 +10,7 @@ const supabase = createClient(
 
 const EXPECTED_SECRET = Deno.env.get('PUSH_WEBHOOK_SECRET')
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
+const MAX_WEBHOOK_BYTES = 256_000
 
 type NotificationRow = {
   id: string
@@ -30,11 +31,15 @@ type WebhookPayload = {
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
-  // Optional shared-secret check — set the same value as PUSH_WEBHOOK_SECRET
-  // (function env var) and as a custom header on the Database Webhook.
-  if (EXPECTED_SECRET) {
-    const got = req.headers.get('x-webhook-secret')
-    if (got !== EXPECTED_SECRET) return new Response('Unauthorized', { status: 401 })
+  // This endpoint holds a service-role client and must fail closed. A missing
+  // secret is a deployment error, never an instruction to disable auth.
+  if (!EXPECTED_SECRET) return new Response('Webhook authentication is not configured', { status: 503 })
+  const got = req.headers.get('x-webhook-secret')
+  if (!got || got !== EXPECTED_SECRET) return new Response('Unauthorized', { status: 401 })
+
+  const contentLength = Number(req.headers.get('content-length') ?? 0)
+  if (Number.isFinite(contentLength) && contentLength > MAX_WEBHOOK_BYTES) {
+    return new Response('Payload too large', { status: 413 })
   }
 
   let payload: WebhookPayload
@@ -44,8 +49,21 @@ Deno.serve(async (req) => {
     return new Response('Invalid JSON', { status: 400 })
   }
 
+  if (payload.type !== 'INSERT' || payload.table !== 'notifications') {
+    return new Response('Unexpected webhook event', { status: 400 })
+  }
+
   const notification = payload.record
-  if (!notification?.user_id) return new Response('No recipient', { status: 200 })
+  if (!notification?.id || !notification.user_id) return new Response('Invalid notification', { status: 400 })
+  if (typeof notification.title !== 'string' || typeof notification.body !== 'string') {
+    return new Response('Invalid notification content', { status: 400 })
+  }
+
+  const safeTitle = notification.title.slice(0, 200)
+  const safeBody = notification.body.slice(0, 1000)
+  const safeData = notification.data && JSON.stringify(notification.data).length <= 4096
+    ? notification.data
+    : {}
 
   // Rows the app already surfaced as a local device notification (e.g.
   // SMS-detected money-in) only feed the in-app list — don't push twice.
@@ -67,10 +85,10 @@ Deno.serve(async (req) => {
 
   const messages = tokenRows.map((row: { id: string; expo_push_token: string }) => ({
     to:    row.expo_push_token,
-    title: notification.title,
-    body:  notification.body,
+    title: safeTitle,
+    body:  safeBody,
     sound: 'default',
-    data:  { ...notification.data, notificationId: notification.id, fundId: notification.fund_id },
+    data:  { ...safeData, notificationId: notification.id, fundId: notification.fund_id },
   }))
 
   const pushRes = await fetch(EXPO_PUSH_URL, {
@@ -82,6 +100,11 @@ Deno.serve(async (req) => {
     },
     body: JSON.stringify(messages),
   })
+
+  if (!pushRes.ok) {
+    console.error('Expo push request failed', pushRes.status)
+    return new Response('Push provider failed', { status: 502 })
+  }
 
   const pushResult = await pushRes.json().catch(() => null)
   const tickets: { status: string; message?: string; details?: { error?: string } }[] =

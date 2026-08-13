@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Share, Alert, Clipboard } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Share, Alert } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp, useFocusEffect } from '@react-navigation/native'
@@ -8,7 +9,10 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
+import { fonts } from '../../theme/typography'
 import { supabase, fundPreviewUrl } from '../../lib/supabase'
+import { formatFundMemberCount, fundMemberCount } from '../../lib/fundMembers'
+import { useFundPermissions } from '../../lib/useFundPermissions'
 import {
   Contribution,
   Expense,
@@ -16,23 +20,39 @@ import {
   Member,
   MemberRole,
   PendingRequest,
+  SponsorshipItem,
   Tab,
   formatMoney,
 } from './fundDetail/types'
 import { ContributionRow, ExpenseRow, MemberRow, PendingRequestRow } from './fundDetail/rows'
-import FundHeader from './fundDetail/FundHeader'
+import FundHeader, { FUND_HEADER_PURPLE } from './fundDetail/FundHeader'
 import EditExpenseModal from './fundDetail/EditExpenseModal'
 import EditContributionModal from './fundDetail/EditContributionModal'
 import ActivityLogModal from './fundDetail/ActivityLogModal'
 import FundSettingsModal from './fundDetail/FundSettingsModal'
+import SponsorshipBoard from './fundDetail/SponsorshipBoard'
+import FundActionMenu from './fundDetail/FundActionMenu'
+import AdminPermissionEditorModal from './fundDetail/AdminPermissionEditorModal'
+import { calculateFundFinancialSummary, isFundReadOnly, isVisibleInFundMoneyView, prioritiseRichAunties } from './fundDetail/finance'
 import LoadingOverlay from '../../components/LoadingOverlay'
+import InviteDetailsModal from '../../components/InviteDetailsModal'
+import { FUND_PERMISSION_KEYS, type FundPermission } from '../../lib/fundPermissions'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'FundDetail'>
   route: RouteProp<MainStackParamList, 'FundDetail'>
+  embedded?: boolean
+  embeddedExpanded?: boolean
+  onToggleEmbeddedExpanded?: () => void
 }
 
-export default function FundDetailScreen({ navigation, route }: Props) {
+export default function FundDetailScreen({
+  navigation,
+  route,
+  embedded = false,
+  embeddedExpanded = false,
+  onToggleEmbeddedExpanded,
+}: Props) {
   const { fundId } = route.params
   const { colors, isDark } = useTheme()
   const { userId } = useAuth()
@@ -43,8 +63,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [expenses, setExpenses]       = useState<Expense[]>([])
   const [members, setMembers]         = useState<Member[]>([])
+  const [richAuntieUserIds, setRichAuntieUserIds] = useState<Set<string>>(new Set())
+  const [sponsorshipItems, setSponsorshipItems] = useState<SponsorshipItem[]>([])
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([])
-  const [isOrganiser, setIsOrganiser] = useState(false)
   const [isLoading, setIsLoading]     = useState(true)
   const [loadError, setLoadError]     = useState<string | null>(null)
   const [isDeleting, setIsDeleting]   = useState(false)
@@ -53,6 +74,19 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   const [editingContribution, setEditingContribution] = useState<Contribution | null>(null)
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [showFundSettings, setShowFundSettings] = useState(false)
+  const [showFundInvite, setShowFundInvite] = useState(false)
+  const [permissionMember, setPermissionMember] = useState<Member | null>(null)
+  const [memberPermissionRows, setMemberPermissionRows] = useState<Record<string, FundPermission[]>>({})
+  const [isLoadingMemberPermissions, setIsLoadingMemberPermissions] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
+  const { can, isLoading: permissionsLoading } = useFundPermissions(fundId)
+  const canRecordContributions = can('record_contributions')
+  const canEditContributions = can('edit_contributions')
+  const canRecordExpenses = can('record_expenses')
+  const canEditExpenses = can('edit_expenses')
+  const canManageMembers = can('manage_members')
+  const canManageSponsorships = can('manage_sponsorships')
+  const canAwardRecognition = can('award_recognition')
 
   useFocusEffect(
     useCallback(() => {
@@ -63,18 +97,12 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         setIsLoading(true)
         setLoadError(null)
 
-        const [{ data: fundData, error: fundError }, { data: membership }] = await Promise.all([
+        const [{ data: fundData, error: fundError }] = await Promise.all([
           supabase
             .from('funds')
             .select('id, owner_id, title, status, goal_amount, currency_code, fund_code, linked_event_id, contribution_deadline, is_private')
             .eq('id', fundId)
             .single(),
-          supabase
-            .from('fund_members')
-            .select('role')
-            .eq('fund_id', fundId)
-            .eq('user_id', userId)
-            .maybeSingle(),
         ])
 
         if (!active) return
@@ -85,18 +113,25 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           return
         }
 
-        const organiser = fundData.owner_id === userId || membership?.role === 'owner' || membership?.role === 'admin'
-        setIsOrganiser(organiser)
-
-        const [{ data: contribData }, { data: expenseData }, { data: memberData }, { data: pendingData }, { data: profileData }] = await Promise.all([
+        const [
+          { data: contribData },
+          { data: expenseData },
+          { data: memberData },
+          { data: pendingData },
+          { data: profileData },
+          { data: pledgeBalanceData },
+          { data: contributorData },
+          { data: sponsorshipData },
+          { data: richAuntieAwardData },
+        ] = await Promise.all([
           supabase
             .from('contributions')
-            .select('id, contributor_name, amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, notes')
+            .select('id, contributor_id, contributor_name, amount, pledged_amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, created_at, notes')
             .eq('fund_id', fundId)
-            .order('confirmed_at', { ascending: false }),
+            .order('created_at', { ascending: false }),
           supabase
             .from('expenses')
-            .select('id, vendor_name, description, category, amount, created_at, has_open_query')
+            .select('id, vendor_name, description, category, amount, created_at, has_open_query, is_sponsored, sponsored_by_user_id, sponsored_by_name')
             .eq('fund_id', fundId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false }),
@@ -106,15 +141,31 @@ export default function FundDetailScreen({ navigation, route }: Props) {
             .eq('fund_id', fundId)
             .eq('status', 'joined')
             .order('joined_at', { ascending: true }),
-          organiser
-            ? supabase
-                .from('fund_members')
-                .select('id, invited_at')
-                .eq('fund_id', fundId)
-                .eq('status', 'pending')
-                .order('invited_at', { ascending: true })
-            : Promise.resolve({ data: [] as any[] }),
+          supabase
+            .from('fund_members')
+            .select('id, invited_at')
+            .eq('fund_id', fundId)
+            .eq('status', 'pending')
+            .order('invited_at', { ascending: true }),
           supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
+          supabase
+            .from('contributor_pledge_balances')
+            .select('pledge_id, allocated_amount, outstanding_amount, pledge_state')
+            .eq('fund_id', fundId),
+          supabase
+            .from('fund_contributors')
+            .select('id, contributor_type')
+            .eq('fund_id', fundId),
+          supabase
+            .from('fund_sponsorship_item_progress')
+            .select('id, fund_id, title, description, category, target_amount, allocated_amount, outstanding_amount, status, claimed_by_user_id, claimed_at, funded_at, fulfilled_at, linked_expense_id, created_at')
+            .eq('fund_id', fundId)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('rich_auntie_awards')
+            .select('recipient_user_id')
+            .eq('fund_id', fundId),
         ])
 
         if (!active) return
@@ -122,11 +173,16 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         const profileByRowId = new Map<string, { user_id: string; name: string; phone: string }>(
           (profileData ?? []).map((p: any) => [p.member_row_id, { user_id: p.user_id, name: p.name, phone: p.phone }])
         )
+        const profileByUserId = new Map<string, { name: string; phone: string }>(
+          (profileData ?? []).map((p: any) => [p.user_id, { name: p.name, phone: p.phone }])
+        )
 
         const totalContributions = (contribData ?? [])
           .filter(c => c.status === 'confirmed' && !c.is_refunded)
           .reduce((s, c) => s + Number(c.amount ?? 0), 0)
-        const totalExpenses      = (expenseData ?? []).reduce((s, e) => s + Number(e.amount ?? 0), 0)
+        const totalExpenses = (expenseData ?? [])
+          .filter(expense => !expense.is_sponsored)
+          .reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0)
 
         setFund({
           id:                  fundData.id,
@@ -138,15 +194,43 @@ export default function FundDetailScreen({ navigation, route }: Props) {
           total_contributions: totalContributions,
           total_expenses:      totalExpenses,
           balance:             totalContributions - totalExpenses,
-          member_count:        (memberData ?? []).length,
+          member_count:        fundMemberCount(memberData?.length),
           fund_code:           fundData.fund_code,
           linked_event_id:     fundData.linked_event_id ?? null,
           contribution_deadline: fundData.contribution_deadline ?? null,
           is_private:          fundData.is_private ?? false,
         })
 
-        setContributions(contribData ?? [])
+        const pledgeBalanceById = new Map<string, any>(
+          (pledgeBalanceData ?? []).map((balance: any) => [balance.pledge_id, balance])
+        )
+        const contributorTypeById = new Map<string, 'member' | 'guest'>(
+          (contributorData ?? []).map((contributor: any) => [contributor.id, contributor.contributor_type])
+        )
+
+        setContributions((contribData ?? []).map((contribution: any) => {
+          const balance = pledgeBalanceById.get(contribution.id)
+          return {
+            ...contribution,
+            contributor_type: contributorTypeById.get(contribution.contributor_id) ?? 'guest',
+            allocated_amount: Number(balance?.allocated_amount ?? 0),
+            outstanding_amount: balance ? Number(balance.outstanding_amount ?? 0) : null,
+            pledge_state: balance?.pledge_state ?? null,
+          }
+        }))
         setExpenses(expenseData ?? [])
+        setSponsorshipItems((sponsorshipData ?? []).map((item: any) => ({
+          ...item,
+          target_amount: Number(item.target_amount ?? 0),
+          allocated_amount: Number(item.allocated_amount ?? 0),
+          outstanding_amount: Number(item.outstanding_amount ?? 0),
+          sponsor_name: item.claimed_by_user_id
+            ? profileByUserId.get(item.claimed_by_user_id)?.name ?? null
+            : null,
+        })))
+        setRichAuntieUserIds(new Set(
+          (richAuntieAwardData ?? []).map(award => award.recipient_user_id),
+        ))
         setMembers(
           (memberData ?? []).map(m => {
             const profile = profileByRowId.get(m.id)
@@ -182,7 +266,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   )
 
   async function handleApprove(memberId: string) {
-    if (decidingId) return
+    if (!canManageMembers || decidingId || !requireActiveFund()) return
     setDecidingId(memberId)
     const { error } = await supabase
       .from('fund_members')
@@ -212,6 +296,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   }
 
   function confirmReject(memberId: string, displayName: string) {
+    if (!canManageMembers || !requireActiveFund()) return
     Alert.alert(
       'Reject Request',
       `Reject ${displayName}'s request to join this fund?`,
@@ -223,7 +308,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   }
 
   async function handleReject(memberId: string) {
-    if (decidingId) return
+    if (!canManageMembers || decidingId || !requireActiveFund()) return
     setDecidingId(memberId)
     const { error } = await supabase
       .from('fund_members')
@@ -241,6 +326,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   }
 
   function confirmRemoveMember(memberId: string, displayName: string) {
+    if (!canManageMembers || !requireActiveFund()) return
     Alert.alert(
       'Remove Member',
       `Remove ${displayName} from this fund? They will lose access to view contributions and expenses, and will need to be re-invited or request to join again.`,
@@ -252,7 +338,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   }
 
   async function handleRemoveMember(memberId: string) {
-    if (decidingId) return
+    if (!canManageMembers || decidingId || !requireActiveFund()) return
     setDecidingId(memberId)
     const { error } = await supabase
       .from('fund_members')
@@ -267,11 +353,98 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     }
 
     setMembers(prev => prev.filter(m => m.id !== memberId))
-    setFund(prev => prev ? { ...prev, member_count: Math.max(0, prev.member_count - 1) } : prev)
+    setFund(prev => prev ? { ...prev, member_count: fundMemberCount(prev.member_count - 1) } : prev)
+  }
+
+  function openMemberDetails(member: Member) {
+    if (!fund || !member.user_id) return
+    navigation.navigate('MemberDetails', {
+      fundId: fund.id,
+      fundTitle: fund.title,
+      currencyCode: fund.currency_code,
+      memberId: member.id,
+      memberUserId: member.user_id,
+      memberName: member.display_name,
+      memberPhone: member.phone,
+      canAward: canAwardRecognition && !isFundReadOnly(fund.status) && member.user_id !== userId,
+    })
+  }
+
+  async function openMemberPermissionEditor(member: Member) {
+    if (!fund || fund.owner_id !== userId || member.role === 'owner' || !member.user_id || isFundReadOnly(fund.status)) return
+    setPermissionMember(member)
+    setIsLoadingMemberPermissions(true)
+    const { data, error } = await supabase.rpc('get_fund_admin_permissions', { p_fund_id: fund.id })
+    setIsLoadingMemberPermissions(false)
+    if (error) {
+      setPermissionMember(null)
+      Alert.alert('Could not load admin permissions', error.message)
+      return
+    }
+
+    const next: Record<string, FundPermission[]> = {}
+    for (const row of data ?? []) {
+      if (!row.member_id || !row.permission_key || !FUND_PERMISSION_KEYS.includes(row.permission_key as FundPermission)) continue
+      const permissions = next[row.member_id] ?? []
+      permissions.push(row.permission_key as FundPermission)
+      next[row.member_id] = permissions
+    }
+    setMemberPermissionRows(next)
+  }
+
+  function showMemberActions(member: Member) {
+    if (!fund) return
+    const hasAdminRelationship = member.role !== 'member' && member.role !== 'owner'
+    const relationshipLabel = member.role === 'owner'
+      ? 'Fund organiser'
+      : hasAdminRelationship
+        ? 'Fund admin'
+        : 'Fund member'
+    const canConfigureAdmin = fund.owner_id === userId
+      && member.role !== 'owner'
+      && Boolean(member.user_id)
+      && !isFundReadOnly(fund.status)
+    const canRemoveMember = canManageMembers
+      && member.role !== 'owner'
+      && member.user_id !== userId
+      && !isFundReadOnly(fund.status)
+    const options: any[] = []
+    if (canConfigureAdmin) {
+      options.push({
+        text: hasAdminRelationship ? 'Manage admin permissions' : 'Make admin',
+        onPress: () => { void openMemberPermissionEditor(member) },
+      })
+    }
+    if (member.user_id) options.push({ text: 'View member details', onPress: () => openMemberDetails(member) })
+    if (canRemoveMember) {
+      options.push({
+        text: 'Remove member',
+        style: 'destructive',
+        onPress: () => confirmRemoveMember(member.id, member.display_name),
+      })
+    }
+    options.push({ text: 'Cancel', style: 'cancel' })
+    Alert.alert(member.display_name, relationshipLabel, options)
+  }
+
+  function handleMemberPermissionsSaved(memberId: string, permissions: FundPermission[]) {
+    setMemberPermissionRows(previous => ({ ...previous, [memberId]: permissions }))
+    setMembers(previous => previous.map(member => member.id === memberId ? { ...member, role: 'admin' } : member))
+    setPermissionMember(null)
+  }
+
+  function handleMemberAdminRemoved(memberId: string) {
+    setMemberPermissionRows(previous => {
+      const next = { ...previous }
+      delete next[memberId]
+      return next
+    })
+    setMembers(previous => previous.map(member => member.id === memberId ? { ...member, role: 'member' } : member))
+    setPermissionMember(null)
   }
 
   async function handleShareInvite() {
-    if (!fund?.fund_code) return
+    if (!canManageMembers || !fund?.fund_code) return
     const link = fundPreviewUrl(fund.fund_code)
     await Share.share({
       message: `Join *${fund.title}* on Tshelo 🙏\n\n${link}`,
@@ -279,25 +452,56 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     })
   }
 
-  function handleCopyCode() {
-    if (!fund?.fund_code) return
-    Clipboard.setString(fund.fund_code)
-    Alert.alert('Copied', 'Invite code copied to clipboard.')
-  }
-
   function handleMoreOptions() {
-    Alert.alert(fund!.title, 'What would you like to do?', [
-      {
-        text: 'Fund Settings',
-        onPress: () => setShowFundSettings(true),
-      },
-      {
-        text: 'Delete Fund',
-        style: 'destructive',
-        onPress: confirmDelete,
-      },
+    if (!fund) return
+    if (fund.owner_id === userId) {
+      Alert.alert(fund.title, 'What would you like to do?', [
+        { text: 'Fund settings', onPress: () => setShowFundSettings(true) },
+        { text: 'Delete fund', style: 'destructive', onPress: confirmDelete },
+        { text: 'Cancel', style: 'cancel' },
+      ])
+      return
+    }
+
+    Alert.alert(fund.title, 'What would you like to do?', [
+      { text: isLeaving ? 'Leaving fund…' : 'Leave fund', style: 'destructive', onPress: confirmLeaveFund },
       { text: 'Cancel', style: 'cancel' },
     ])
+  }
+
+  function confirmLeaveFund() {
+    if (!fund || isLeaving || fund.owner_id === userId) return
+    const linkedEventNote = fund.linked_event_id
+      ? '\n\nThis will not remove you from the linked event.'
+      : ''
+    Alert.alert(
+      'Leave Fund?',
+      `You will lose access to this fund. Your previous contributions remain in its records.${linkedEventNote}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Leave Fund', style: 'destructive', onPress: leaveFund },
+      ],
+    )
+  }
+
+  async function leaveFund() {
+    if (!fund || isLeaving || fund.owner_id === userId) return
+    setIsLeaving(true)
+    const { error } = await supabase.rpc('leave_fund', { p_fund_id: fund.id })
+    setIsLeaving(false)
+
+    if (error) {
+      Alert.alert('Could not leave fund', error.message)
+      return
+    }
+
+    navigation.reset({ index: 0, routes: [{ name: 'Tabs' as any }] })
+  }
+
+  function requireActiveFund() {
+    if (fund && !isFundReadOnly(fund.status)) return true
+    Alert.alert('Fund is closed', 'Closed funds are read-only. You can still view their records and history.')
+    return false
   }
 
   function confirmDelete() {
@@ -340,7 +544,9 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     setEditingExpense(null)
     const next = expenses.map(e => (e.id === updated.id ? updated : e))
     setExpenses(next)
-    const totalExpenses = next.reduce((s, e) => s + Number(e.amount ?? 0), 0)
+    const totalExpenses = next
+      .filter(expense => !expense.is_sponsored)
+      .reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0)
     setFund(prev => prev ? {
       ...prev,
       total_expenses: totalExpenses,
@@ -362,17 +568,34 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     } : previous)
   }
 
+  const visibleContributions = contributions.filter(isVisibleInFundMoneyView)
+  const displayedMembers = prioritiseRichAunties(members, richAuntieUserIds)
+  const financialSummary = calculateFundFinancialSummary({
+    goalAmount: fund?.goal_amount ?? 0,
+    totalIn: fund?.total_contributions ?? 0,
+    totalOut: fund?.total_expenses ?? 0,
+  })
   const TABS: { id: Tab; label: string; count: number }[] = [
-    { id: 'contributions', label: 'Contributions', count: contributions.length },
+    { id: 'contributions', label: 'Money',         count: visibleContributions.length },
+    { id: 'sponsorships',  label: 'Sponsor',       count: sponsorshipItems.length },
     { id: 'expenses',      label: 'Expenses',      count: expenses.length },
-    { id: 'members',       label: 'Members',       count: members.length },
+    { id: 'members',       label: 'Members',       count: fundMemberCount(members.length) },
   ]
+
+  useEffect(() => {
+    if (embedded || !fund?.linked_event_id) return
+    navigation.replace('EventDetail', {
+      eventId: fund.linked_event_id,
+      workspace: 'fund',
+      fundTab: route.params.tab ?? 'contributions',
+    })
+  }, [embedded, fund?.linked_event_id, navigation, route.params.tab])
 
   // ── Loading (first load only — refreshes overlay the stale page) ──
   if (isLoading && !fund) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safe, embedded && styles.embeddedSafe]} edges={embedded ? [] : undefined}>
+        {!embedded && <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />}
         <LoadingOverlay />
       </SafeAreaView>
     )
@@ -381,8 +604,8 @@ export default function FundDetailScreen({ navigation, route }: Props) {
   // ── Error ──────────────────────────────────────────────
   if (loadError || !fund) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safe, embedded && styles.embeddedSafe]} edges={embedded ? [] : undefined}>
+        {!embedded && <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />}
         <View style={styles.loadingWrap}>
           <Text style={styles.errorText}>{loadError ?? 'Fund not found.'}</Text>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.errorBack}>
@@ -393,32 +616,73 @@ export default function FundDetailScreen({ navigation, route }: Props) {
     )
   }
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+  if (!embedded && fund.linked_event_id) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        <LoadingOverlay />
+      </SafeAreaView>
+    )
+  }
 
-      <FundHeader
-        fund={fund}
-        isOrganiser={isOrganiser && fund.status === 'active'}
-        isOwner={fund.owner_id === userId}
-        isDeleting={isDeleting}
-        onBack={() => navigation.goBack()}
-        onRecordContribution={() => navigation.navigate('RecordContribution', {
-          fundId: fund.id,
-          fundTitle: fund.title,
-          currencyCode: fund.currency_code,
-        })}
-        onRecordExpense={() => navigation.navigate('RecordExpense', {
-          fundId: fund.id,
-          fundTitle: fund.title,
-          currencyCode: fund.currency_code,
-        })}
-        onViewHistory={() => setShowActivityLog(true)}
-        onViewEvent={fund.linked_event_id ? () => navigation.navigate('EventDetail', { eventId: fund.linked_event_id! }) : undefined}
-        onMoreOptions={handleMoreOptions}
-        onCopyCode={handleCopyCode}
-        onShareInvite={handleShareInvite}
-      />
+  return (
+    <SafeAreaView
+      style={[styles.safe, embedded && styles.embeddedSafe]}
+      edges={embedded ? [] : ['top', 'left', 'right']}
+    >
+      {!embedded && <StatusBar barStyle="dark-content" backgroundColor={FUND_HEADER_PURPLE} />}
+
+      {embedded ? (
+        <View style={[styles.embeddedFundHeader, embeddedExpanded && styles.embeddedFundHeaderExpanded]}>
+          {embeddedExpanded ? (
+            <Text style={styles.embeddedExpandedTitle} numberOfLines={2}>{fund.title}</Text>
+          ) : null}
+          <View style={[styles.embeddedFundControlsRow, embeddedExpanded && styles.embeddedFundControlsRowExpanded]}>
+            <View style={styles.embeddedFundHeading}>
+              {canManageMembers && !isFundReadOnly(fund.status) && fund.fund_code ? (
+                <TouchableOpacity
+                  style={styles.embeddedInviteLink}
+                  onPress={() => setShowFundInvite(true)}
+                  activeOpacity={0.72}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open fund invite details"
+                >
+                  <Ionicons name="copy-outline" size={17} color={colors.primary} />
+                  <Text style={styles.embeddedFundEyebrow}>Copy Fund Invite</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.embeddedHeaderActions}>
+              {onToggleEmbeddedExpanded ? (
+                <TouchableOpacity
+                  style={styles.embeddedHeaderButton}
+                  onPress={onToggleEmbeddedExpanded}
+                  accessibilityLabel={embeddedExpanded ? 'Restore Event and Fund overview' : 'Expand fund workspace'}
+                >
+                  <Ionicons name={embeddedExpanded ? 'contract-outline' : 'expand-outline'} size={18} color={colors.primary} />
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.embeddedHeaderButton} onPress={() => setShowActivityLog(true)} accessibilityLabel="Fund history">
+                <Ionicons name="time-outline" size={18} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.embeddedHeaderButton} onPress={handleMoreOptions} accessibilityLabel="Fund options">
+                <Ionicons name="ellipsis-horizontal" size={19} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <FundHeader
+          fund={fund}
+          isOwner={fund.owner_id === userId && !isFundReadOnly(fund.status)}
+          isDeleting={isDeleting}
+          remainingToTarget={financialSummary.remainingToTarget}
+          amountOverTarget={financialSummary.amountOverTarget}
+          onBack={() => navigation.goBack()}
+          onViewHistory={() => setShowActivityLog(true)}
+          onMoreOptions={handleMoreOptions}
+        />
+      )}
 
       {/* ── Tabs ───────────────────────────────────── */}
       <View style={styles.tabBar}>
@@ -432,12 +696,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
             <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
               {tab.label}
             </Text>
-            <View style={[styles.tabCount, activeTab === tab.id && styles.tabCountActive]}>
-              <Text style={[styles.tabCountText, activeTab === tab.id && styles.tabCountTextActive]}>
-                {tab.count}
-              </Text>
-            </View>
-            {tab.id === 'members' && isOrganiser && pendingRequests.length > 0 && (
+            {tab.id === 'members' && canManageMembers && !isFundReadOnly(fund.status) && pendingRequests.length > 0 && (
               <View style={styles.tabPendingDot} />
             )}
           </TouchableOpacity>
@@ -449,26 +708,18 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
         {activeTab === 'contributions' && (
           <>
-            <View style={styles.summaryStrip}>
-              <Text style={styles.summaryText}>
-                Total in: <Text style={styles.summaryValue}>{formatMoney(fund.total_contributions, fund.currency_code)}</Text>
-              </Text>
-              <Text style={styles.summaryText}>
-                {contributions.length} contribution{contributions.length !== 1 ? 's' : ''}
-              </Text>
-            </View>
-            {contributions.length === 0 ? (
+            {visibleContributions.length === 0 ? (
               <View style={styles.emptyTab}>
                 <Text style={styles.emptyTabEmoji}>💰</Text>
                 <Text style={styles.emptyTabText}>No contributions recorded yet.</Text>
               </View>
             ) : (
-              contributions.map(c => (
+              visibleContributions.map(c => (
                 <ContributionRow
                   key={c.id}
                   item={c}
                   currencyCode={fund.currency_code}
-                  onPress={isOrganiser ? () => setEditingContribution(c) : undefined}
+                  onPress={canEditContributions && !isFundReadOnly(fund.status) ? () => setEditingContribution(c) : undefined}
                 />
               ))
             )}
@@ -484,10 +735,15 @@ export default function FundDetailScreen({ navigation, route }: Props) {
               <Text style={styles.summaryText}>
                 {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
               </Text>
+              {expenses.some(expense => expense.is_sponsored) && (
+                <Text style={styles.summaryText}>
+                  {expenses.filter(expense => expense.is_sponsored).length} sponsored
+                </Text>
+              )}
             </View>
             {expenses.length === 0 ? (
               <View style={styles.emptyTab}>
-                <Text style={styles.emptyTabEmoji}>🧾</Text>
+                <Ionicons name="receipt-outline" size={28} color={colors.textMuted} style={styles.emptyTabIcon} />
                 <Text style={styles.emptyTabText}>No expenses recorded yet.</Text>
               </View>
             ) : (
@@ -496,16 +752,47 @@ export default function FundDetailScreen({ navigation, route }: Props) {
                   key={e.id}
                   item={e}
                   currencyCode={fund.currency_code}
-                  onPress={isOrganiser ? () => setEditingExpense(e) : undefined}
+                  onPress={canEditExpenses && !isFundReadOnly(fund.status) ? () => setEditingExpense(e) : undefined}
                 />
               ))
             )}
           </>
         )}
 
+        {activeTab === 'sponsorships' && (
+          <SponsorshipBoard
+            fundId={fund.id}
+            currencyCode={fund.currency_code}
+            goalAmount={fund.goal_amount}
+            canManageSponsorships={canManageSponsorships}
+            canRecordContributions={canRecordContributions}
+            canRecordExpenses={canRecordExpenses}
+            isFundActive={fund.status === 'active'}
+            items={sponsorshipItems}
+            onItemsChange={setSponsorshipItems}
+            onRecordPayment={item => navigation.navigate('RecordContribution', {
+              fundId: fund.id,
+              fundTitle: fund.title,
+              currencyCode: fund.currency_code,
+              initialMode: 'received',
+              sponsorshipItemId: item.id,
+              sponsorUserId: item.claimed_by_user_id ?? undefined,
+            })}
+            onRecordPurchase={(item, direct) => navigation.navigate('RecordExpense', {
+              fundId: fund.id,
+              fundTitle: fund.title,
+              currencyCode: fund.currency_code,
+              sponsorshipItemId: item.id,
+              sponsorshipItemTitle: item.title,
+              sponsorshipTargetAmount: item.target_amount,
+              sponsorUserId: direct ? item.claimed_by_user_id ?? undefined : undefined,
+            })}
+          />
+        )}
+
         {activeTab === 'members' && (
           <>
-            {isOrganiser && pendingRequests.length > 0 && (
+            {canManageMembers && !isFundReadOnly(fund.status) && pendingRequests.length > 0 && (
               <>
                 <Text style={styles.pendingSectionTitle}>
                   Pending Requests ({pendingRequests.length})
@@ -524,21 +811,50 @@ export default function FundDetailScreen({ navigation, route }: Props) {
 
             <View style={styles.summaryStrip}>
               <Text style={styles.summaryText}>
-                {members.length} member{members.length !== 1 ? 's' : ''}
+                {formatFundMemberCount(members.length)}
               </Text>
             </View>
-            {members.map(m => (
+            {displayedMembers.map(m => (
               <MemberRow
                 key={m.id}
                 item={m}
-                canRemove={isOrganiser && m.role !== 'owner' && m.user_id !== userId}
+                isRichAuntie={Boolean(m.user_id && richAuntieUserIds.has(m.user_id))}
+                canRemove={canManageMembers && !isFundReadOnly(fund.status) && m.role !== 'owner' && m.user_id !== userId}
                 isRemoving={decidingId === m.id}
                 onRemove={() => confirmRemoveMember(m.id, m.display_name)}
+                onPress={() => showMemberActions(m)}
+                onOptions={m.role !== 'owner' && (canManageMembers || fund.owner_id === userId) ? () => showMemberActions(m) : undefined}
               />
             ))}
           </>
         )}
       </ScrollView>
+
+      {fund.status === 'active' && (
+        <FundActionMenu
+          canRecordContributions={canRecordContributions}
+          canRecordExpenses={canRecordExpenses}
+          canManageMembers={canManageMembers}
+          onRecordContribution={() => navigation.navigate('RecordContribution', {
+            fundId: fund.id,
+            fundTitle: fund.title,
+            currencyCode: fund.currency_code,
+            initialMode: 'received',
+          })}
+          onMakePledge={() => navigation.navigate('RecordContribution', {
+            fundId: fund.id,
+            fundTitle: fund.title,
+            currencyCode: fund.currency_code,
+            initialMode: 'pledge',
+          })}
+          onRecordExpense={() => navigation.navigate('RecordExpense', {
+            fundId: fund.id,
+            fundTitle: fund.title,
+            currencyCode: fund.currency_code,
+          })}
+          onInviteMembers={() => { void handleShareInvite() }}
+        />
+      )}
 
       <EditExpenseModal
         expense={editingExpense}
@@ -550,6 +866,7 @@ export default function FundDetailScreen({ navigation, route }: Props) {
       <EditContributionModal
         contribution={editingContribution}
         currencySymbol={fund.currency_code === 'BWP' ? 'P' : fund.currency_code}
+        canRefund={fund.owner_id === userId}
         onClose={() => setEditingContribution(null)}
         onSaved={handleContributionSaved}
       />
@@ -575,7 +892,27 @@ export default function FundDetailScreen({ navigation, route }: Props) {
         }}
       />
 
-      {isLoading && <LoadingOverlay />}
+      <InviteDetailsModal
+        visible={showFundInvite}
+        inviteType="Fund"
+        title={fund.title}
+        inviteValue={fund.fund_code}
+        helpText="This invite joins the contribution fund only. It does not invite someone to the event or give them fund-management permissions."
+        shareMessage={`Join *${fund.title}* on Tshelo 🙏\n\n${fundPreviewUrl(fund.fund_code)}`}
+        onClose={() => setShowFundInvite(false)}
+      />
+
+      <AdminPermissionEditorModal
+        visible={Boolean(permissionMember)}
+        member={permissionMember}
+        initialPermissions={permissionMember ? memberPermissionRows[permissionMember.id] ?? [] : []}
+        isLoading={isLoadingMemberPermissions}
+        onClose={() => setPermissionMember(null)}
+        onSaved={handleMemberPermissionsSaved}
+        onRemoved={handleMemberAdminRemoved}
+      />
+
+      {(isLoading || permissionsLoading) && <LoadingOverlay />}
     </SafeAreaView>
   )
 }
@@ -584,7 +921,48 @@ function makeStyles(colors: AppColors) {
   return StyleSheet.create({
     safe: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: FUND_HEADER_PURPLE,
+    },
+    embeddedSafe: {
+      backgroundColor: '#FFFFFF',
+    },
+    embeddedFundHeader: {
+      minHeight: 76,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: '#FFFFFF',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    embeddedFundHeaderExpanded: { minHeight: 112, justifyContent: 'flex-start', paddingTop: 14 },
+    embeddedFundControlsRow: { width: '100%', flexDirection: 'row', alignItems: 'center' },
+    embeddedFundControlsRowExpanded: { marginTop: 6 },
+    embeddedFundHeading: { flex: 1, minWidth: 0 },
+    embeddedExpandedTitle: {
+      paddingRight: 8,
+      fontSize: 20,
+      lineHeight: 25,
+      fontFamily: fonts.inter.extraBold,
+      color: colors.textPrimary,
+    },
+    embeddedFundEyebrow: {
+      fontSize: 12,
+      fontFamily: fonts.inter.extraBold,
+      letterSpacing: 0.1,
+      color: colors.primary,
+    },
+    embeddedInviteLink: { alignSelf: 'flex-start', minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7 },
+    embeddedHeaderActions: { flexDirection: 'row', gap: 7, marginLeft: 10 },
+    embeddedHeaderButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryLight,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
 
     // ── Loading / Error ───────────────────────────────────
@@ -596,6 +974,7 @@ function makeStyles(colors: AppColors) {
     },
     errorText: {
       fontSize: 15,
+      fontFamily: fonts.inter.regular,
       color: colors.textSecondary,
       textAlign: 'center',
       paddingHorizontal: 32,
@@ -610,28 +989,27 @@ function makeStyles(colors: AppColors) {
     },
     errorBackText: {
       fontSize: 14,
-      fontWeight: '600',
+      fontFamily: fonts.inter.semiBold,
       color: colors.primary,
     },
 
     // ── Tabs ─────────────────────────────────────────
     tabBar: {
       flexDirection: 'row',
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      paddingHorizontal: 16,
-      paddingTop: 16,
+      backgroundColor: '#FFFFFF',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 18,
+      paddingTop: 14,
       paddingBottom: 0,
-      gap: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: '#D4D4D8',
     },
     tabItem: {
       flex: 1,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      paddingBottom: 12,
+      paddingBottom: 9,
       borderBottomWidth: 2,
       borderBottomColor: 'transparent',
       position: 'relative',
@@ -640,32 +1018,13 @@ function makeStyles(colors: AppColors) {
       borderBottomColor: colors.primary,
     },
     tabLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textMuted,
+      fontSize: 12,
+      fontFamily: fonts.inter.bold,
+      color: '#A1A1AA',
     },
     tabLabelActive: {
       color: colors.primary,
-      fontWeight: '700',
-    },
-    tabCount: {
-      backgroundColor: colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-      minWidth: 20,
-      alignItems: 'center',
-    },
-    tabCountActive: {
-      backgroundColor: colors.primaryLight,
-    },
-    tabCountText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.textMuted,
-    },
-    tabCountTextActive: {
-      color: colors.primary,
+      fontFamily: fonts.inter.bold,
     },
     tabPendingDot: {
       position: 'absolute',
@@ -680,12 +1039,12 @@ function makeStyles(colors: AppColors) {
     // ── Content ──────────────────────────────────────
     content: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: '#FFFFFF',
     },
     contentInner: {
       paddingHorizontal: 20,
-      paddingTop: 8,
-      paddingBottom: 48,
+      paddingTop: 18,
+      paddingBottom: 104,
     },
     summaryStrip: {
       flexDirection: 'row',
@@ -695,10 +1054,11 @@ function makeStyles(colors: AppColors) {
     },
     summaryText: {
       fontSize: 13,
+      fontFamily: fonts.inter.regular,
       color: colors.textSecondary,
     },
     summaryValue: {
-      fontWeight: '700',
+      fontFamily: fonts.inter.bold,
       color: colors.primary,
     },
     summaryRight: {
@@ -708,21 +1068,20 @@ function makeStyles(colors: AppColors) {
     },
     historyLink: {
       fontSize: 13,
-      fontWeight: '700',
+      fontFamily: fonts.inter.bold,
       color: colors.primary,
     },
 
     // ── Pending requests ─────────────────────────────
     pendingSectionTitle: {
       fontSize: 12,
-      fontWeight: '700',
+      fontFamily: fonts.inter.bold,
       color: colors.textMuted,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
       marginBottom: 10,
       marginTop: 8,
     },
-
     // ── Empty tab ────────────────────────────────────
     emptyTab: {
       alignItems: 'center',
@@ -732,8 +1091,12 @@ function makeStyles(colors: AppColors) {
       fontSize: 40,
       marginBottom: 12,
     },
+    emptyTabIcon: {
+      marginBottom: 12,
+    },
     emptyTabText: {
       fontSize: 14,
+      fontFamily: fonts.inter.regular,
       color: colors.textMuted,
     },
   })

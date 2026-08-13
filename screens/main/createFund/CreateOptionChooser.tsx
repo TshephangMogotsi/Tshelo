@@ -16,9 +16,10 @@ type Props = {
   onSelect: (option: CreateOption) => void
   onQuickAction: (id: QuickActionId) => void
   onBack: () => void
+  visibleQuickActions?: ReadonlySet<QuickActionId>
 }
 
-export default function CreateOptionChooser({ onSelect, onQuickAction, onBack }: Props) {
+export default function CreateOptionChooser({ onSelect, onQuickAction, onBack, visibleQuickActions }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
@@ -43,7 +44,7 @@ export default function CreateOptionChooser({ onSelect, onQuickAction, onBack }:
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.rail}
         >
-          {QUICK_ACTIONS.map(action => (
+          {QUICK_ACTIONS.filter(action => !visibleQuickActions || visibleQuickActions.has(action.id)).map(action => (
             <TouchableOpacity
               key={action.id}
               style={styles.railItem}
