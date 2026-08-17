@@ -2,17 +2,14 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { LogOut } from 'lucide-react'
 import type { AppUser } from '@/lib/app-user'
-
-type AccountSection = 'home' | 'contributions' | 'funds'
+import { AccountNavigation } from '@/components/account-navigation'
 
 export function AccountShell({
   user,
   children,
-  active = 'home',
 }: {
   user: AppUser
   children: React.ReactNode
-  active?: AccountSection
 }) {
   const initials = user.name
     .split(' ')
@@ -41,12 +38,7 @@ export function AccountShell({
 
       <div className="member-shell">
         <nav className="member-sidebar" aria-label="Account sections">
-          <ul>
-            <li><Link className={active === 'home' ? 'active' : undefined} href="/account">Home</Link></li>
-            <li><Link className={active === 'contributions' ? 'active' : undefined} href="/account/contributions">My contributions</Link></li>
-            <li><Link className={active === 'funds' ? 'active' : undefined} href="/account/funds">My funds</Link></li>
-            <li><Link href="/account#events">My events</Link></li>
-          </ul>
+          <AccountNavigation />
           <p>Account</p>
           <ul>
             <li><Link href="/account#profile">Account details</Link></li>

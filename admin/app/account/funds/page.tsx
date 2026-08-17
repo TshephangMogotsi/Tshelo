@@ -1,10 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CircleCheckBig, HandCoins, UsersRound } from 'lucide-react'
-import { AccountShell } from '@/components/account-shell'
-import { requireAppUser } from '@/lib/app-user'
+import { getAppUserContext } from '@/lib/app-user'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
-import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -138,14 +136,16 @@ function FundCard({
 }
 
 export default async function AccountFundsPage() {
-  const supabase = await createClient()
-  const user = await requireAppUser(supabase)
-  const membershipsResult = await supabase
-    .from('fund_members')
-    .select('id, role, status, suggested_contribution, contribution_goal, funds!inner(id, owner_id, title, fund_code, fund_type, currency_code, goal_amount, status, contribution_deadline, auto_close_date, closed_at, linked_event_id, created_at)')
-    .eq('user_id', user.id)
-    .is('funds.deleted_at', null)
-    .order('created_at', { ascending: false })
+  const { supabase, userId, userPromise } = await getAppUserContext()
+  const [membershipsResult] = await Promise.all([
+    supabase
+      .from('fund_members')
+      .select('id, role, status, suggested_contribution, contribution_goal, funds!inner(id, owner_id, title, fund_code, fund_type, currency_code, goal_amount, status, contribution_deadline, auto_close_date, closed_at, linked_event_id, created_at)')
+      .eq('user_id', userId)
+      .is('funds.deleted_at', null)
+      .order('created_at', { ascending: false }),
+    userPromise,
+  ])
 
   const memberships = (membershipsResult.data ?? []) as unknown as MembershipRow[]
   const fundIds = memberships.map((membership) => membershipFund(membership)?.id).filter((id): id is string => Boolean(id))
@@ -187,7 +187,7 @@ export default async function AccountFundsPage() {
   const hasError = membershipsResult.error || contributionsResult.error || membersResult.error
 
   return (
-    <AccountShell user={user} active="funds">
+    <>
       <section className="member-pagehead">
         <div>
           <h1>My <em>funds</em></h1>
@@ -230,6 +230,6 @@ export default async function AccountFundsPage() {
       </section>
 
       {hasError && <p className="member-contribution-error">Some fund details could not be loaded. Please refresh the page.</p>}
-    </AccountShell>
+    </>
   )
 }

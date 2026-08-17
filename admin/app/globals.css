@@ -347,6 +347,20 @@ tbody tr:hover { background: #fcfbfd; }
 .member-profile-grid strong { font-size: 11px; }
 .member-web-note { margin: 10px 22px 22px; padding: 13px 16px; color: var(--muted); background: var(--purple-pale); border-radius: 10px; font-size: 10px; line-height: 1.6; }
 .member-empty { width: 100%; padding: 24px; color: var(--muted); text-align: center; font-size: 11px; }
+.member-route-loading { padding-top: 4px; animation: member-loading-in .16s ease-out both; }
+.member-loading-heading, .member-loading-copy, .member-loading-card > div { background: linear-gradient(90deg, #e9e6dc 25%, #f5f3ec 50%, #e9e6dc 75%); background-size: 200% 100%; animation: member-loading-shimmer 1.1s linear infinite; }
+.member-loading-heading { width: min(310px, 62%); height: 38px; border-radius: 10px; }
+.member-loading-copy { width: min(570px, 88%); height: 17px; margin-top: 12px; border-radius: 7px; }
+.member-loading-card { min-height: 230px; margin-top: 27px; padding: 24px; background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+.member-loading-card > div { height: 42px; margin-bottom: 14px; border-radius: 10px; }
+.member-loading-card > div:nth-child(2) { width: 84%; }
+.member-loading-card > div:nth-child(3) { width: 68%; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@keyframes member-loading-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes member-loading-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .member-route-loading, .member-loading-heading, .member-loading-copy, .member-loading-card > div { animation: none; }
+}
 .member-footer { max-width: 1296px; margin: 0 auto; padding: 16px 0 36px; color: #8e97a8; border-top: 1px solid var(--line); font-size: 10px; display: flex; justify-content: space-between; gap: 16px; }
 
 @media (max-width: 1050px) {

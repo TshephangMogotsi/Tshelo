@@ -1,10 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { AccountShell } from '@/components/account-shell'
 import { StatusPill } from '@/components/status-pill'
-import { requireAppUser } from '@/lib/app-user'
+import { getAppUserContext } from '@/lib/app-user'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
-import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,8 +51,7 @@ export default async function ContributionsPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  const supabase = await createClient()
-  const user = await requireAppUser(supabase)
+  const { supabase, userId, userPromise } = await getAppUserContext()
   const query = await searchParams
   const today = new Date().toISOString().slice(0, 10)
   const defaultFrom = `${today.slice(0, 4)}-01-01`
@@ -65,7 +62,7 @@ export default async function ContributionsPage({
   let contributionsQuery = supabase
     .from('contributions')
     .select('id, amount, currency_code, payment_method, status, created_at, funds(id, title)')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .gte('created_at', `${from}T00:00:00.000Z`)
     .lte('created_at', `${to}T23:59:59.999Z`)
     .order('created_at', { ascending: false })
@@ -76,9 +73,10 @@ export default async function ContributionsPage({
     supabase
       .from('fund_members')
       .select('fund_id, funds(id, title)')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     contributionsQuery,
+    userPromise,
   ])
 
   const memberships = (membershipsResult.data ?? []) as MembershipRow[]
@@ -93,7 +91,7 @@ export default async function ContributionsPage({
   ).sort((a, b) => a.title.localeCompare(b.title))
 
   return (
-    <AccountShell user={user} active="contributions">
+    <>
       <section className="member-pagehead">
         <div>
           <h1>My <em>contributions</em></h1>
@@ -156,6 +154,6 @@ export default async function ContributionsPage({
           </div>
         </div>
       </section>
-    </AccountShell>
+    </>
   )
 }

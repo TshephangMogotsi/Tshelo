@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from './supabase-server'
 
@@ -14,12 +15,19 @@ export type AppUser = {
   createdAt: string
 }
 
-export async function requireAppUser(client?: ServerClient): Promise<AppUser> {
+export async function requireAppUserId(client?: ServerClient) {
   const supabase = client ?? await createClient()
   const { data: auth } = await supabase.auth.getClaims()
   const userId = auth?.claims.sub
 
   if (!userId) redirect('/login')
+
+  return userId
+}
+
+export async function requireAppUser(client?: ServerClient, knownUserId?: string): Promise<AppUser> {
+  const supabase = client ?? await createClient()
+  const userId = knownUserId ?? await requireAppUserId(supabase)
 
   const { data: profile } = await supabase
     .from('users')
@@ -34,7 +42,7 @@ export async function requireAppUser(client?: ServerClient): Promise<AppUser> {
   return {
     id: profile.id,
     name: profile.name || 'Tshelo member',
-    phone: profile.phone || (typeof auth.claims.phone === 'string' ? auth.claims.phone : ''),
+    phone: profile.phone || '',
     trustScore: profile.trust_score ?? 0,
     trustLevel: profile.trust_level ?? 'new',
     tokenBalance: profile.token_balance ?? 0,
@@ -42,3 +50,14 @@ export async function requireAppUser(client?: ServerClient): Promise<AppUser> {
     createdAt: profile.created_at,
   }
 }
+
+export const getAppUserContext = cache(async () => {
+  const supabase = await createClient()
+  const userId = await requireAppUserId(supabase)
+
+  return {
+    supabase,
+    userId,
+    userPromise: requireAppUser(supabase, userId),
+  }
+})

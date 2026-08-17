@@ -1,11 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, CalendarDays, Coins, HandCoins, ListChecks, UserRound } from 'lucide-react'
-import { AccountShell } from '@/components/account-shell'
 import { StatusPill } from '@/components/status-pill'
-import { requireAppUser } from '@/lib/app-user'
+import { getAppUserContext } from '@/lib/app-user'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
-import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,36 +47,36 @@ function contributionFund(row: ContributionRow) {
 }
 
 export default async function AccountPage() {
-  const supabase = await createClient()
-  const user = await requireAppUser(supabase)
+  const { supabase, userId, userPromise } = await getAppUserContext()
 
-  const [ownedFundsResult, membershipCountResult, membershipsResult, contributionsResult, eventsResult] = await Promise.all([
+  const [user, ownedFundsResult, membershipCountResult, membershipsResult, contributionsResult, eventsResult] = await Promise.all([
+    userPromise,
     supabase
       .from('funds')
       .select('*', { count: 'exact', head: true })
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
       .is('deleted_at', null),
     supabase
       .from('fund_members')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'joined'),
     supabase
       .from('fund_members')
       .select('id, role, status, funds(id, title, fund_code, status, goal_amount, currency_code, created_at)')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .in('status', ['joined', 'pending'])
       .order('created_at', { ascending: false })
       .limit(6),
     supabase
       .from('contributions')
       .select('id, amount, currency_code, status, created_at, funds(title)')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     supabase
       .from('events')
       .select('*', { count: 'exact', head: true })
-      .eq('creator_id', user.id)
+      .eq('creator_id', userId)
       .is('deleted_at', null),
   ])
 
@@ -99,7 +97,7 @@ export default async function AccountPage() {
   ]
 
   return (
-    <AccountShell user={user} active="home">
+    <>
       <section className="member-pagehead" id="home">
         <div>
           <h1>Dumela, <em>{firstName}</em></h1>
@@ -186,6 +184,6 @@ export default async function AccountPage() {
         </div>
         <div className="member-web-note">This web dashboard is an overview. Use the Tshelo mobile app to create funds, record contributions, manage events and update account details.</div>
       </section>
-    </AccountShell>
+    </>
   )
 }
