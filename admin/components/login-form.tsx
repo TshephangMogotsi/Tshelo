@@ -26,6 +26,7 @@ export function LoginForm() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
+      options: { shouldCreateUser: false },
     })
     setLoading(false)
 

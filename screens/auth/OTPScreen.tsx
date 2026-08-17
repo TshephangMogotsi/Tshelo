@@ -65,7 +65,10 @@ export default function OTPScreen({ navigation, route }: Props) {
     }
 
     if (!requireOnline()) return
-    const { error } = await supabase.auth.signInWithOtp({ phone })
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: { shouldCreateUser: mode === 'register' },
+    })
     if (error) { Alert.alert('Error', error.message); return }
     setCountdown(RESEND_COUNTDOWN)
     setDigits(Array(OTP_LENGTH).fill(''))

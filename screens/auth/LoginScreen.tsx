@@ -36,9 +36,15 @@ export default function LoginScreen({ navigation }: Props) {
     if (!requireOnline()) return
     const fullPhone = `+267${cleanedPhone}`
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: fullPhone,
+      options: { shouldCreateUser: false },
+    })
     setLoading(false)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) {
+      Alert.alert('Code not sent', 'Check the number or create a Tshelo account first, then try again.')
+      return
+    }
     navigation.navigate('OTP', { phone: fullPhone, mode: 'login' })
   }
 

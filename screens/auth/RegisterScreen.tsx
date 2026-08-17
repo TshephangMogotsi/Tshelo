@@ -63,7 +63,10 @@ export default function RegisterScreen({ navigation, route }: Props) {
     if (!requireOnline()) return
     const fullPhone = `${dialCode}${cleanPhone}`
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone })
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: fullPhone,
+      options: { shouldCreateUser: true },
+    })
     setLoading(false)
     if (error) { Alert.alert('Error', error.message); return }
     navigation.navigate('OTP', {
