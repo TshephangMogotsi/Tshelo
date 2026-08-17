@@ -24,6 +24,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify
+      - name: Enforce Android export size budgets
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://bundle-check.invalid
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: bundle-check-public-key
+        run: npm run bundle:size
       - name: Reject high-severity dependency advisories
         run: npm audit --audit-level=high
 

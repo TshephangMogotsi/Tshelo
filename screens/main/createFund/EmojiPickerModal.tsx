@@ -9,7 +9,7 @@ import {
   ScrollView,
   FlatList,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import emojiData from '@emoji-mart/data'
 import type { EmojiMartData } from '@emoji-mart/data'
 import { useTheme } from '../../../context/ThemeContext'

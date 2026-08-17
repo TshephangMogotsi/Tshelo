@@ -10,6 +10,7 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm test -- --runInBand",
+    "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "postinstall": "patch-package"
   },
@@ -33,7 +34,6 @@
     "confetti-cannon-burst-rn-expo": "^1.0.5",
     "expo": "~54.0.35",
     "expo-calendar": "~15.0.8",
-    "expo-camera": "~17.0.10",
     "expo-contacts": "~15.0.11",
     "expo-dev-client": "~6.0.21",
     "expo-file-system": "~19.0.23",

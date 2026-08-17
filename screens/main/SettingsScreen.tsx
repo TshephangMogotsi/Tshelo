@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { fonts } from '../../theme/typography'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme, ThemePreference } from '../../context/ThemeContext'

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import countries from 'world-countries'
 import { TOKEN_FEATURE_PRICES } from '../../../lib/tokenPricing'
 

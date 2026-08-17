@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, TextInput, LayoutAnimation, Platform, UIManager } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import countries from 'world-countries'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'

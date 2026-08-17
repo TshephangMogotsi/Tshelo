@@ -11,7 +11,7 @@ import {
   StatusBar,
   Platform,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { colors } from '../theme/colors'
 import { fonts } from '../theme/typography'
 import { BOTSWANA_BANKS, Bank } from '../data/botswanaBanks'

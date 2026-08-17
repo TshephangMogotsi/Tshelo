@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import { BRAND_ACCENT, BRAND_LAVENDER, BRAND_PURPLE, PickedOrganiser } from './constants'

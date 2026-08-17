@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tshelo Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#F2F0E8;
+  --paper:#FFFFFF;
+  --ink:#16203A;
+  --ink-2:#2B3348;
+  --ink-soft:#5A6478;
+  --ink-faint:#8E97A8;
+  --purple:#6D3BEB;
+  --purple-dk:#5A2FD0;
+  --purple-soft:#EDE7FE;
+  --purple-line:#CDBAF8;
+  --amber-bg:#FDF3D8;
+  --amber-line:#E8CE86;
+  --amber-tx:#8A6A1F;
+  --green-bg:#E4F3EA;
+  --green:#2C6650;
+  --rule:#E3E0D6;
+  --rule-2:#D6D2C6;
+  --r-lg:18px; --r-md:14px; --r-sm:10px;
+  --sh:0 1px 2px rgba(22,32,58,.04), 0 12px 30px -18px rgba(22,32,58,.28);
+  --sh-lift:0 2px 4px rgba(22,32,58,.05), 0 20px 44px -22px rgba(22,32,58,.34);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.55}
+h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;margin:0;letter-spacing:-.015em;color:var(--ink)}
+p{margin:0}
+a{color:inherit}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+
+/* prototype strip */
+.demo{background:var(--ink);color:rgba(255,255,255,.72);padding:9px 22px;font-size:12px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.demo .lab{letter-spacing:.14em;text-transform:uppercase;font-size:10px;color:#B9A3F5;font-weight:600}
+.demo button{background:transparent;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85);border-radius:999px;padding:5px 14px;font-size:12px;cursor:pointer}
+.demo button:hover{background:rgba(255,255,255,.1)}
+.demo button.on{background:var(--purple);border-color:var(--purple);color:#fff}
+
+/* top bar */
+.top{background:var(--cream);border-bottom:1px solid var(--rule);position:sticky;top:0;z-index:30}
+.topin{max-width:1340px;margin:0 auto;padding:16px 22px;display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none}
+.tile{width:34px;height:34px;border-radius:9px;background:var(--purple);color:#fff;display:grid;place-items:center;
+  font-family:Fraunces,serif;font-weight:700;font-size:19px;line-height:1}
+.wordmark{font-family:Fraunces,Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.02em}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;background:var(--purple-soft);border:1px solid var(--purple-line);
+  border-radius:999px;padding:6px 7px 6px 15px;cursor:pointer;transition:box-shadow .18s}
+.pill:hover{box-shadow:0 4px 14px -6px rgba(109,59,235,.5)}
+.pill .n{font-weight:700;font-size:15px;color:var(--purple-dk)}
+.pill .t{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--purple);font-weight:600}
+.pill .add{background:var(--purple);color:#fff;border-radius:999px;width:24px;height:24px;display:grid;place-items:center;font-size:16px;line-height:1}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600}
+
+/* shell */
+.shell{max-width:1340px;margin:0 auto;padding:28px 22px 90px;display:grid;grid-template-columns:212px 1fr;gap:32px;align-items:start}
+nav.side{position:sticky;top:84px}
+nav.side ul{list-style:none;margin:0;padding:0}
+nav.side a{display:block;text-decoration:none;padding:10px 16px;border-radius:999px;font-size:14.5px;color:var(--ink-soft);
+  transition:background .16s,color .16s}
+nav.side a:hover{background:rgba(22,32,58,.05);color:var(--ink)}
+nav.side a.on{background:var(--ink);color:#fff;font-weight:500}
+nav.side .grouplab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding:20px 16px 7px;font-weight:600}
+
+/* page */
+.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.pagehead h1{font-size:34px;line-height:1.1}
+.pagehead h1 em{font-style:italic;color:var(--purple)}
+.pagehead .lede{margin-top:8px;color:var(--ink-soft);font-size:16px;max-width:56ch;font-family:Fraunces,Georgia,serif}
+.view{display:none}
+.view.on{display:block}
+
+.btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:999px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;transition:transform .14s,box-shadow .16s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px -10px rgba(22,32,58,.6)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule-2);font-weight:500}
+.btn.ghost:hover{border-color:var(--ink);box-shadow:none}
+.btn.purple{background:var(--purple);border-color:var(--purple)}
+.btn.purple:hover{box-shadow:0 8px 20px -10px rgba(109,59,235,.8)}
+.btn.sm{padding:8px 15px;font-size:13px}
+
+.card{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r-lg);box-shadow:var(--sh);margin-bottom:22px;overflow:hidden}
+.card>h2{font-size:17px;padding:18px 22px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;justify-content:space-between}
+.card>h2 .act{font-family:Inter,sans-serif;font-size:13px;font-weight:600;color:var(--purple);cursor:pointer}
+.body{padding:22px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+.stat{padding:20px 22px;border-right:1px solid var(--rule)}
+.stat:last-child{border-right:none}
+.stat .k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+.stat .v{font-family:Fraunces,Georgia,serif;font-size:30px;margin-top:7px;line-height:1}
+.stat .v.p{color:var(--purple)}
+.stat .n{font-size:12px;color:var(--ink-faint);margin-top:6px}
+@media(max-width:760px){.stat{border-right:none;border-bottom:1px solid var(--rule)}}
+
+.quick{display:flex;gap:10px;flex-wrap:wrap}
+
+/* fund cards */
+.fundgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
+.fund{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r-md);padding:20px 22px;transition:box-shadow .2s,transform .2s}
+.fund:hover{box-shadow:var(--sh-lift);transform:translateY(-2px)}
+.fund .fh{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
+.fund .nm{font-family:Fraunces,Georgia,serif;font-size:19px;font-weight:600}
+.fund .meta{font-size:12.5px;color:var(--ink-faint);margin-top:3px}
+.tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:999px;font-weight:700;white-space:nowrap}
+.tag.org{background:var(--purple-soft);color:var(--purple-dk)}
+.tag.mem{background:#EDEBE3;color:var(--ink-soft)}
+.tag.closed{background:var(--green-bg);color:var(--green)}
+.prog{margin-top:16px}
+.prog .nums{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink-soft);margin-bottom:7px}
+.prog .nums b{font-family:Fraunces,Georgia,serif;color:var(--ink);font-size:19px;font-weight:600}
+.track{height:8px;background:#EAE7DD;border-radius:999px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--purple);border-radius:999px;transition:width .6s cubic-bezier(.3,0,.2,1)}
+.track i.amber{background:var(--amber-line)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:12px 14px;text-align:right;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;border-bottom:1px solid var(--rule-2)}
+tbody tr:last-child td{border-bottom:none}
+td.l,th.l{text-align:left}
+td .sub{display:block;font-size:12px;color:var(--ink-faint);margin-top:2px}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px}
+.chip.ok{background:var(--green-bg);color:var(--green)}
+.chip.wait{background:#EDEBE3;color:var(--ink-soft)}
+.chip.pl{background:var(--purple-soft);color:var(--purple-dk)}
+
+/* icon tiles, matching the feature cards on the site */
+.itile{width:44px;height:44px;border-radius:13px;background:var(--purple-soft);display:grid;place-items:center;color:var(--purple);flex:none}
+.itile svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.itile.sm{width:36px;height:36px;border-radius:11px}
+.itile.sm svg{width:18px;height:18px}
+.itile.amber{background:var(--amber-bg);color:var(--amber-tx)}
+.itile.green{background:var(--green-bg);color:var(--green)}
+.itile.plain{background:#EDEBE3;color:var(--ink-soft)}
+.tagpill{display:inline-block;background:var(--purple-soft);color:var(--purple-dk);font-size:12.5px;font-weight:600;padding:6px 15px;border-radius:999px}
+.tagpill.amber{background:var(--amber-bg);color:var(--amber-tx)}
+.tagpill.green{background:var(--green-bg);color:var(--green)}
+.card>h2 .h2left{display:flex;align-items:center;gap:12px}
+
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:grid;grid-template-columns:36px 1fr auto;gap:15px;padding:15px 0;border-bottom:1px solid var(--rule);align-items:start}
+.feed li:last-child{border-bottom:none}
+.dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:14px;background:#EDEBE3}
+.dot.p{background:var(--purple-soft);color:var(--purple-dk)}
+.dot.a{background:var(--amber-bg);color:var(--amber-tx)}
+.dot.g{background:var(--green-bg);color:var(--green)}
+.feed .txt{font-size:14px}
+.feed .txt b{font-weight:600}
+.feed .txt small{display:block;color:var(--ink-faint);font-size:12.5px;margin-top:3px}
+.feed .when{font-size:12px;color:var(--ink-faint);white-space:nowrap}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+select,input[type=text],input[type=date]{font:inherit;font-size:14px;padding:9px 13px;border:1px solid var(--rule-2);
+  border-radius:999px;background:var(--paper);color:var(--ink)}
+input[type=text]{border-radius:var(--r-sm)}
+
+/* token packs */
+.packs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.pack{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r-md);padding:22px 18px;text-align:center;position:relative;cursor:pointer;transition:transform .2s,box-shadow .2s,border-color .2s}
+.pack:hover{transform:translateY(-4px);box-shadow:var(--sh-lift);border-color:var(--purple-line)}
+.pack.best{border-color:var(--purple);border-width:2px;padding:21px 17px}
+.pack .ribbon{position:absolute;top:0;left:50%;transform:translate(-50%,-50%);background:var(--purple);color:#fff;
+  font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:4px 12px;border-radius:999px;font-weight:700}
+.pack .nm{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+.pack .tk{font-family:Fraunces,Georgia,serif;font-size:40px;margin:8px 0 0;line-height:1;color:var(--purple)}
+.pack .tk small{font-family:Inter,sans-serif;font-size:11px;color:var(--ink-faint);display:block;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;font-weight:600}
+.pack .pr{font-family:Fraunces,Georgia,serif;font-size:24px;margin-top:14px;font-weight:600}
+.pack .per{font-size:12px;color:var(--ink-faint);margin-top:3px}
+.pack .buys{margin-top:14px;font-size:12.5px;color:var(--ink-soft);border-top:1px solid var(--rule);padding-top:12px}
+
+.passcard{background:var(--ink);color:#fff;border-radius:var(--r-lg);padding:30px;display:grid;grid-template-columns:1fr auto;gap:28px;align-items:center;margin-bottom:22px;position:relative;overflow:hidden}
+.passcard::after{content:"";position:absolute;right:-90px;top:-90px;width:280px;height:280px;border-radius:50%;background:rgba(109,59,235,.28)}
+.passcard>*{position:relative;z-index:1}
+.passcard h3{color:#fff;font-size:27px}
+.passcard .eyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#B9A3F5;margin-bottom:9px;font-weight:700}
+.passcard ul{margin:14px 0 0;padding-left:19px;color:rgba(255,255,255,.76);font-size:14px}
+.passcard li{margin-bottom:5px}
+.passcard .price .big{font-family:Fraunces,Georgia,serif;font-size:46px;line-height:1;color:#fff}
+.passcard .price small{display:block;color:rgba(255,255,255,.6);font-size:12.5px;margin-top:5px}
+.passcard .price{text-align:right}
+.passcard .btn{background:var(--purple);border-color:var(--purple);margin-top:16px}
+@media(max-width:720px){.passcard{grid-template-columns:1fr;padding:24px}.passcard .price{text-align:left}}
+
+/* marketplace */
+.mkt{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.item{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r-md);padding:22px;display:flex;flex-direction:column;gap:11px;transition:box-shadow .2s,transform .2s}
+.item:hover{box-shadow:var(--sh-lift);transform:translateY(-2px)}
+.item .nm{font-family:Fraunces,Georgia,serif;font-size:18px;font-weight:600}
+.item .ds{font-size:13.5px;color:var(--ink-soft);flex:1}
+.item .foot{display:flex;justify-content:space-between;align-items:center;padding-top:13px;border-top:1px solid var(--rule)}
+.cost{font-weight:700;font-size:14px;color:var(--purple)}
+
+/* news */
+.news{list-style:none;margin:0;padding:0}
+.news li{padding:18px 0;border-bottom:1px solid var(--rule)}
+.news li:last-child{border-bottom:none}
+.news .kind{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--purple);font-weight:700}
+.news h3{font-size:20px;margin:6px 0 5px}
+.news p{font-size:14px;color:var(--ink-soft)}
+.news .date{font-size:12px;color:var(--ink-faint);margin-top:7px}
+
+.note{font-size:13.5px;color:var(--ink-soft);line-height:1.6;background:var(--purple-soft);border-radius:var(--r-sm);padding:14px 18px;margin-top:18px}
+.note b{color:var(--ink)}
+.note.amber{background:var(--amber-bg)}
+.note.amber b{color:var(--amber-tx)}
+
+/* guest views */
+.guestwrap{min-height:100vh;background:var(--cream);display:none;padding:0 20px 70px}
+.guestwrap.on{display:block}
+.guesttop{max-width:600px;margin:0 auto;padding:28px 0 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.urlbar{font-size:12px;color:var(--ink-faint);background:var(--paper);border:1px solid var(--rule);border-radius:999px;padding:7px 16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcard{max-width:600px;margin:24px auto 0;background:var(--paper);border:1px solid var(--rule);border-radius:22px;box-shadow:var(--sh-lift);overflow:hidden}
+.gbanner{background:var(--ink);color:#fff;padding:30px 30px 26px;position:relative;overflow:hidden}
+.gbanner::after{content:"";position:absolute;right:-70px;bottom:-90px;width:230px;height:230px;border-radius:50%;background:rgba(109,59,235,.3)}
+.gbanner>*{position:relative;z-index:1}
+.gbanner .emoji{font-size:32px}
+.gbanner h2{color:#fff;font-size:30px;margin-top:10px;letter-spacing:-.02em}
+.gbanner .sub{color:rgba(255,255,255,.72);font-size:14.5px;margin-top:8px;font-family:Fraunces,Georgia,serif}
+.gbody{padding:26px 30px 30px}
+.gline{display:flex;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.gline:last-of-type{border-bottom:none}
+.gline .k{color:var(--ink-faint)}
+.gline .v{font-weight:500;text-align:right}
+.seclab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:10px}
+.rsvp{display:flex;gap:10px;flex-wrap:wrap}
+.rsvp button{flex:1;min-width:96px;background:var(--paper);border:1px solid var(--rule-2);border-radius:999px;padding:13px;
+  cursor:pointer;font-size:14.5px;font-weight:500;transition:all .16s}
+.rsvp button:hover{border-color:var(--ink)}
+.rsvp button.sel{background:var(--purple);color:#fff;border-color:var(--purple)}
+.guestbox{margin-top:20px;background:var(--purple-soft);border-radius:var(--r-md);padding:18px 20px;display:none}
+.guestbox.on{display:block}
+.guestbox h4{font-family:Fraunces,serif;font-size:17px;font-weight:600;margin:0 0 4px}
+.guestbox .why{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px}
+.namerow{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:center;margin-bottom:9px}
+.namerow label{font-size:12.5px;color:var(--ink-soft);font-weight:600}
+.namerow input{width:100%;padding:10px 13px;border:1px solid var(--purple-line);border-radius:var(--r-sm);background:#fff;font:inherit;font-size:14px}
+.namerow input:focus{outline:2px solid var(--purple);outline-offset:1px}
+.namerow input.err{border-color:#C0392B;background:#FDF0EE}
+.errmsg{font-size:12.5px;color:#B03A2E;margin-top:8px;display:none}
+.errmsg.on{display:block}
+.cta{display:block;width:100%;text-align:center;background:var(--purple);color:#fff;border:none;border-radius:999px;
+  padding:16px;font-size:15px;font-weight:600;cursor:pointer;margin-top:20px;transition:transform .14s,box-shadow .16s}
+.cta:hover{transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(109,59,235,.9)}
+.cta small{display:block;font-weight:400;font-size:12px;opacity:.82;margin-top:3px}
+.cta.dark{background:var(--ink)}
+.done{display:none;margin-top:16px;background:var(--green-bg);border-radius:var(--r-sm);padding:14px 18px;font-size:13.5px;color:var(--green)}
+.done.on{display:block}
+.done b{display:block;font-weight:600;margin-bottom:3px}
+/* code entry */
+.codecard{max-width:440px;margin:60px auto 0;background:var(--paper);border:1px solid var(--rule);border-radius:22px;box-shadow:var(--sh-lift);padding:34px 30px;text-align:center}
+.codecard h2{font-size:27px;margin-bottom:8px}
+.codecard .sub{font-size:14.5px;color:var(--ink-soft);font-family:Fraunces,Georgia,serif;margin-bottom:24px}
+.codeinput{width:100%;padding:16px;font-family:ui-monospace,Menlo,monospace;font-size:26px;letter-spacing:.34em;text-align:center;
+  text-transform:uppercase;border:1.5px solid var(--rule-2);border-radius:14px;background:var(--cream);color:var(--ink)}
+.codeinput:focus{outline:2px solid var(--purple);outline-offset:2px;border-color:var(--purple);background:#fff}
+.codeinput.err{border-color:#C0392B;background:#FDF0EE}
+.codehint{font-size:12.5px;color:var(--ink-faint);margin-top:14px;line-height:1.6}
+
+/* contribute flow */
+.stepwrap{margin-top:24px;padding-top:22px;border-top:1px solid var(--rule)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
+.field input{width:100%;padding:12px 14px;border:1px solid var(--rule-2);border-radius:var(--r-sm);background:#fff;font:inherit;font-size:15px}
+.field input:focus{outline:2px solid var(--purple);outline-offset:1px;border-color:var(--purple)}
+.field input.err{border-color:#C0392B;background:#FDF0EE}
+.amtrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.amtrow button{background:var(--cream);border:1px solid var(--rule-2);border-radius:999px;padding:8px 16px;font-size:13.5px;cursor:pointer;font-weight:500}
+.amtrow button:hover{border-color:var(--purple);color:var(--purple-dk)}
+.amtrow button.sel{background:var(--purple);color:#fff;border-color:var(--purple)}
+.provtabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.provtabs button{flex:1;min-width:100px;background:var(--paper);border:1px solid var(--rule-2);border-radius:999px;padding:10px;font-size:13.5px;font-weight:500;cursor:pointer}
+.provtabs button.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+.paybox{background:var(--cream);border-radius:var(--r-md);padding:18px 20px}
+.payline{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.payline:last-child{border-bottom:none}
+.payline .k{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+.payline .v{font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:600}
+.payline .v.tx{font-family:Inter,sans-serif;font-size:15px}
+.copybtn{background:var(--purple-soft);border:none;color:var(--purple-dk);border-radius:999px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.copybtn:hover{background:var(--purple-line)}
+.verify{display:flex;gap:11px;background:var(--green-bg);border-radius:var(--r-sm);padding:13px 16px;margin-top:16px;font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+.verify b{color:var(--green);display:block;margin-bottom:3px}
+.warnbox{background:var(--amber-bg);border-radius:var(--r-sm);padding:13px 16px;margin-top:12px;font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+.warnbox b{color:var(--amber-tx);display:block;margin-bottom:3px}
+.pending{background:var(--amber-bg);border-radius:var(--r-md);padding:20px;text-align:center;margin-top:18px}
+.pending .big{font-family:Fraunces,serif;font-size:21px;margin-bottom:6px}
+.pending .txt{font-size:13.5px;color:var(--ink-soft);line-height:1.6}
+.stepnum{display:inline-block;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--purple);font-weight:700;margin-bottom:10px}
+
+.privacy{font-size:12.5px;color:var(--ink-faint);margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);line-height:1.6}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(22,32,58,.55);backdrop-filter:blur(3px);z-index:100;display:none;
+  align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.overlay.on{display:flex}
+.modal{background:var(--paper);border-radius:20px;box-shadow:0 30px 70px -20px rgba(22,32,58,.5);width:100%;max-width:520px;
+  max-height:92vh;display:flex;flex-direction:column;animation:pop .22s cubic-bezier(.2,.9,.3,1)}
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.modal header{padding:22px 26px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:13px}
+.modal header h3{font-family:Fraunces,serif;font-size:21px;font-weight:600;flex:1}
+.modal .x{background:transparent;border:none;font-size:24px;line-height:1;color:var(--ink-faint);cursor:pointer;padding:0 4px}
+.modal .mbody{padding:22px 26px;overflow-y:auto}
+.modal footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--rule)}
+.modal footer .btn{flex:none}
+@media(max-width:560px){.modal footer .btn{flex:1}}
+.mnote{font-size:12.5px;color:var(--ink-soft);line-height:1.55;background:var(--cream);border-radius:var(--r-sm);padding:12px 15px;margin-top:14px}
+.mnote b{color:var(--ink)}
+.mnote.amber{background:var(--amber-bg)}.mnote.amber b{color:var(--amber-tx)}
+.mnote.green{background:var(--green-bg)}.mnote.green b{color:var(--green)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.frow{grid-template-columns:1fr}}
+.field select{width:100%;padding:12px 14px;border:1px solid var(--rule-2);border-radius:var(--r-sm);background:#fff;font:inherit;font-size:15px}
+.switch{display:flex;align-items:center;gap:12px;background:var(--cream);border-radius:var(--r-sm);padding:13px 15px;cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--purple)}
+.switch .t{display:block;font-size:14px;font-weight:500}
+.switch .d{display:block;font-size:12.5px;color:var(--ink-faint);margin-top:3px;line-height:1.45}
+input[type=range]{width:100%;accent-color:var(--purple)}
+.split{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}
+.split div{background:var(--cream);border-radius:var(--r-sm);padding:12px;text-align:center}
+.split .k{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+.split .v{font-family:Fraunces,serif;font-size:19px;margin-top:4px}
+.split .v.p{color:var(--purple)}
+.sharegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+.sharegrid button{background:var(--cream);border:1px solid var(--rule-2);border-radius:var(--r-sm);padding:14px 10px;
+  font-size:13px;font-weight:600;cursor:pointer;display:grid;gap:7px;justify-items:center}
+.sharegrid button:hover{border-color:var(--purple);color:var(--purple-dk)}
+.sharegrid svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.linkbox{display:flex;gap:8px;align-items:center;background:var(--cream);border-radius:var(--r-sm);padding:12px 14px;margin-top:6px}
+.linkbox code{flex:1;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* stripe checkout */
+.stripebar{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--ink-faint);margin-top:16px;justify-content:center}
+.stripebar b{color:var(--ink-soft);font-weight:600}
+.cardbox{border:1px solid var(--rule-2);border-radius:var(--r-sm);background:#fff;padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:15px;color:var(--ink)}
+.cardbox .row{display:flex;justify-content:space-between;gap:12px}
+.cardbox .row+.row{margin-top:12px;padding-top:12px;border-top:1px solid var(--rule)}
+.paytab{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.paytab button{flex:1;min-width:110px;background:var(--paper);border:1px solid var(--rule-2);border-radius:999px;padding:11px;font-size:13.5px;font-weight:500;cursor:pointer}
+.paytab button.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+.summ{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--rule)}
+.summ:last-of-type{border-bottom:none}
+.summ .v{font-family:Fraunces,serif;font-size:20px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+  padding:14px 22px;border-radius:999px;font-size:14px;font-weight:500;z-index:200;opacity:0;pointer-events:none;
+  transition:opacity .22s,transform .22s;box-shadow:0 14px 34px -12px rgba(22,32,58,.7);max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{padding:0 22px 46px;color:var(--ink-faint);font-size:12.5px}
+footer .in{max-width:1340px;margin:0 auto;border-top:1px solid var(--rule);padding-top:16px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr;gap:20px;padding-top:22px}
+  nav.side{position:static;overflow-x:auto}
+  nav.side ul{display:flex;gap:8px}
+  nav.side .grouplab{display:none}
+  nav.side a{white-space:nowrap;border:1px solid var(--rule);background:var(--paper);padding:9px 16px}
+  .card .body{overflow-x:auto}
+  table{min-width:440px}
+  .pagehead h1{font-size:28px}
+  .gbody{padding:22px}
+  .gbanner{padding:24px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="demo">
+  <span class="lab">Prototype</span>
+  <button data-mode="app" class="on">Logged in dashboard</button>
+  <button data-mode="gcode">Guest: enter code</button>
+  <button data-mode="gfund">Guest: shared fund</button>
+  <button data-mode="gevent">Guest: shared event</button>
+  <span style="opacity:.55">Demo data only</span>
+</div>
+
+<!-- ================= LOGGED IN ================= -->
+<div id="app">
+<header class="top">
+  <div class="topin">
+    <a class="logo" href="#"><span class="tile">T</span><span class="wordmark">Tshelo</span></a>
+    <div class="spacer"></div>
+    <div class="pill" id="tokenPill" role="button" tabindex="0" aria-label="Token balance, buy more tokens">
+      <span class="n" id="balN">38</span><span class="t">tokens</span><span class="add">+</span>
+    </div>
+    <div class="avatar">NB</div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="side" aria-label="Dashboard sections">
+    <ul>
+      <li><a href="#" class="on" data-v="home">Home</a></li>
+      <li><a href="#" data-v="contrib">My contributions</a></li>
+      <li><a href="#" data-v="funds">My funds</a></li>
+      <li><a href="#" data-v="events">My events</a></li>
+    </ul>
+    <div class="grouplab">Account</div>
+    <ul>
+      <li><a href="#" data-v="tokens">Buy tokens</a></li>
+      <li><a href="#" data-v="market">Marketplace</a></li>
+      <li><a href="#" data-v="news">News</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <!-- HOME -->
+    <section class="view on" id="v-home">
+      <div class="pagehead">
+        <div>
+          <h1>Dumela, <em>Nono</em></h1>
+          <p class="lede">Everything you are organising and contributing to, in one place. The app stays the place you record contributions day to day.</p>
+        </div>
+        <button class="btn purple" data-go="tokens">Buy tokens</button>
+      </div>
+
+      <div class="card"><div class="stats">
+        <div class="stat"><div class="k">Token balance</div><div class="v p" id="balA">38</div><div class="n">never expires</div></div>
+        <div class="stat"><div class="k">Lifetime contributed</div><div class="v">P14,850</div><div class="n">across 9 funds</div></div>
+        <div class="stat"><div class="k">Funds organised</div><div class="v">2</div><div class="n">1 closing this month</div></div>
+        <div class="stat"><div class="k">Funds joined</div><div class="v">4</div><div class="n">2 still open</div></div>
+        <div class="stat"><div class="k">Events organised</div><div class="v">1</div><div class="n">142 guests confirmed</div></div>
+      </div></div>
+
+      <div class="card">
+        <h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></svg></span>Quick actions</span></h2>
+        <div class="body quick">
+          <button class="btn" data-act="createFund">Create a fund</button>
+          <button class="btn ghost" data-act="createEvent">Create an event</button>
+          <button class="btn ghost" data-act="invite">Invite members</button>
+          <button class="btn ghost" data-act="exportPdf">Export my statement</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>Recent activity</span><span class="act" data-go="funds">View all funds</span></h2>
+        <div class="body">
+          <ul class="feed">
+            <li><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M14.6 9.6a2.8 2.8 0 00-2.6-1.4c-1.5 0-2.6.9-2.6 2.1 0 2.9 5.2 1.4 5.2 4.2 0 1.2-1.1 2.1-2.6 2.1a2.8 2.8 0 01-2.6-1.4"/></svg></span><div class="txt"><b>Kagiso Serema</b> contributed P1,000 to Mmadikwena Funeral<small>Detected from an Orange Money SMS and confirmed by you</small></div><div class="when">2 hours ago</div></li>
+            <li><span class="itile sm amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><div class="txt"><b>Rich Auntie alert.</b> Dineo Phiri blessed the fund<small>Paid the caterer directly, recorded as P2,500</small></div><div class="when">Yesterday</div></li>
+            <li><span class="itile sm green"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.2l2.7 2.7L16.3 9.3"/></svg></span><div class="txt"><b>14 guests</b> replied to Kabo and Lesedi Wedding<small>Now 142 attending including 31 named plus ones</small></div><div class="when">2 days ago</div></li>
+            <li><span class="itile sm plain"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h14v17l-2.3-1.6-2.35 1.6L12 18.9l-2.35 1.6L7.3 18.9 5 20.5z"/><path d="M8.7 8.5h6.6M8.7 12.4h4.6"/></svg></span><div class="txt">Receipt scanned at Choppies, P486 for water and drinks<small>Logged against Mmadikwena Funeral expenses</small></div><div class="when">3 days ago</div></li>
+            <li><span class="itile sm plain"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.3"/><path d="M2.8 19.5a6.4 6.4 0 0112.4 0"/><path d="M16.2 6a3.3 3.3 0 010 6"/><path d="M17.4 14.2a6.4 6.4 0 013.8 5.3"/></svg></span><div class="txt"><b>Tebogo Molefe</b> joined Mmadikwena Funeral<small>Invited by you on WhatsApp</small></div><div class="when">4 days ago</div></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTRIBUTIONS -->
+    <section class="view" id="v-contrib">
+      <div class="pagehead">
+        <div><h1>My <em>contributions</em></h1><p class="lede">Everything you have personally contributed, across every fund you have ever joined.</p></div>
+        <div class="quick"><button class="btn ghost" data-act="exportPdf">Export as PDF</button><button class="btn ghost" data-act="yearEnd">Year end summary</button></div>
+      </div>
+      <div class="card"><div class="body">
+        <div class="filters">
+          <select aria-label="Filter by fund"><option>All funds</option><option>Mmadikwena Funeral</option><option>Kabo and Lesedi Wedding</option><option>Boitumelo Graduation</option><option>Mothusi Burial Society</option></select>
+          <input type="date" value="2026-01-01" aria-label="From date">
+          <input type="date" value="2026-08-12" aria-label="To date">
+          <button class="btn ghost sm">Apply</button>
+        </div>
+        <table>
+          <thead><tr><th>Fund</th><th>Date</th><th>Amount</th><th class="l">Method</th><th class="l">Status</th></tr></thead>
+          <tbody>
+            <tr><td>Mmadikwena Funeral</td><td>08 Aug 2026</td><td>P1,500</td><td class="l">Orange Money</td><td class="l"><span class="chip ok">Confirmed</span></td></tr>
+            <tr><td>Mothusi Burial Society</td><td>01 Aug 2026</td><td>P200</td><td class="l">MyZaka</td><td class="l"><span class="chip ok">Confirmed</span></td></tr>
+            <tr><td>Kabo and Lesedi Wedding</td><td>22 Jul 2026</td><td>P3,000</td><td class="l">Orange Money</td><td class="l"><span class="chip ok">Confirmed</span></td></tr>
+            <tr><td>Mothusi Burial Society</td><td>01 Jul 2026</td><td>P200</td><td class="l">MyZaka</td><td class="l"><span class="chip ok">Confirmed</span></td></tr>
+            <tr><td>Boitumelo Graduation</td><td>14 Jun 2026</td><td>P500</td><td class="l">Smega</td><td class="l"><span class="chip ok">Confirmed</span></td></tr>
+            <tr><td>Rre Ramotswe Memorial</td><td>03 Mar 2026</td><td>P2,000</td><td class="l">Orange Money</td><td class="l"><span class="chip wait">Fund closed</span></td></tr>
+          </tbody>
+        </table>
+        <div class="note"><b>Your year end summary is generated every January.</b> It totals every contribution you made in the previous year across all funds, as one PDF you can keep for your own records.</div>
+      </div></div>
+    </section>
+
+    <!-- FUNDS -->
+    <section class="view" id="v-funds">
+      <div class="pagehead">
+        <div><h1>My <em>funds</em></h1><p class="lede">Funds you run, funds you belong to, and the archive of everything already closed.</p></div>
+        <button class="btn purple" data-act="createFund">Create a fund</button>
+      </div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M14.6 9.6a2.8 2.8 0 00-2.6-1.4c-1.5 0-2.6.9-2.6 2.1 0 2.9 5.2 1.4 5.2 4.2 0 1.2-1.1 2.1-2.6 2.1a2.8 2.8 0 01-2.6-1.4"/></svg></span>Funds I organise</span></h2><div class="body"><div class="fundgrid">
+        <div class="fund">
+          <div class="fh"><div><div class="nm">Mmadikwena Funeral</div><div class="meta">34 members · 61 contributions</div><div style="margin-top:9px"><span class="tagpill">Closes 30 August</span></div></div><span class="tag org">Organiser</span></div>
+          <div class="prog"><div class="nums"><span><b>P12,400</b> raised</span><span>of P15,000</span></div><div class="track"><i style="width:83%"></i></div></div>
+          <div class="actions">
+            <button class="btn sm" data-act="record">Record a contribution</button>
+            <button class="btn ghost sm" data-act="invite">Invite members</button>
+            <button class="btn ghost sm" data-act="richAuntie">Add Rich Auntie</button>
+            <button class="btn ghost sm" data-act="interim">Interim report · 3 tokens</button>
+          </div>
+        </div>
+        <div class="fund">
+          <div class="fh"><div><div class="nm">Kabo and Lesedi Wedding</div><div class="meta">52 members · 88 contributions</div><div style="margin-top:9px"><span class="tagpill">Linked to an event</span></div></div><span class="tag org">Organiser</span></div>
+          <div class="prog"><div class="nums"><span><b>P28,600</b> raised</span><span>of P40,000</span></div><div class="track"><i style="width:72%"></i></div></div>
+          <div class="actions">
+            <button class="btn sm" data-act="record">Record a contribution</button>
+            <button class="btn ghost sm" data-act="invite">Invite members</button>
+            <button class="btn ghost sm" data-act="viewFund">View members</button>
+            <button class="btn ghost sm" data-act="closeFund">Close fund · free report</button>
+          </div>
+        </div>
+      </div></div></div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.3"/><path d="M2.8 19.5a6.4 6.4 0 0112.4 0"/><path d="M16.2 6a3.3 3.3 0 010 6"/><path d="M17.4 14.2a6.4 6.4 0 013.8 5.3"/></svg></span>Funds I belong to</span></h2><div class="body"><div class="fundgrid">
+        <div class="fund">
+          <div class="fh"><div><div class="nm">Boitumelo Graduation</div><div class="meta">Organised by Masego Kgosi</div><div style="margin-top:9px"><span class="tagpill">You gave P500</span></div></div><span class="tag mem">Member</span></div>
+          <div class="prog"><div class="nums"><span><b>P6,200</b> raised</span><span>of P8,000</span></div><div class="track"><i style="width:78%"></i></div></div>
+          <div class="actions"><button class="btn ghost sm" data-act="viewFund">View fund</button><button class="btn ghost sm" data-act="viewFund">See all contributions</button></div>
+        </div>
+        <div class="fund">
+          <div class="fh"><div><div class="nm">Mothusi Burial Society</div><div class="meta">Committee of 4</div><div style="margin-top:9px"><span class="tagpill">P200 monthly</span></div></div><span class="tag mem">Member</span></div>
+          <div class="prog"><div class="nums"><span><b>P41,800</b> held</span><span>of P60,000 annual goal</span></div><div class="track"><i style="width:70%"></i></div></div>
+          <div class="actions"><button class="btn ghost sm" data-act="viewFund">View fund</button><button class="btn ghost sm" data-act="exportPdf">My monthly statement</button></div>
+        </div>
+      </div></div></div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.2l2.7 2.7L16.3 9.3"/></svg></span>Closed funds</span></h2><div class="body"><div class="fundgrid">
+        <div class="fund">
+          <div class="fh"><div><div class="nm">Rre Ramotswe Memorial</div><div class="meta">Closed 12 Mar 2026 · 41 members</div><div style="margin-top:9px"><span class="tagpill green">P22,150 raised</span></div></div><span class="tag closed">Closed</span></div>
+          <div class="actions"><button class="btn ghost sm" data-act="auditReport">Download final audit report</button><button class="btn ghost sm" data-act="auditTrail">View audit trail</button></div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- EVENTS -->
+    <section class="view" id="v-events">
+      <div class="pagehead">
+        <div><h1>My <em>events</em></h1><p class="lede">Guest lists and replies. An event on its own is a guest list. Budget only exists when an event is linked to a fund.</p></div>
+        <button class="btn purple" data-act="createEvent">Create an event</button>
+      </div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg></span>Event linked to a fund</span></h2><div class="body">
+        <div class="fund" style="border:none;padding:0">
+          <div class="fh"><div><div class="nm">Kabo and Lesedi Wedding</div><div class="meta">14 November 2026 · 14:00 · Gaborone Sun Conference Centre</div>
+            <div style="margin-top:10px"><span class="tagpill">Linked to a fund</span> <span class="tagpill amber">Budget private to organisers</span></div></div><span class="tag org">Organiser</span></div>
+
+          <div class="split" style="grid-template-columns:1fr 1fr 1fr">
+            <div><div class="k">Event budget</div><div class="v">P40,000</div></div>
+            <div><div class="k">Fund goal, 80%</div><div class="v p">P32,000</div></div>
+            <div><div class="k">You pay</div><div class="v">P8,000</div></div>
+          </div>
+
+          <div class="prog"><div class="nums"><span><b>P28,600</b> raised by the fund</span><span>of the P32,000 goal</span></div><div class="track"><i style="width:89%"></i></div></div>
+          <div class="prog"><div class="nums"><span><b>142</b> attending</span><span>111 invited guests · 31 named plus ones</span></div><div class="track"><i style="width:86%"></i></div></div>
+
+          <div class="actions">
+            <button class="btn sm" data-act="shareRsvp">Share RSVP link</button>
+            <button class="btn ghost sm" data-act="calendar">Add to calendar</button>
+            <button class="btn ghost sm" data-act="exportGuests">Export guest list</button>
+            <button class="btn ghost sm" data-act="remind">Remind non responders</button>
+            <button class="btn ghost sm" data-act="expense">Record an expense</button>
+          </div>
+          <div class="note"><b>The budget lives on the pairing, not on the event.</b> Budget is what the day costs. Goal is the share of it the fund is raising. What is left is what the organisers cover themselves. Members see the fund goal and the progress. Only organisers ever see the budget or what you pay.</div>
+        </div>
+      </div></div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm plain"><svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.3"/><path d="M2.8 19.5a6.4 6.4 0 0112.4 0"/><path d="M16.2 6a3.3 3.3 0 010 6"/><path d="M17.4 14.2a6.4 6.4 0 013.8 5.3"/></svg></span>Events on their own</span></h2><div class="body">
+        <div class="fund" style="border:none;padding:0">
+          <div class="fh"><div><div class="nm">Mmadikwena Memorial Service</div><div class="meta">29 August 2026 · 09:00 · Kanye Village Hall</div>
+            <div style="margin-top:10px"><span class="tagpill">Guest list only</span></div></div><span class="tag org">Organiser</span></div>
+          <div class="prog"><div class="nums"><span><b>64</b> attending</span><span>52 invited guests · 12 named plus ones</span></div><div class="track"><i style="width:71%"></i></div></div>
+          <div class="actions">
+            <button class="btn sm" data-act="shareRsvp">Share RSVP link</button>
+            <button class="btn ghost sm" data-act="calendar">Add to calendar</button>
+            <button class="btn ghost sm" data-act="exportGuests">Export guest list</button>
+            <button class="btn ghost sm" data-act="linkFund">Link a fund</button>
+          </div>
+          <div class="note"><b>No budget here, and that is deliberate.</b> This event is a guest list, a date and a venue. Link a fund to it and the budget, goal and expense tracking appear.</div>
+        </div>
+      </div></div>
+
+      <div class="card">
+        <h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.3"/><path d="M2.8 19.5a6.4 6.4 0 0112.4 0"/><path d="M16.2 6a3.3 3.3 0 010 6"/><path d="M17.4 14.2a6.4 6.4 0 013.8 5.3"/></svg></span>Guest list</span><span class="act" data-act="exportGuests">Export for the caterer</span></h2>
+        <div class="body">
+          <table id="guestTable">
+            <thead><tr><th>Guest</th><th class="l">Reply</th><th class="l">Bringing</th><th>Head count</th></tr></thead>
+            <tbody>
+              <tr><td>Keabetswe Ntsime</td><td class="l"><span class="chip ok">Yes</span></td><td class="l">Tumelo Ntsime<span class="sub">Bagelo Ntsime</span></td><td>3</td></tr>
+              <tr><td>Mma Kgomotso Selepe</td><td class="l"><span class="chip ok">Yes</span></td><td class="l">Onalenna Selepe</td><td>2</td></tr>
+              <tr><td>Lesego Mokwena</td><td class="l"><span class="chip ok">Yes</span></td><td class="l"><span style="color:var(--ink-faint)">Just me</span></td><td>1</td></tr>
+              <tr><td>Thato Baruti</td><td class="l"><span class="chip pl">Maybe</span></td><td class="l">Naledi Baruti<span class="sub">Kefilwe Baruti</span><span class="sub">Oratile Baruti</span></td><td>4</td></tr>
+              <tr><td>Gaone Pule</td><td class="l"><span class="chip wait">No reply</span></td><td class="l"><span style="color:var(--ink-faint)">Not answered</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+          <div class="note"><b>Every plus one is named at RSVP.</b> A guest cannot say plus three without telling you who they are. Catering, seating and the door list all work off real names rather than a number.</div>
+        </div>
+      </div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm plain"><svg viewBox="0 0 24 24"><path d="M12 21s6.5-6.1 6.5-10.5a6.5 6.5 0 10-13 0C5.5 14.9 12 21 12 21z"/><circle cx="12" cy="10.4" r="2.4"/></svg></span>Events I am invited to</span></h2><div class="body">
+        <ul class="feed">
+          <li><span class="itile sm"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg></span><div class="txt"><b>Boitumelo's Graduation</b><small>26 September 2026 · Palapye · you replied yes, bringing Mpho Bokete</small></div><div class="when"><button class="btn ghost sm" data-act="calendar">Add to calendar</button></div></li>
+          <li><span class="itile sm plain"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg></span><div class="txt"><b>Aunt Neo's 60th</b><small>4 October 2026 · Francistown · not answered yet</small></div><div class="when"><button class="btn ghost sm" data-act="rsvpSelf">RSVP</button></div></li>
+        </ul>
+        <div class="note"><b>Calendar sync.</b> Every event you organise or accept can be added to Google Calendar, Outlook or Apple Calendar. Turn on automatic sync once and accepted invitations land in your calendar without you doing anything.</div>
+      </div></div>
+    </section>
+
+    <!-- TOKENS -->
+    <section class="view" id="v-tokens">
+      <div class="pagehead"><div><h1>Buy <em>tokens</em></h1><p class="lede">Tokens unlock features. They are not contributions and they never touch the money your community is raising.</p></div></div>
+
+      <div class="passcard">
+        <div>
+          <div class="eyebrow">Best value if you organise often</div>
+          <h3>Tshelo Unlimited</h3>
+          <ul>
+            <li>Unlimited funds and events for twelve months</li>
+            <li>Up to 100 members on every fund</li>
+            <li>Every report included, interim and certified</li>
+            <li>Priority support and Verified badge eligibility</li>
+          </ul>
+        </div>
+        <div class="price">
+          <div class="big">P150</div>
+          <small>twelve months, P12.50 a month</small>
+          <button class="btn" data-act="buyPass">Get Unlimited</button>
+        </div>
+      </div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M14.6 9.6a2.8 2.8 0 00-2.6-1.4c-1.5 0-2.6.9-2.6 2.1 0 2.9 5.2 1.4 5.2 4.2 0 1.2-1.1 2.1-2.6 2.1a2.8 2.8 0 01-2.6-1.4"/></svg></span>Token packs</span></h2><div class="body">
+        <div class="packs">
+          <div class="pack" data-tok="10"><div class="nm">Starter</div><div class="tk">10<small>tokens</small></div><div class="pr">P5</div><div class="per">P0.50 per token</div><div class="buys">One extra fund</div></div>
+          <div class="pack" data-tok="30"><div class="nm">Value</div><div class="tk">30<small>tokens</small></div><div class="pr">P13</div><div class="per">P0.43 per token</div><div class="buys">Three extra funds</div></div>
+          <div class="pack best" data-tok="60"><div class="ribbon">Most popular</div><div class="nm">Popular</div><div class="tk">60<small>tokens</small></div><div class="pr">P24</div><div class="per">P0.40 per token</div><div class="buys">Six funds, or bigger member limits</div></div>
+          <div class="pack" data-tok="120"><div class="nm">Power</div><div class="tk">120<small>tokens</small></div><div class="pr">P45</div><div class="per">P0.375 per token</div><div class="buys">Twelve funds and spare tokens</div></div>
+        </div>
+        <div class="note"><b>Payment happens here on tshelo.com, never inside the app.</b> Cards are processed by Stripe. Orange Money, MyZaka and Smega are processed by our local mobile money partner. Tokens appear in your app the moment payment clears.</div>
+      </div></div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.85-4.45 4.3 1.06 6.05L12 17.15 6.59 20l1.06-6.05L3.2 9.65l6.1-.85z"/></svg></span>What tokens buy</span></h2><div class="body"><table>
+        <thead><tr><th>Feature</th><th>Tokens</th></tr></thead>
+        <tbody>
+          <tr><td>Additional fund</td><td>10</td></tr>
+          <tr><td>Additional event</td><td>10</td></tr>
+          <tr><td>Fund and event created together</td><td>15</td></tr>
+          <tr><td>Members 21 to 50</td><td>15</td></tr>
+          <tr><td>Members 51 to 100</td><td>30</td></tr>
+          <tr><td>Members 101 to 250</td><td>60</td></tr>
+          <tr><td>Interim PDF report</td><td>3</td></tr>
+          <tr><td>Certified audit pack</td><td>10</td></tr>
+          <tr><td>Year end contribution statement</td><td>5</td></tr>
+          <tr><td>Smart Plan</td><td>8</td></tr>
+        </tbody>
+      </table></div></div>
+
+      <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h7l5 5v14H6z"/><path d="M13 2.5v5h5"/><path d="M9.5 12.5h6M9.5 16h4"/></svg></span>Purchase and usage history</span></h2><div class="body"><table>
+        <thead><tr><th>Date</th><th class="l">Detail</th><th>Tokens</th><th>Paid</th></tr></thead>
+        <tbody>
+          <tr><td>02 Aug 2026</td><td class="l">Popular pack, Orange Money</td><td>+60</td><td>P24.00</td></tr>
+          <tr><td>02 Aug 2026</td><td class="l">Members 51 to 100, Kabo and Lesedi Wedding</td><td>-30</td><td>—</td></tr>
+          <tr><td>19 Jul 2026</td><td class="l">Certified audit pack, Rre Ramotswe Memorial</td><td>-10</td><td>—</td></tr>
+          <tr><td>04 Jul 2026</td><td class="l">Bonus, fund closed with full receipt coverage</td><td>+5</td><td>—</td></tr>
+          <tr><td>28 Jun 2026</td><td class="l">Additional fund, Mmadikwena Funeral</td><td>-10</td><td>—</td></tr>
+        </tbody>
+      </table></div></div>
+    </section>
+
+    <!-- MARKETPLACE -->
+    <section class="view" id="v-market">
+      <div class="pagehead"><div><h1><em>Marketplace</em></h1><p class="lede">Planning tools built from what actually happens at Botswana funerals, weddings and graduations.</p></div></div>
+      <div class="mkt">
+        <div class="item"><span class="itile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 4.5A2 2 0 016.5 3H19v18H6.5a2 2 0 01-2-2z"/><path d="M4.5 17.5A2 2 0 016.5 16H19"/></svg></span><div class="nm">Wedding budget template</div><div class="ds">Every line a Botswana wedding actually has, from lobola contributions to tent hire, with a running total against your fund.</div><div><span class="tagpill">Editable spreadsheet</span></div><div class="foot"><span class="cost">8 tokens</span><button class="btn ghost sm" data-act="unlock">Unlock</button></div></div>
+        <div class="item"><span class="itile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 4.5A2 2 0 016.5 3H19v18H6.5a2 2 0 01-2-2z"/><path d="M4.5 17.5A2 2 0 016.5 16H19"/></svg></span><div class="nm">Funeral planning guide</div><div class="ds">A checklist and timeline for the seven days, written for the person who suddenly has to organise everything.</div><div><span class="tagpill">Seven day checklist</span></div><div class="foot"><span class="cost">8 tokens</span><button class="btn ghost sm" data-act="unlock">Unlock</button></div></div>
+        <div class="item"><span class="itile"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg></span><div class="nm">Graduation party planner</div><div class="ds">Guest list template, venue comparison and a catering calculator that works backwards from headcount.</div><div><span class="tagpill">Catering calculator</span></div><div class="foot"><span class="cost">5 tokens</span><button class="btn ghost sm" data-act="unlock">Unlock</button></div></div>
+        <div class="item"><span class="itile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><div class="nm">Contribution analytics</div><div class="ds">Who contributed when, how giving moved over the life of the fund, and where the gaps opened up.</div><div><span class="tagpill">Fund insights</span></div><div class="foot"><span class="cost">10 tokens</span><button class="btn ghost sm" data-act="unlock">Unlock</button></div></div>
+        <div class="item"><span class="itile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6.5-6.1 6.5-10.5a6.5 6.5 0 10-13 0C5.5 14.9 12 21 12 21z"/><circle cx="12" cy="10.4" r="2.4"/></svg></span><div class="nm">Vendor directory</div><div class="ds">Caterers, venues and decorators by region with price guides. Vendor names you record stay private to your fund.</div><div><span class="tagpill">By region</span></div><div class="foot"><span class="cost">5 tokens</span><button class="btn ghost sm" data-act="unlock">Unlock</button></div></div>
+        <div class="item"><span class="itile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><div class="nm">Smart Plan</div><div class="ds">A suggested budget split for your event type and fund size, built from anonymised patterns across the platform.</div><div><span class="tagpill">Powered by AI</span></div><div class="foot"><span class="cost">8 tokens</span><button class="btn ghost sm" data-act="unlock">Unlock</button></div></div>
+      </div>
+      <div class="note"><b>Nothing you record is sold on.</b> Vendor names and member details stay inside your fund. Only anonymised, aggregated patterns feed Smart Plan.</div>
+    </section>
+
+    <!-- NEWS -->
+    <section class="view" id="v-news">
+      <div class="pagehead"><div><h1>News and <em>updates</em></h1><p class="lede">What is new in Tshelo, and what other organisers have learned.</p></div></div>
+      <div class="card"><div class="body"><ul class="news">
+        <li><div class="kind">Product update</div><h3>Plus ones now come with names</h3><p>When a guest says they are bringing three people, they tell you who. Your guest list, your caterer count and your door list all work off real names.</p><div class="date">10 August 2026</div></li>
+        <li><div class="kind">Product update</div><h3>Guest RSVP links no longer need the app</h3><p>Share an event on WhatsApp and your guests reply straight from the browser. They only need Tshelo if they want to contribute to the fund.</p><div class="date">6 August 2026</div></li>
+        <li><div class="kind">Tips and guides</div><h3>Closing a fund well: the last three things to do</h3><p>Scan the final receipts, let members see the totals for a week before you close, then export the audit report and share it in the group.</p><div class="date">29 July 2026</div></li>
+        <li><div class="kind">Country launch</div><h3>Kenya is next</h3><p>M-Pesa detection is in testing. Feature costs in tokens stay exactly the same, only the local price of a token pack changes.</p><div class="date">3 July 2026</div></li>
+      </ul></div></div>
+    </section>
+  </main>
+</div>
+
+<footer><div class="in">
+  <span>Tshelo · Data Sentinels (Pty) Ltd · tshelo.com</span>
+  <span>Tshelo never holds your money. Made with love for Africa.</span>
+</div></footer>
+</div>
+
+
+<!-- ================= GUEST: ENTER CODE ================= -->
+<div class="guestwrap" id="gcode">
+  <div class="guesttop">
+    <a class="logo" href="#"><span class="tile">T</span><span class="wordmark">Tshelo</span></a>
+    <div class="urlbar">tshelo.com/join</div>
+  </div>
+  <div class="codecard">
+    <h2>Enter your fund code</h2>
+    <div class="sub">Someone shared a fund or an event with you. Type the six character code they sent.</div>
+    <input class="codeinput" id="codeInput" maxlength="6" placeholder="ABC123" autocomplete="off" aria-label="Six character fund code">
+    <div class="errmsg" id="codeErr" style="text-align:center">That code was not found, has expired, or was withdrawn by the organiser.</div>
+    <button class="cta" id="codeGo">See the fund</button>
+    <div class="codehint">No account needed and nothing to download. Codes are six characters and never contain the letter O or the number zero, so there is nothing to confuse. Try <b>K7M2QP</b>.</div>
+  </div>
+</div>
+
+<!-- ================= GUEST: FUND ================= -->
+<div class="guestwrap" id="gfund">
+  <div class="guesttop">
+    <a class="logo" href="#"><span class="tile">T</span><span class="wordmark">Tshelo</span></a>
+    <div class="urlbar">tshelo.com/invite/K7M2QP</div>
+  </div>
+  <div class="gcard">
+    <div class="gbanner">
+      <div class="emoji">🕊️</div>
+      <h2>Mmadikwena Funeral</h2>
+      <div class="sub">Organised by Nono Bokete</div>
+    </div>
+    <div class="gbody">
+      <div class="prog"><div class="nums"><span><b>P12,400</b> raised</span><span>of P15,000</span></div><div class="track"><i style="width:83%"></i></div></div>
+      <div style="margin-top:20px">
+        <div class="gline"><span class="k">Contributors</span><span class="v">34 people</span></div>
+        <div class="gline"><span class="k">Organiser</span><span class="v">Nono Bokete</span></div>
+        <div class="gline"><span class="k">Fund closes</span><span class="v">30 August 2026</span></div>
+      </div>
+      <div class="stepwrap" id="c1">
+        <div class="stepnum">Step 1 of 3</div>
+        <div class="seclab" style="margin-bottom:12px">Contribute to this fund</div>
+        <div class="field">
+          <label for="cName">Your full name</label>
+          <input type="text" id="cName" placeholder="As the organiser knows you" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="cAmt">Amount in Pula</label>
+          <input type="text" id="cAmt" inputmode="numeric" placeholder="500">
+          <div class="amtrow" id="amtQuick">
+            <button data-a="200">P200</button><button data-a="500">P500</button>
+            <button data-a="1000">P1,000</button><button data-a="2000">P2,000</button>
+          </div>
+        </div>
+        <div class="errmsg" id="cErr">Please give your name and an amount so the organiser can match your payment.</div>
+        <button class="cta" id="cNext">Get the payment details</button>
+        <div style="text-align:center;margin-top:12px;font-size:12.5px;color:var(--ink-faint)">You pay through your own mobile money. Tshelo never touches the money.</div>
+      </div>
+
+      <div class="stepwrap" id="c2" style="display:none">
+        <div class="stepnum">Step 2 of 3</div>
+        <div class="seclab" style="margin-bottom:12px">Send <span id="echoAmt">P500</span> from your phone</div>
+        <div class="provtabs" id="provTabs">
+          <button data-p="orange" class="sel">Orange Money</button>
+          <button data-p="myzaka">MyZaka</button>
+          <button data-p="smega">Smega</button>
+        </div>
+        <div class="paybox">
+          <div class="payline"><span class="k">Send to</span><span style="display:flex;align-items:center;gap:10px"><span class="v" id="payNum">71 234 567</span><button class="copybtn" data-copy="payNum">Copy</button></span></div>
+          <div class="payline"><span class="k">Account name</span><span class="v tx">Nono Bokete</span></div>
+          <div class="payline"><span class="k">Reference</span><span style="display:flex;align-items:center;gap:10px"><span class="v" id="payRef">K7M2-041</span><button class="copybtn" data-copy="payRef">Copy</button></span></div>
+          <div class="payline"><span class="k">Amount</span><span class="v" id="payAmt">P500</span></div>
+        </div>
+        <div class="verify">
+          <span class="itile sm green" style="width:32px;height:32px;border-radius:10px"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l7.5 3v6c0 4.6-3.1 8.4-7.5 9.4-4.4-1-7.5-4.8-7.5-9.4v-6z"/><path d="M8.8 12.2l2.3 2.3 4.1-4.6"/></svg></span>
+          <span><b>This number is verified.</b> It belongs to the organiser of this fund and was checked against their mobile money identity. It has not changed since the fund opened on 12 June 2026.</span>
+        </div>
+        <div class="warnbox">
+          <b>If anyone sends you a different number, it is not this fund.</b>
+          Always open the link again rather than paying a number from a forwarded screenshot. Use the reference exactly as shown so your name appears against your payment.
+        </div>
+        <button class="cta" id="cPaid">I have sent it</button>
+        <button class="cta dark" id="cBack" style="background:transparent;color:var(--ink-soft);box-shadow:none;font-weight:500;margin-top:6px">Go back</button>
+      </div>
+
+      <div class="stepwrap" id="c3" style="display:none">
+        <div class="stepnum">Step 3 of 3</div>
+        <div class="pending">
+          <div class="big">Waiting for the organiser</div>
+          <div class="txt" id="pendTxt"></div>
+        </div>
+        <div class="warnbox">
+          <b>This is a record, not a receipt.</b>
+          Tshelo did not move your money and cannot confirm it on its own. Nono will see your payment arrive on her phone and confirm it against reference <b id="pendRef">K7M2-041</b>. If it does not appear within a day, contact her or your mobile money provider.
+        </div>
+        <button class="cta" id="cAnother" style="background:transparent;color:var(--ink-soft);box-shadow:none;font-weight:500">Contribute again</button>
+      </div>
+
+      <div class="privacy">You are seeing one fund that was shared with you. Individual names and amounts, the activity feed, and all expense details stay private to members. This link expires 90 days after it was created and the organiser can revoke it at any time.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GUEST: EVENT ================= -->
+<div class="guestwrap" id="gevent">
+  <div class="guesttop">
+    <a class="logo" href="#"><span class="tile">T</span><span class="wordmark">Tshelo</span></a>
+    <div class="urlbar">tshelo.com/invite/R4X9BT</div>
+  </div>
+  <div class="gcard">
+    <div class="gbanner">
+      <div class="emoji">💍</div>
+      <h2>Kabo and Lesedi</h2>
+      <div class="sub">You are invited. Please let us know if you can come.</div>
+    </div>
+    <div class="gbody">
+      <div class="gline"><span class="k">Date</span><span class="v">Saturday 14 November 2026</span></div>
+      <div class="gline"><span class="k">Time</span><span class="v">14:00</span></div>
+      <div class="gline"><span class="k">Venue</span><span class="v">Gaborone Sun Conference Centre<br><a href="#" style="font-size:12.5px;color:var(--purple);font-weight:600">Open in maps</a></span></div>
+
+      <div style="margin-top:24px">
+        <div class="seclab">Will you be there</div>
+        <div class="rsvp" id="rsvp">
+          <button data-r="yes">Yes</button>
+          <button data-r="no">No</button>
+          <button data-r="maybe">Maybe</button>
+        </div>
+
+        <div id="bringWrap" style="margin-top:18px;display:none">
+          <div class="seclab">How many are you bringing</div>
+          <select id="plus" aria-label="Number of additional guests">
+            <option value="0">Just me</option>
+            <option value="1">Plus one</option>
+            <option value="2">Plus two</option>
+            <option value="3">Plus three</option>
+            <option value="4">Plus four</option>
+          </select>
+        </div>
+
+        <div class="guestbox" id="guestbox">
+          <h4>Who are you bringing</h4>
+          <div class="why">Kabo and Lesedi need names for the seating plan and the caterer. Full names please.</div>
+          <div id="nameFields"></div>
+          <div class="errmsg" id="errmsg">Please give a name for every guest you are bringing.</div>
+        </div>
+
+        <button class="cta dark" id="sendRsvp">Send my reply</button>
+
+        <div class="done" id="rsvpDone">
+          <b>Thank you, your reply is with Kabo and Lesedi.</b>
+          <span id="doneDetail"></span>
+        </div>
+      </div>
+
+      <div style="margin-top:26px;padding-top:20px;border-top:1px solid var(--rule)">
+        <div class="seclab">The couple's fund</div>
+        <div class="prog"><div class="nums"><span><b>P28,600</b> raised</span><span>of P40,000</span></div><div class="track"><i style="width:72%"></i></div></div>
+        <button class="cta">Contribute to the fund<small>Opens the Tshelo app</small></button>
+      </div>
+
+      <div class="privacy">You can reply without an account. You are seeing one event that was shared with you, and you cannot see the full guest list, other replies, or the budget. Names you give are shared only with the organisers of this event. This link expires 30 days after the event date.</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <header><span class="itile sm" id="mIcon"></span><h3 id="mTitle"></h3><button class="x" id="mClose" aria-label="Close">&times;</button></header>
+    <div class="mbody" id="mBody"></div>
+    <footer id="mFoot"></footer>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* section switching */
+const links=[...document.querySelectorAll('nav.side a')];
+function show(v){
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
+  links.forEach(a=>a.classList.toggle('on',a.dataset.v===v));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+links.forEach(a=>a.addEventListener('click',e=>{e.preventDefault();show(a.dataset.v);}));
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.go)));
+const pill=document.getElementById('tokenPill');
+pill.addEventListener('click',()=>show('tokens'));
+pill.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show('tokens');}});
+
+/* token packs */
+let bal=38;
+document.querySelectorAll('.pack').forEach(p=>p.addEventListener('click',()=>ACT.buyPack(p)));
+
+/* ---------- RSVP with named plus ones ---------- */
+const rsvpBtns=[...document.querySelectorAll('#rsvp button')];
+const bringWrap=document.getElementById('bringWrap');
+const plusSel=document.getElementById('plus');
+const guestbox=document.getElementById('guestbox');
+const nameFields=document.getElementById('nameFields');
+const errmsg=document.getElementById('errmsg');
+const doneBox=document.getElementById('rsvpDone');
+const doneDetail=document.getElementById('doneDetail');
+let reply=null;
+
+function buildNames(){
+  const n=parseInt(plusSel.value,10);
+  guestbox.classList.toggle('on', n>0);
+  nameFields.innerHTML='';
+  for(let i=1;i<=n;i++){
+    const row=document.createElement('div'); row.className='namerow';
+    const lab=document.createElement('label'); lab.setAttribute('for','g'+i); lab.textContent='Guest '+i;
+    const inp=document.createElement('input'); inp.type='text'; inp.id='g'+i;
+    inp.placeholder='Full name'; inp.autocomplete='off';
+    inp.addEventListener('input',()=>{inp.classList.remove('err');errmsg.classList.remove('on');});
+    row.append(lab,inp); nameFields.appendChild(row);
+  }
+}
+rsvpBtns.forEach(b=>b.addEventListener('click',()=>{
+  rsvpBtns.forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');
+  reply=b.dataset.r;
+  doneBox.classList.remove('on');
+  const bringing = reply!=='no';
+  bringWrap.style.display = bringing?'block':'none';
+  if(!bringing){ plusSel.value='0'; guestbox.classList.remove('on'); nameFields.innerHTML=''; }
+  else buildNames();
+}));
+plusSel.addEventListener('change',buildNames);
+
+document.getElementById('sendRsvp').addEventListener('click',()=>{
+  if(!reply){ errmsg.textContent='Please tell us whether you can come.'; errmsg.classList.add('on'); return; }
+  const inputs=[...nameFields.querySelectorAll('input')];
+  const missing=inputs.filter(i=>!i.value.trim());
+  if(missing.length){
+    missing.forEach(i=>i.classList.add('err'));
+    errmsg.textContent='Please give a name for every guest you are bringing.';
+    errmsg.classList.add('on');
+    missing[0].focus();
+    return;
+  }
+  errmsg.classList.remove('on');
+  const names=inputs.map(i=>i.value.trim());
+  const wordFor={yes:'attending',no:'not attending',maybe:'a maybe'};
+  doneDetail.textContent = reply==='no'
+    ? 'Marked as not attending. They will miss you.'
+    : 'You are down as ' + wordFor[reply] + (names.length
+        ? ', bringing ' + names.join(', ') + '. Head count ' + (names.length+1) + '.'
+        : ', just you. Head count 1.');
+  doneBox.classList.add('on');
+  doneBox.scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+
+
+
+/* ================= mock interactions ================= */
+const ov=document.getElementById('overlay'),mTitle=document.getElementById('mTitle'),
+      mBody=document.getElementById('mBody'),mFoot=document.getElementById('mFoot'),
+      mIcon=document.getElementById('mIcon'),toastEl=document.getElementById('toast');
+const SVG={
+ fund:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M14.6 9.6a2.8 2.8 0 00-2.6-1.4c-1.5 0-2.6.9-2.6 2.1 0 2.9 5.2 1.4 5.2 4.2 0 1.2-1.1 2.1-2.6 2.1a2.8 2.8 0 01-2.6-1.4"/>',
+ cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/>',
+ people:'<circle cx="9" cy="8.5" r="3.3"/><path d="M2.8 19.5a6.4 6.4 0 0112.4 0"/><path d="M16.2 6a3.3 3.3 0 010 6"/><path d="M17.4 14.2a6.4 6.4 0 013.8 5.3"/>',
+ link:'<path d="M10 13.8a4.2 4.2 0 006.3.45l2.5-2.5a4.2 4.2 0 00-5.95-5.95l-1.4 1.4"/><path d="M14 10.2a4.2 4.2 0 00-6.3-.45l-2.5 2.5a4.2 4.2 0 005.95 5.95l1.4-1.4"/>',
+ card:'<rect x="2.5" y="5" width="19" height="14" rx="3.5"/><path d="M2.5 10h19"/>',
+ spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+ doc:'<path d="M6 2.5h7l5 5v14H6z"/><path d="M13 2.5v5h5"/><path d="M9.5 12.5h6M9.5 16h4"/>',
+ check:'<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.2l2.7 2.7L16.3 9.3"/>'
+};
+let toastT;
+function toast(msg){clearTimeout(toastT);toastEl.textContent=msg;toastEl.classList.add('on');
+  toastT=setTimeout(()=>toastEl.classList.remove('on'),2600);}
+function closeModal(){ov.classList.remove('on');}
+function modal(o){
+  mTitle.textContent=o.title;
+  mIcon.innerHTML='<svg viewBox="0 0 24 24">'+(SVG[o.icon]||SVG.doc)+'</svg>';
+  mIcon.className='itile sm'+(o.tone?' '+o.tone:'');
+  mBody.innerHTML=o.body;
+  mFoot.innerHTML=(o.cancel===false?'':'<button class="btn ghost" data-close>Cancel</button>')+
+    (o.action?'<button class="btn purple" id="mGo">'+o.action+'</button>':'');
+  ov.classList.add('on');
+  if(o.action&&o.onGo) document.getElementById('mGo').addEventListener('click',o.onGo);
+  if(o.after) o.after();
+}
+document.getElementById('mClose').addEventListener('click',closeModal);
+ov.addEventListener('click',e=>{if(e.target===ov||e.target.hasAttribute('data-close'))closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+/* --- helpers --- */
+function download(name,mime,text){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type:mime}));
+  a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+const EV={title:'Kabo and Lesedi Wedding',loc:'Gaborone Sun Conference Centre, Gaborone, Botswana',
+  start:'20261114T120000Z',end:'20261114T180000Z',
+  desc:'Kabo and Lesedi are getting married. RSVP and fund: https://tshelo.com/invite/R4X9BT'};
+function icsText(){
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Tshelo//Events//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+   'BEGIN:VEVENT','UID:R4X9BT@tshelo.com','DTSTAMP:20260812T090000Z','DTSTART:'+EV.start,'DTEND:'+EV.end,
+   'SUMMARY:'+EV.title,'LOCATION:'+EV.loc,'DESCRIPTION:'+EV.desc,'URL:https://tshelo.com/invite/R4X9BT',
+   'BEGIN:VALARM','TRIGGER:-P1D','ACTION:DISPLAY','DESCRIPTION:'+EV.title+' is tomorrow','END:VALARM',
+   'END:VEVENT','END:VCALENDAR'].join('\r\n');
+}
+const gcalURL='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(EV.title)+
+  '&dates='+EV.start+'/'+EV.end+'&details='+encodeURIComponent(EV.desc)+'&location='+encodeURIComponent(EV.loc);
+const outlookURL='https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject='+
+  encodeURIComponent(EV.title)+'&startdt=2026-11-14T14:00:00&enddt=2026-11-14T20:00:00&location='+encodeURIComponent(EV.loc)+
+  '&body='+encodeURIComponent(EV.desc);
+
+/* --- actions --- */
+const ACT={
+ createFund:()=>modal({title:'Create a fund',icon:'fund',action:'Create fund',body:`
+   <div class="field"><label for="fName">Fund name</label><input id="fName" type="text" placeholder="Mmadikwena Funeral"></div>
+   <div class="frow">
+     <div class="field"><label for="fType">What is it for</label><select id="fType"><option>Funeral</option><option>Wedding</option><option>Graduation</option><option>Party</option><option>Society or stokvel</option><option>Other</option></select></div>
+     <div class="field"><label for="fGoal">Goal in Pula</label><input id="fGoal" type="text" inputmode="numeric" placeholder="15000"></div>
+   </div>
+   <label class="switch"><input type="checkbox" id="fEvent"><span><span class="t">Also create an event for this</span><span class="d">Adds a date, venue and guest list. A budget only appears when a fund and an event are paired.</span></span></label>
+   <div class="mnote"><b>This is your second fund this year.</b> It costs 10 tokens, leaving you <b id="fLeft"></b>. Your first fund each year is always free.</div>`,
+   after:()=>{document.getElementById('fLeft').textContent=(bal-10)+' tokens';},
+   onGo:()=>{const n=(document.getElementById('fName').value||'Untitled fund');
+     const combo=document.getElementById('fEvent').checked;
+     bal-=combo?15:10;setBal();closeModal();
+     toast(combo?('"'+n+'" created with a linked event. 15 tokens spent.'):('"'+n+'" created. 10 tokens spent.'));}}),
+
+ createEvent:()=>modal({title:'Create an event',icon:'cal',action:'Create event',body:`
+   <div class="field"><label for="eName">Event name</label><input id="eName" type="text" placeholder="Kabo and Lesedi Wedding"></div>
+   <div class="frow">
+     <div class="field"><label for="eDate">Date</label><input id="eDate" type="date" value="2026-11-14" style="width:100%;border-radius:var(--r-sm)"></div>
+     <div class="field"><label for="eTime">Time</label><input id="eTime" type="text" value="14:00"></div>
+   </div>
+   <div class="field"><label for="eVenue">Venue</label><input id="eVenue" type="text" placeholder="Gaborone Sun Conference Centre"></div>
+   <label class="switch"><input type="checkbox" id="eFund"><span><span class="t">Link a fund to this event</span><span class="d">Only then does a budget exist. Without a fund this is a guest list, a date and a venue.</span></span></label>
+   <div id="budgetPanel" style="display:none;margin-top:16px">
+     <div class="field"><label for="eBudget">What will the day cost, in Pula</label><input id="eBudget" type="text" inputmode="numeric" value="40000"></div>
+     <div class="field"><label for="eSlider">How much of that should the fund raise <b id="ePct">80%</b></label><input id="eSlider" type="range" min="0" max="100" value="80"></div>
+     <div class="split">
+       <div><div class="k">Budget</div><div class="v" id="sB">P40,000</div></div>
+       <div><div class="k">Fund goal</div><div class="v p" id="sG">P32,000</div></div>
+       <div><div class="k">You pay</div><div class="v" id="sY">P8,000</div></div>
+     </div>
+   </div>
+   <div class="mnote amber"><b>Only organisers ever see the budget.</b> Members see the fund goal and how close it is. Guests see neither.</div>`,
+   after:()=>{
+     const cb=document.getElementById('eFund'),bp=document.getElementById('budgetPanel'),
+           sl=document.getElementById('eSlider'),bu=document.getElementById('eBudget');
+     const upd=()=>{const b=parseInt(String(bu.value).replace(/[^0-9]/g,''),10)||0,pc=+sl.value;
+       const g=Math.round(b*pc/100);
+       document.getElementById('ePct').textContent=pc+'%';
+       document.getElementById('sB').textContent='P'+b.toLocaleString('en-US');
+       document.getElementById('sG').textContent='P'+g.toLocaleString('en-US');
+       document.getElementById('sY').textContent='P'+(b-g).toLocaleString('en-US');};
+     cb.addEventListener('change',()=>{bp.style.display=cb.checked?'block':'none';});
+     sl.addEventListener('input',upd);bu.addEventListener('input',upd);upd();},
+   onGo:()=>{const linked=document.getElementById('eFund').checked;
+     bal-=linked?15:10;setBal();closeModal();
+     toast(linked?'Event created and linked to a new fund. 15 tokens spent.':'Event created. Guest list only, no budget. 10 tokens spent.');}}),
+
+ calendar:()=>modal({title:'Add to your calendar',icon:'cal',cancel:false,action:'Done',onGo:closeModal,body:`
+   <div style="font-size:14px;color:var(--ink-soft)">Kabo and Lesedi Wedding, Saturday 14 November 2026 at 14:00, Gaborone Sun Conference Centre.</div>
+   <div class="sharegrid">
+     <button data-cal="google"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg>Google Calendar</button>
+     <button data-cal="outlook"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg>Outlook</button>
+     <button data-cal="ics"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4 20h16"/></svg>Apple or other</button>
+   </div>
+   <label class="switch" style="margin-top:16px"><input type="checkbox" id="autoSync"><span><span class="t">Keep my calendar in sync automatically</span><span class="d">Connect Google or Outlook once. Every event you organise or accept appears in your calendar, and changes to the date or venue update it.</span></span></label>
+   <div class="mnote"><b>One way is instant, two way needs a connection.</b> The three buttons above work right now with no account. Automatic sync needs you to connect the calendar so Tshelo can update the entry when details change.</div>`,
+   after:()=>{
+     document.querySelectorAll('[data-cal]').forEach(b=>b.addEventListener('click',()=>{
+       const k=b.dataset.cal;
+       if(k==='google'){window.open(gcalURL,'_blank');toast('Opening Google Calendar');}
+       else if(k==='outlook'){window.open(outlookURL,'_blank');toast('Opening Outlook');}
+       else{download('kabo-and-lesedi-wedding.ics','text/calendar',icsText());toast('Calendar file downloaded');}
+     }));
+     document.getElementById('autoSync').addEventListener('change',e=>{
+       if(e.target.checked)toast('In the real build this opens Google or Microsoft sign in');});}}),
+
+ shareRsvp:()=>modal({title:'Share the RSVP link',icon:'link',cancel:false,action:'Done',onGo:closeModal,body:`
+   <div style="font-size:14px;color:var(--ink-soft)">Anyone with this link can reply without an account and without downloading anything.</div>
+   <div class="linkbox"><code>tshelo.com/invite/R4X9BT</code><button class="copybtn" data-copytext="https://tshelo.com/invite/R4X9BT">Copy</button></div>
+   <div class="sharegrid">
+     <button data-share="wa"><svg viewBox="0 0 24 24"><path d="M3.5 20.5l1.4-4.6A8.2 8.2 0 1112 20.2a8.2 8.2 0 01-4.2-1.15z"/></svg>WhatsApp</button>
+     <button data-share="sms"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>SMS</button>
+     <button data-share="qr"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="6"/><rect x="14.5" y="3.5" width="6" height="6"/><rect x="3.5" y="14.5" width="6" height="6"/><path d="M14.5 14.5h3v3h-3zM20.5 20.5h-3"/></svg>QR code</button>
+   </div>
+   <div class="mnote amber"><b>The link forwards.</b> Anyone who receives it can see the event and reply. It expires 30 days after the event date and you can withdraw it at any time from here.</div>`,
+   after:()=>{
+     document.querySelectorAll('[data-share]').forEach(b=>b.addEventListener('click',()=>{
+       const m={wa:'WhatsApp',sms:'your messages app',qr:'a printable QR code'}[b.dataset.share];
+       toast('Opens '+m+' in the real build');}));}}),
+
+ invite:()=>modal({title:'Invite members',icon:'people',cancel:false,action:'Done',onGo:closeModal,body:`
+   <div style="font-size:14px;color:var(--ink-soft)">Members can see every contribution and every expense on this fund. Only invite people who should.</div>
+   <div class="linkbox"><code>tshelo.com/invite/K7M2QP</code><button class="copybtn" data-copytext="https://tshelo.com/invite/K7M2QP">Copy</button></div>
+   <div class="sharegrid">
+     <button data-share="wa"><svg viewBox="0 0 24 24"><path d="M3.5 20.5l1.4-4.6A8.2 8.2 0 1112 20.2a8.2 8.2 0 01-4.2-1.15z"/></svg>WhatsApp</button>
+     <button data-share="sms"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>SMS</button>
+   </div>
+   <div class="mnote"><b>34 of 50 seats used.</b> This fund is unlocked to 50 members. Going past 50 costs 30 tokens, or is included in Unlimited.</div>`,
+   after:()=>{document.querySelectorAll('[data-share]').forEach(b=>b.addEventListener('click',()=>toast('Opens the share sheet in the real build')));}}),
+
+ record:()=>modal({title:'Record a contribution',icon:'fund',action:'Record it',body:`
+   <div class="mnote green" style="margin-top:0"><b>Detected from an SMS on your phone</b> Orange Money, P1,000 received from 71 902 118 at 09:14 today.</div>
+   <div class="frow" style="margin-top:16px">
+     <div class="field"><label for="rWho">Who sent it</label><input id="rWho" type="text" value="Kagiso Serema"></div>
+     <div class="field"><label for="rAmt">Amount</label><input id="rAmt" type="text" value="1000"></div>
+   </div>
+   <div class="field"><label for="rNote">Note, optional</label><input id="rNote" type="text" placeholder="Second instalment"></div>
+   <div class="mnote"><b>Everyone in the fund will see this.</b> If you change it later, the edit is logged with your name and the time, and members can see what changed.</div>`,
+   onGo:()=>{closeModal();toast('P1,000 from Kagiso Serema recorded. All 34 members notified.');}}),
+
+ richAuntie:()=>modal({title:'Add a Rich Auntie',icon:'spark',tone:'amber',action:'Add blessing',body:`
+   <div style="font-size:14px;color:var(--ink-soft)">For generosity that happens outside the fund. Someone who paid a vendor directly, lent a bakkie, or gave far above the ask.</div>
+   <div class="field" style="margin-top:16px"><label for="raName">Who blessed the fund</label><input id="raName" type="text" placeholder="Mma Kgomotso"></div>
+   <div class="field"><label for="raWhat">What they did</label><input id="raWhat" type="text" placeholder="Paid the caterer directly"></div>
+   <div class="field"><label for="raVal">Estimated value, optional</label><input id="raVal" type="text" inputmode="numeric" placeholder="2500"></div>
+   <div class="mnote amber"><b>Not counted towards the goal.</b> Rich Auntie contributions are celebrated and appear in the final report, but the progress bar only reflects money that came through the fund.</div>`,
+   onGo:()=>{closeModal();toast('Blessing added. Members can react to it.');}}),
+
+ interim:()=>modal({title:'Interim report',icon:'doc',action:'Spend 3 tokens',body:`
+   <div style="font-size:14px;color:var(--ink-soft)">A PDF of Mmadikwena Funeral as it stands today: every contribution, every expense, every edit, with receipt images attached.</div>
+   <div class="summ" style="margin-top:14px"><span>Interim report</span><span class="v">3 tokens</span></div>
+   <div class="summ"><span>Your balance after</span><span class="v" id="iLeft"></span></div>
+   <div class="mnote"><b>The report at closing is always free.</b> This one is for showing the family where things stand before the fund ends.</div>`,
+   after:()=>{document.getElementById('iLeft').textContent=(bal-3)+' tokens';},
+   onGo:()=>{bal-=3;setBal();closeModal();toast('Report generated. 3 tokens spent.');}}),
+
+ closeFund:()=>modal({title:'Close this fund',icon:'check',action:'Close and generate report',body:`
+   <div style="font-size:14px;color:var(--ink-soft)">Kabo and Lesedi Wedding, P28,600 raised from 52 members across 88 contributions.</div>
+   <div class="mnote amber" style="margin-top:14px"><b>Closing cannot be undone.</b> No further contributions or expenses can be added. The record stays visible to every member forever and the audit trail is locked.</div>
+   <div class="mnote green"><b>The final audit report is free.</b> It is generated the moment you close and shared with every member automatically.</div>`,
+   onGo:()=>{closeModal();toast('Fund closed. Final report sent to all 52 members.');}}),
+
+ unlock:(btn)=>{
+   const item=btn.closest('.item'),name=item.querySelector('.nm').textContent;
+   const cost=parseInt(item.querySelector('.cost').textContent,10);
+   modal({title:'Unlock '+name,icon:'spark',action:'Spend '+cost+' tokens',body:`
+     <div style="font-size:14px;color:var(--ink-soft)">${item.querySelector('.ds').textContent}</div>
+     <div class="summ" style="margin-top:14px"><span>${name}</span><span class="v">${cost} tokens</span></div>
+     <div class="summ"><span>Your balance after</span><span class="v">${bal-cost} tokens</span></div>
+     <div class="mnote"><b>Yours to keep.</b> Once unlocked it stays in your account and can be used on every fund and event you run.</div>`,
+     onGo:()=>{if(bal<cost){closeModal();toast('Not enough tokens. Top up first.');return;}
+       bal-=cost;setBal();closeModal();toast(name+' unlocked.');}});},
+
+ buyPack:(btn)=>{const tok=parseInt(btn.dataset.tok,10);
+   const price={10:'P5',30:'P13',60:'P24',120:'P45'}[tok];
+   checkout('Buy '+tok+' tokens',price,()=>{bal+=tok;setBal();toast(tok+' tokens added to your balance.');});},
+
+ buyPass:()=>checkout('Tshelo Unlimited, 12 months','P150',()=>toast('Unlimited is active until 12 August 2027.')),
+
+ exportGuests:()=>{
+   const rows=[['Guest','Reply','Bringing','Head count']];
+   document.querySelectorAll('#guestTable tbody tr').forEach(tr=>{
+     const c=[...tr.children].map(td=>td.innerText.replace(/\n/g,'; ').trim());
+     rows.push(c);});
+   download('kabo-and-lesedi-guest-list.csv','text/csv',
+     rows.map(r=>r.map(v=>'"'+v.replace(/"/g,'""')+'"').join(',')).join('\n'));
+   toast('Guest list downloaded with every named plus one.');},
+
+ exportPdf:()=>toast('Your statement is being prepared and will download shortly.'),
+ yearEnd:()=>toast('Your 2026 summary is generated every January.'),
+ auditReport:()=>toast('Final audit report downloading.'),
+ auditTrail:()=>modal({title:'Audit trail',icon:'doc',cancel:false,action:'Close',onGo:closeModal,body:`
+   <ul class="feed" style="margin:0">
+     <li><span class="itile sm plain"><svg viewBox="0 0 24 24">${SVG.check}</svg></span><div class="txt"><b>Fund closed</b><small>Nono Bokete · 12 Mar 2026, 16:40</small></div><div class="when"></div></li>
+     <li><span class="itile sm plain"><svg viewBox="0 0 24 24">${SVG.doc}</svg></span><div class="txt"><b>Contribution edited from P500 to P5,000</b><small>Nono Bokete · 09 Mar 2026, 11:02 · reason: sender confirmed amount</small></div><div class="when"></div></li>
+     <li><span class="itile sm plain"><svg viewBox="0 0 24 24">${SVG.fund}</svg></span><div class="txt"><b>Expense added, P486 Choppies</b><small>Nono Bokete · 07 Mar 2026, 14:19 · receipt attached</small></div><div class="when"></div></li>
+   </ul>
+   <div class="mnote"><b>Nothing here can be deleted.</b> Every change keeps its author and its timestamp, and every member can read this.</div>`}),
+ viewFund:()=>toast('Opens the full fund view in the real build.'),
+ remind:()=>toast('Reminder sent to 6 guests who have not replied.'),
+ expense:()=>toast('Opens the scan or upload receipt flow.'),
+ linkFund:()=>toast('Links a fund and turns on budget tracking for this event.'),
+ rsvpSelf:()=>toast('Opens your RSVP for Aunt Neo\u2019s 60th.'),
+};
+
+function checkout(what,price,onDone){
+  modal({title:'Checkout',icon:'card',action:'Pay '+price,body:`
+    <div class="summ" style="padding-top:0"><span>${what}</span><span class="v">${price}</span></div>
+    <div class="paytab" id="payTab" style="margin-top:18px">
+      <button data-m="card" class="sel">Card</button>
+      <button data-m="momo">Mobile money</button>
+      <button data-m="bank">Bank transfer</button>
+    </div>
+    <div id="payPane"></div>
+    <div class="stripebar" id="payBar"></div>`,
+    after:()=>{
+      const pane=document.getElementById('payPane'),bar=document.getElementById('payBar');
+      const panes={
+        card:`<div class="cardbox">
+            <div class="row"><span style="color:var(--ink-faint)">Card number</span><span>4242 4242 4242 4242</span></div>
+            <div class="row"><span style="color:var(--ink-faint)">Expiry</span><span>04 / 29</span></div>
+            <div class="row"><span style="color:var(--ink-faint)">CVC</span><span>•••</span></div>
+          </div>`,
+        momo:`<div class="paybox"><div class="payline"><span class="k">Provider</span><span class="v tx">Orange Money</span></div>
+            <div class="payline"><span class="k">Your number</span><span class="v">71 902 118</span></div>
+            <div class="payline"><span class="k">Confirm on</span><span class="v tx">Your phone, USSD prompt</span></div></div>`,
+        bank:`<div class="paybox"><div class="payline"><span class="k">Bank</span><span class="v tx">First National Bank Botswana</span></div>
+            <div class="payline"><span class="k">Reference</span><span class="v">TOK-4471</span></div>
+            <div class="payline"><span class="k">Clears in</span><span class="v tx">1 to 2 business days</span></div></div>`};
+      const bars={card:'Payments secured by <b>Stripe</b>. Tshelo never stores your card details.',
+        momo:'Processed by our <b>local mobile money partner</b>, not by Stripe.',
+        bank:'Manual reconciliation. Tokens are credited once the transfer clears.'};
+      const set=m=>{pane.innerHTML=panes[m];bar.innerHTML=bars[m];};
+      set('card');
+      document.querySelectorAll('#payTab button').forEach(b=>b.addEventListener('click',()=>{
+        document.querySelectorAll('#payTab button').forEach(x=>x.classList.remove('sel'));
+        b.classList.add('sel');set(b.dataset.m);}));},
+    onGo:()=>{closeModal();onDone&&onDone();}});
+}
+function setBal(){document.getElementById('balN').textContent=bal;document.getElementById('balA').textContent=bal;}
+
+document.addEventListener('click',e=>{
+  const cp=e.target.closest('[data-copytext]');
+  if(cp){navigator.clipboard&&navigator.clipboard.writeText(cp.dataset.copytext);
+    const o=cp.textContent;cp.textContent='Copied';setTimeout(()=>cp.textContent=o,1300);return;}
+  const b=e.target.closest('[data-act]');
+  if(!b)return;
+  const fn=ACT[b.dataset.act];
+  if(fn){e.preventDefault();fn(b);}
+});
+
+/* ---------- guest: code entry ---------- */
+const codeInput=document.getElementById('codeInput');
+const codeErr=document.getElementById('codeErr');
+const VALID=['K7M2QP','R4X9BT'];
+codeInput.addEventListener('input',()=>{
+  codeInput.value=codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  codeInput.classList.remove('err'); codeErr.classList.remove('on');
+});
+function submitCode(){
+  const v=codeInput.value.trim();
+  if(!VALID.includes(v)){
+    codeInput.classList.add('err'); codeErr.classList.add('on'); codeInput.focus(); return;
+  }
+  setMode(v==='R4X9BT'?'gevent':'gfund');
+}
+document.getElementById('codeGo').addEventListener('click',submitCode);
+codeInput.addEventListener('keydown',e=>{if(e.key==='Enter')submitCode();});
+
+/* ---------- guest: contribute ---------- */
+const c1=document.getElementById('c1'),c2=document.getElementById('c2'),c3=document.getElementById('c3');
+const cName=document.getElementById('cName'),cAmt=document.getElementById('cAmt'),cErr=document.getElementById('cErr');
+const NUMBERS={orange:'71 234 567',myzaka:'74 556 018',smega:'76 902 447'};
+let refSeq=41;
+const fmt=n=>'P'+Number(n).toLocaleString('en-US');
+
+document.querySelectorAll('#amtQuick button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#amtQuick button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); cAmt.value=b.dataset.a; cAmt.classList.remove('err'); cErr.classList.remove('on');
+}));
+[cName,cAmt].forEach(i=>i.addEventListener('input',()=>{i.classList.remove('err');cErr.classList.remove('on');}));
+
+document.getElementById('cNext').addEventListener('click',()=>{
+  const amt=parseInt(String(cAmt.value).replace(/[^0-9]/g,''),10);
+  let bad=false;
+  if(!cName.value.trim()){cName.classList.add('err');bad=true;}
+  if(!amt||amt<1){cAmt.classList.add('err');bad=true;}
+  if(bad){cErr.classList.add('on');return;}
+  const initials=cName.value.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const ref='K7M2-'+initials+String(refSeq).padStart(2,'0');
+  document.getElementById('payRef').textContent=ref;
+  document.getElementById('pendRef').textContent=ref;
+  document.getElementById('payAmt').textContent=fmt(amt);
+  document.getElementById('echoAmt').textContent=fmt(amt);
+  document.getElementById('pendTxt').textContent=
+    cName.value.trim()+', your '+fmt(amt)+' will show on this fund as pending until Nono confirms it arrived.';
+  c1.style.display='none'; c2.style.display='block';
+  c2.scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+document.querySelectorAll('#provTabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#provTabs button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');
+  document.getElementById('payNum').textContent=NUMBERS[b.dataset.p];
+}));
+document.querySelectorAll('.copybtn').forEach(b=>b.addEventListener('click',()=>{
+  const t=document.getElementById(b.dataset.copy).textContent.replace(/\s/g,'');
+  navigator.clipboard&&navigator.clipboard.writeText(t);
+  const o=b.textContent; b.textContent='Copied'; setTimeout(()=>b.textContent=o,1300);
+}));
+document.getElementById('cBack').addEventListener('click',()=>{c2.style.display='none';c1.style.display='block';});
+document.getElementById('cPaid').addEventListener('click',()=>{
+  c2.style.display='none'; c3.style.display='block'; refSeq++;
+  c3.scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+document.getElementById('cAnother').addEventListener('click',()=>{
+  c3.style.display='none'; c1.style.display='block';
+  cName.value=''; cAmt.value='';
+  document.querySelectorAll('#amtQuick button').forEach(x=>x.classList.remove('sel'));
+});
+
+/* prototype modes */
+
+const modes={app:document.getElementById('app'),gcode:document.getElementById('gcode'),
+  gfund:document.getElementById('gfund'),gevent:document.getElementById('gevent')};
+function setMode(m){
+  document.querySelectorAll('.demo button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  modes.app.style.display = m==='app'?'block':'none';
+  ['gcode','gfund','gevent'].forEach(k=>modes[k].classList.toggle('on',k===m));
+  window.scrollTo({top:0});
+}
+document.querySelectorAll('.demo button').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.mode)));
+</script>
