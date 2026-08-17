@@ -7,13 +7,13 @@ import { createClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 
 export default async function FundsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const admin = await requirePlatformAdmin()
   const rawQuery = (await searchParams).q ?? ''
   const query = rawQuery.replace(/[,%()]/g, '').trim().slice(0, 60)
   const supabase = await createClient()
+  const adminPromise = requirePlatformAdmin(supabase)
   let request = supabase.from('funds').select('id, title, fund_code, fund_type, currency_code, goal_amount, status, created_at').order('created_at', { ascending: false }).limit(50)
   if (query) request = /^\d+$/.test(query) ? request.ilike('fund_code', `%${query}%`) : request.ilike('title', `%${query}%`)
-  const { data: funds, error } = await request
+  const [admin, { data: funds, error }] = await Promise.all([adminPromise, request])
 
   return (
     <AppShell admin={admin} title="Funds" description="Review funds and their current operating status." action={<SearchForm defaultValue={query} placeholder="Search funds" />}>

@@ -7,10 +7,10 @@ import { createClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const admin = await requirePlatformAdmin()
   const rawQuery = (await searchParams).q ?? ''
   const query = rawQuery.replace(/[,%()]/g, '').trim().slice(0, 60)
   const supabase = await createClient()
+  const adminPromise = requirePlatformAdmin(supabase)
   let request = supabase
     .from('users')
     .select('id, name, phone, country_code, trust_level, is_flagged, is_banned, profile_completed, created_at')
@@ -19,7 +19,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     .limit(50)
 
   if (query) request = /^\+?\d+$/.test(query) ? request.ilike('phone', `%${query}%`) : request.ilike('name', `%${query}%`)
-  const { data: users, error } = await request
+  const [admin, { data: users, error }] = await Promise.all([adminPromise, request])
 
   return (
     <AppShell admin={admin} title="Users" description="Search and review registered Tshelo accounts." action={<SearchForm defaultValue={query} placeholder="Search users" />}>

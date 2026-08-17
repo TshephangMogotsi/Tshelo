@@ -42,7 +42,7 @@ export function AppShell({ admin, title, description, children, action }: Props)
       <header className="topbar">
         <div className="topbar-inner">
           <button className="menu-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}><Menu size={22} /></button>
-          <Link className="topbar-brand" href="/">
+          <Link className="topbar-brand" href="/" prefetch>
             <Image src="/tshelo-icon.png" width={36} height={36} alt="" priority />
             <span>Tshelo</span>
             <small>Admin</small>
@@ -65,7 +65,7 @@ export function AppShell({ admin, title, description, children, action }: Props)
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = href === '/' ? pathname === href : pathname.startsWith(href)
             return (
-              <Link key={href} href={href} className={active ? 'active' : ''} onClick={() => setMenuOpen(false)}>
+              <Link key={href} href={href} prefetch className={active ? 'active' : ''} onClick={() => setMenuOpen(false)}>
                 <Icon size={18} /><span>{label}</span>
               </Link>
             )

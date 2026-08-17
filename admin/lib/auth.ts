@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from './supabase-server'
 
+type ServerClient = Awaited<ReturnType<typeof createClient>>
+
 export type PlatformAdmin = {
   userId: string
   role: 'support' | 'operations' | 'finance' | 'super_admin'
@@ -8,33 +10,33 @@ export type PlatformAdmin = {
   phone: string
 }
 
-export async function requirePlatformAdmin(): Promise<PlatformAdmin> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export async function requirePlatformAdmin(client?: ServerClient): Promise<PlatformAdmin> {
+  const supabase = client ?? await createClient()
+  const { data: auth } = await supabase.auth.getClaims()
+  const userId = auth?.claims.sub
 
-  if (!user) redirect('/login')
+  if (!userId) redirect('/login')
 
-  const { data: admin } = await supabase
-    .from('platform_admins')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const [{ data: admin }, { data: profile }] = await Promise.all([
+    supabase
+      .from('platform_admins')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle(),
+    supabase
+      .from('users')
+      .select('name, phone')
+      .eq('id', userId)
+      .maybeSingle(),
+  ])
 
   if (!admin) redirect('/unauthorized')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('name, phone')
-    .eq('id', user.id)
-    .maybeSingle()
-
   return {
-    userId: user.id,
+    userId,
     role: admin.role as PlatformAdmin['role'],
     name: profile?.name ?? 'Tshelo admin',
-    phone: profile?.phone ?? user.phone ?? '',
+    phone: profile?.phone ?? (typeof auth.claims.phone === 'string' ? auth.claims.phone : ''),
   }
 }

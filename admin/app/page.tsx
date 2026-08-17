@@ -9,10 +9,11 @@ import { createClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  const admin = await requirePlatformAdmin()
   const supabase = await createClient()
+  const adminPromise = requirePlatformAdmin(supabase)
 
-  const [usersResult, fundsResult, ticketsResult, disputesResult, recentFundsResult, recentTicketsResult] = await Promise.all([
+  const [admin, usersResult, fundsResult, ticketsResult, disputesResult, recentFundsResult, recentTicketsResult] = await Promise.all([
+    adminPromise,
     supabase.from('users').select('*', { count: 'exact', head: true }).is('deleted_at', null),
     supabase.from('funds').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('support_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending', 'in_progress']),
@@ -49,7 +50,7 @@ export default async function DashboardPage() {
 
       <section className="dashboard-grid">
         <article className="panel">
-          <div className="panel-heading"><div><h3>Newest funds</h3><p>Recently created across Tshelo</p></div><Link href="/funds">View all <ArrowRight size={15} /></Link></div>
+          <div className="panel-heading"><div><h3>Newest funds</h3><p>Recently created across Tshelo</p></div><Link href="/funds" prefetch>View all <ArrowRight size={15} /></Link></div>
           <div className="compact-list">
             {(recentFundsResult.data ?? []).map((fund) => (
               <div className="compact-row" key={fund.id}>
@@ -63,7 +64,7 @@ export default async function DashboardPage() {
         </article>
 
         <article className="panel">
-          <div className="panel-heading"><div><h3>Support queue</h3><p>Latest requests from members</p></div><Link href="/support">Open queue <ArrowRight size={15} /></Link></div>
+          <div className="panel-heading"><div><h3>Support queue</h3><p>Latest requests from members</p></div><Link href="/support" prefetch>Open queue <ArrowRight size={15} /></Link></div>
           <div className="compact-list">
             {(recentTicketsResult.data ?? []).map((ticket) => (
               <div className="compact-row" key={ticket.id}>

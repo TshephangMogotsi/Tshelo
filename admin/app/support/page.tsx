@@ -7,13 +7,13 @@ import { createClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 
 export default async function SupportPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const admin = await requirePlatformAdmin()
   const rawQuery = (await searchParams).q ?? ''
   const query = rawQuery.replace(/[,%()]/g, '').trim().slice(0, 60)
   const supabase = await createClient()
+  const adminPromise = requirePlatformAdmin(supabase)
   let request = supabase.from('support_tickets').select('id, ticket_number, category, subject, priority, status, assigned_to, created_at').order('created_at', { ascending: false }).limit(50)
   if (query) request = /^\d+$/.test(query) ? request.ilike('ticket_number', `%${query}%`) : request.ilike('subject', `%${query}%`)
-  const { data: tickets, error } = await request
+  const [admin, { data: tickets, error }] = await Promise.all([adminPromise, request])
 
   return (
     <AppShell admin={admin} title="Support" description="Review the latest member support requests." action={<SearchForm defaultValue={query} placeholder="Search tickets" />}>
