@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { LogOut } from 'lucide-react'
 import type { AppUser } from '@/lib/app-user'
 
-type AccountSection = 'home' | 'contributions'
+type AccountSection = 'home' | 'contributions' | 'funds'
 
 export function AccountShell({
   user,
@@ -44,7 +44,7 @@ export function AccountShell({
           <ul>
             <li><Link className={active === 'home' ? 'active' : undefined} href="/account">Home</Link></li>
             <li><Link className={active === 'contributions' ? 'active' : undefined} href="/account/contributions">My contributions</Link></li>
-            <li><Link href="/account#funds">My funds</Link></li>
+            <li><Link className={active === 'funds' ? 'active' : undefined} href="/account/funds">My funds</Link></li>
             <li><Link href="/account#events">My events</Link></li>
           </ul>
           <p>Account</p>

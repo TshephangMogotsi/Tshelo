@@ -296,6 +296,26 @@ tbody tr:hover { background: #fcfbfd; }
 .member-contribution-error { margin: 14px 0 0; color: var(--red); font-size: 10px; }
 .member-year-note { margin-top: 20px; padding: 14px 16px; color: var(--muted); background: var(--purple-pale); border-radius: 10px; font-size: 10px; line-height: 1.6; }
 .member-year-note strong { color: var(--purple-dark); }
+.member-funds-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.member-funds-card { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; }
+.member-funds-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.member-funds-card-head h3 { margin: 0; font-family: Fraunces, Georgia, serif; font-size: 18px; font-weight: 600; }
+.member-funds-card-head p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+.member-funds-detail { display: inline-flex; margin-top: 10px; padding: 5px 9px; color: var(--purple-dark); background: var(--purple-pale); border-radius: 999px; font-size: 8px; font-weight: 700; }
+.member-funds-detail.positive { color: var(--green); background: var(--green-pale); }
+.member-funds-role { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.member-funds-role.organiser { color: var(--purple-dark); background: var(--purple-pale); }
+.member-funds-role.member { color: #765a18; background: var(--amber-pale); }
+.member-funds-role.closed { color: var(--green); background: var(--green-pale); }
+.member-fund-progress { margin-top: 18px; }
+.member-fund-progress > div:first-child { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 9px; }
+.member-fund-progress strong { color: var(--ink); font-size: 11px; }
+.member-fund-track { height: 5px; margin-top: 8px; background: #ece9e0; border-radius: 999px; overflow: hidden; }
+.member-fund-track i { display: block; height: 100%; background: var(--purple); border-radius: inherit; }
+.member-fund-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+.member-fund-actions a, .member-fund-actions button { min-height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 7px 12px; color: var(--ink); background: transparent; border: 1px solid #d6d2c6; border-radius: 999px; font-size: 9px; font-weight: 650; }
+.member-fund-actions a:hover { border-color: var(--ink); }
+.member-fund-actions button:disabled { color: #8e8991; cursor: not-allowed; opacity: .72; }
 .member-feed { list-style: none; margin: 0; padding: 0; }
 .member-feed li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .member-feed li:first-child { padding-top: 0; }
@@ -402,6 +422,7 @@ tbody tr:hover { background: #fcfbfd; }
   .member-card > header { padding: 14px 16px; }
   .member-card-body { padding: 18px 16px; }
   .member-contribution-filters label { max-width: none; }
+  .member-funds-grid { grid-template-columns: 1fr; }
   .member-feed li { grid-template-columns: 34px minmax(0, 1fr); }
   .member-feed time { grid-column: 2; }
   .member-footer { padding-left: 14px; padding-right: 14px; }

@@ -119,7 +119,7 @@ export default async function AccountPage() {
       <section className="member-card">
         <header><div className="member-section-title"><span><ListChecks size={18} /></span><h2>Quick actions</h2></div></header>
         <div className="member-card-body member-actions">
-          <a className="primary" href="#funds">View my funds</a>
+          <Link className="primary" href="/account/funds">View my funds</Link>
           <Link href="/account/contributions">My contributions</Link>
           <a href="#events">My events</a>
           <a href="#profile">Account details</a>
@@ -129,7 +129,7 @@ export default async function AccountPage() {
       <section className="member-card" id="activity">
         <header>
           <div className="member-section-title"><span><Coins size={18} /></span><h2>Recent activity</h2></div>
-          <a href="#funds">View all funds <ArrowRight size={14} /></a>
+          <Link href="/account/funds">View all funds <ArrowRight size={14} /></Link>
         </header>
         <div className="member-card-body">
           <ul className="member-feed">
