@@ -4,6 +4,10 @@ Private web console for platform-wide Tshelo operations. It shares Supabase Auth
 and the production data model with the mobile application, but platform staff
 access is controlled by the separate `platform_admins` allowlist.
 
+The same phone-OTP page also supports existing mobile-app users. Staff are
+routed to the admin dashboard; regular users are routed to the read-only
+`/account` area and remain subject to the existing Supabase row-level policies.
+
 ## Local setup
 
 1. Copy `.env.example` to `.env.local`.

@@ -18,6 +18,15 @@ export default async function LoginPage() {
       .eq('is_active', true)
       .maybeSingle()
     if (admin) redirect('/')
+
+    const { data: appUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .eq('is_banned', false)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (appUser) redirect('/account')
   }
 
   return <LoginForm />

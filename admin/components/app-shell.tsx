@@ -75,7 +75,9 @@ export function AppShell({ admin, title, description, children, action }: Props)
           <div className="admin-profile">
             <div className="admin-avatar">{admin.name.charAt(0).toUpperCase()}</div>
             <div className="admin-identity"><strong>{admin.name}</strong><span>{titleCase(admin.role)}</span></div>
-            <Link href="/logout" aria-label="Sign out" title="Sign out"><LogOut size={17} /></Link>
+            <form action="/logout" method="post">
+              <button type="submit" aria-label="Sign out" title="Sign out"><LogOut size={17} /></button>
+            </form>
           </div>
         </aside>
         {menuOpen && <button className="menu-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}

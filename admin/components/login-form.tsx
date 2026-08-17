@@ -72,14 +72,30 @@ export function LoginForm() {
           .maybeSingle()
       : { data: null }
 
-    if (!admin) {
-      await supabase.auth.signOut()
-      setLoading(false)
-      setMessage('This account does not have access to the Tshelo admin dashboard.')
+    if (admin) {
+      router.replace('/')
+      router.refresh()
       return
     }
 
-    router.replace('/')
+    const { data: appUser } = user
+      ? await supabase
+          .from('users')
+          .select('id')
+          .eq('id', user.id)
+          .eq('is_banned', false)
+          .is('deleted_at', null)
+          .maybeSingle()
+      : { data: null }
+
+    if (!appUser) {
+      await supabase.auth.signOut()
+      setLoading(false)
+      setMessage('This Tshelo account is not available. Contact support if you need help.')
+      return
+    }
+
+    router.replace('/account')
     router.refresh()
   }
 
@@ -91,15 +107,15 @@ export function LoginForm() {
           <span>Tshelo</span>
         </div>
         <div className="login-brand-copy">
-          <p className="eyebrow light">Operations portal</p>
-          <h1>Keep every contribution, fund and community in view.</h1>
+          <p className="eyebrow light">Secure web access</p>
+          <h1>Your Tshelo, wherever you are.</h1>
           <p>
-            A private workspace for the people who keep Tshelo safe, responsive and moving.
+            App users can review their account, while authorised staff continue to the operations dashboard.
           </p>
         </div>
         <div className="security-note">
           <ShieldCheck size={19} />
-          <span>Restricted to authorised Tshelo staff</span>
+          <span>Protected by secure phone verification</span>
         </div>
       </section>
 
@@ -111,11 +127,11 @@ export function LoginForm() {
             </button>
           )}
           <div className="login-icon"><LockKeyhole size={22} /></div>
-          <p className="eyebrow">Admin access</p>
+          <p className="eyebrow">Secure sign in</p>
           <h2>{step === 'phone' ? 'Welcome back' : 'Enter your code'}</h2>
           <p className="form-intro">
             {step === 'phone'
-              ? 'Use the Botswana number linked to your authorised Tshelo account.'
+              ? 'Use the Botswana number linked to your Tshelo account.'
               : `We sent a six-digit code to ${fullPhone}.`}
           </p>
 
@@ -164,7 +180,7 @@ export function LoginForm() {
           <p id="login-message" className={`form-message ${message.includes('sent') ? 'success' : ''}`} aria-live="polite">
             {message}
           </p>
-          <p className="login-help">Access is controlled by the platform-admin allowlist.</p>
+          <p className="login-help">App users open My Tshelo. Authorised staff continue to the admin dashboard.</p>
         </div>
       </section>
     </main>
