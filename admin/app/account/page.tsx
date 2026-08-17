@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { CircleCheck, Coins, HandCoins, ShieldCheck, Users } from 'lucide-react'
+import { ArrowRight, CalendarDays, Coins, HandCoins, ListChecks, UserRound } from 'lucide-react'
 import { AccountShell } from '@/components/account-shell'
 import { StatusPill } from '@/components/status-pill'
 import { requireAppUser } from '@/lib/app-user'
@@ -30,15 +30,28 @@ type MembershipRow = {
   funds: FundSummary | FundSummary[] | null
 }
 
+type ContributionRow = {
+  id: string
+  amount: number | string
+  currency_code: string
+  status: string
+  created_at: string
+  funds: { title: string } | { title: string }[] | null
+}
+
 function membershipFund(row: MembershipRow) {
   return Array.isArray(row.funds) ? row.funds[0] : row.funds
 }
 
-export default async function AccountPage() {
-  const user = await requireAppUser()
-  const supabase = await createClient()
+function contributionFund(row: ContributionRow) {
+  return Array.isArray(row.funds) ? row.funds[0] : row.funds
+}
 
-  const [ownedFundsResult, membershipCountResult, membershipsResult] = await Promise.all([
+export default async function AccountPage() {
+  const supabase = await createClient()
+  const user = await requireAppUser(supabase)
+
+  const [ownedFundsResult, membershipCountResult, membershipsResult, contributionsResult, eventsResult] = await Promise.all([
     supabase
       .from('funds')
       .select('*', { count: 'exact', head: true })
@@ -56,67 +69,122 @@ export default async function AccountPage() {
       .in('status', ['joined', 'pending'])
       .order('created_at', { ascending: false })
       .limit(6),
+    supabase
+      .from('contributions')
+      .select('id, amount, currency_code, status, created_at, funds(title)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('creator_id', user.id)
+      .is('deleted_at', null),
   ])
 
   const memberships = (membershipsResult.data ?? []) as MembershipRow[]
+  const contributions = (contributionsResult.data ?? []) as ContributionRow[]
+  const recentContributions = contributions.slice(0, 5)
+  const lifetimeContributed = contributions
+    .filter((contribution) => contribution.status === 'confirmed' && contribution.currency_code === 'BWP')
+    .reduce((total, contribution) => total + Number(contribution.amount || 0), 0)
+  const contributedFundCount = new Set(contributions.map((contribution) => contributionFund(contribution)?.title).filter(Boolean)).size
   const firstName = user.name.split(' ')[0]
   const stats = [
-    { label: 'Owned funds', value: ownedFundsResult.count ?? 0, icon: HandCoins, tone: 'purple' },
-    { label: 'Fund memberships', value: membershipCountResult.count ?? 0, icon: Users, tone: 'green' },
-    { label: 'Trust points', value: user.trustScore, icon: ShieldCheck, tone: 'amber' },
-    { label: 'Tshelo tokens', value: user.tokenBalance, icon: Coins, tone: 'red' },
+    { label: 'Token balance', value: user.tokenBalance.toLocaleString('en-BW'), hint: 'Never expires', accent: true },
+    { label: 'Lifetime contributed', value: formatMoney(lifetimeContributed, 'BWP'), hint: `Across ${contributedFundCount} fund${contributedFundCount === 1 ? '' : 's'}` },
+    { label: 'Funds organised', value: (ownedFundsResult.count ?? 0).toLocaleString('en-BW'), hint: 'Created by you' },
+    { label: 'Funds joined', value: (membershipCountResult.count ?? 0).toLocaleString('en-BW'), hint: 'Current memberships' },
+    { label: 'Events organised', value: (eventsResult.count ?? 0).toLocaleString('en-BW'), hint: 'Created by you' },
   ]
 
   return (
     <AccountShell user={user}>
-      <section className="member-welcome">
+      <section className="member-pagehead" id="home">
         <div>
-          <p className="eyebrow">My Tshelo</p>
           <h1>Dumela, <em>{firstName}</em></h1>
-          <p>Your personal account overview, secured by phone verification.</p>
+          <p>Everything you are organising and contributing to, in one place. The app stays the place you record contributions day to day.</p>
         </div>
-        <div className="member-profile-status"><CircleCheck size={18} /><span>Profile {user.profileCompleted ? 'complete' : 'incomplete'}</span></div>
+        <span className="member-profile-state">Profile {user.profileCompleted ? 'complete' : 'incomplete'}</span>
       </section>
 
-      <section className="stat-grid member-stat-grid" aria-label="Account summary">
-        {stats.map(({ label, value, icon: Icon, tone }) => (
-          <article className="stat-card" key={label}>
-            <div className={`stat-icon ${tone}`}><Icon size={19} /></div>
-            <p>{label}</p><strong>{value.toLocaleString('en-BW')}</strong><span>From your Tshelo account</span>
+      <section className="member-card member-stats" aria-label="Account summary">
+        {stats.map(({ label, value, hint, accent }) => (
+          <article key={label}>
+            <p>{label}</p><strong className={accent ? 'accent' : ''}>{value}</strong><span>{hint}</span>
           </article>
         ))}
       </section>
 
-      <div className="member-content-grid">
-        <section className="panel">
-          <div className="panel-heading"><div><h3>Your funds</h3><p>Recent funds you own or have joined</p></div></div>
-          <div className="compact-list">
-            {memberships.map((membership) => {
-              const fund = membershipFund(membership)
-              if (!fund) return null
-              return (
-                <div className="compact-row" key={membership.id}>
-                  <div className="list-monogram">{fund.title.charAt(0)}</div>
-                  <div className="row-primary"><strong>{fund.title}</strong><span>{fund.fund_code} · {titleCase(membership.role)}</span></div>
-                  <div className="row-value"><strong>{formatMoney(fund.goal_amount, fund.currency_code)}</strong><StatusPill value={fund.status} /></div>
-                </div>
-              )
-            })}
-            {!memberships.length && <div className="empty-row">No funds are linked to this account yet.</div>}
-          </div>
-        </section>
+      <section className="member-card">
+        <header><div className="member-section-title"><span><ListChecks size={18} /></span><h2>Quick actions</h2></div></header>
+        <div className="member-card-body member-actions">
+          <a className="primary" href="#funds">View my funds</a>
+          <a href="#activity">My contributions</a>
+          <a href="#events">My events</a>
+          <a href="#profile">Account details</a>
+        </div>
+      </section>
 
-        <aside className="panel member-profile-card">
-          <div className="panel-heading"><div><h3>Account details</h3><p>Your verified Tshelo profile</p></div></div>
-          <dl>
-            <div><dt>Name</dt><dd>{user.name}</dd></div>
-            <div><dt>Phone</dt><dd className="mono">{user.phone}</dd></div>
-            <div><dt>Trust level</dt><dd>{titleCase(user.trustLevel)}</dd></div>
-            <div><dt>Member since</dt><dd>{formatDate(user.createdAt)}</dd></div>
-          </dl>
-          <p>This web view is read-only. Use the Tshelo mobile app to manage funds, contributions and profile details.</p>
-        </aside>
-      </div>
+      <section className="member-card" id="activity">
+        <header>
+          <div className="member-section-title"><span><Coins size={18} /></span><h2>Recent activity</h2></div>
+          <a href="#funds">View all funds <ArrowRight size={14} /></a>
+        </header>
+        <div className="member-card-body">
+          <ul className="member-feed">
+            {recentContributions.map((contribution) => (
+              <li key={contribution.id}>
+                <span className="member-feed-icon"><Coins size={17} /></span>
+                <div><strong>You contributed {formatMoney(contribution.amount, contribution.currency_code)}</strong><p>{contributionFund(contribution)?.title ?? 'Tshelo fund'} · {titleCase(contribution.status)}</p></div>
+                <time>{formatDate(contribution.created_at)}</time>
+              </li>
+            ))}
+          </ul>
+          {!recentContributions.length && <div className="member-empty">Your recent contributions will appear here.</div>}
+        </div>
+      </section>
+
+      <section className="member-card" id="funds">
+        <header><div className="member-section-title"><span><HandCoins size={18} /></span><h2>My funds</h2></div></header>
+        <div className="member-card-body member-fund-grid">
+          {memberships.map((membership) => {
+            const fund = membershipFund(membership)
+            if (!fund) return null
+            return (
+              <article className="member-fund" key={membership.id}>
+                <div className="member-fund-head">
+                  <div><h3>{fund.title}</h3><p>{fund.fund_code} · {formatDate(fund.created_at)}</p></div>
+                  <span>{titleCase(membership.role)}</span>
+                </div>
+                <div className="member-fund-goal"><p>Fund goal</p><strong>{formatMoney(fund.goal_amount, fund.currency_code)}</strong></div>
+                <div className="member-fund-foot"><StatusPill value={fund.status} /><span>{titleCase(membership.status)}</span></div>
+              </article>
+            )
+          })}
+          {!memberships.length && <div className="member-empty">No funds are linked to this account yet.</div>}
+        </div>
+      </section>
+
+      <section className="member-card" id="events">
+        <header><div className="member-section-title"><span><CalendarDays size={18} /></span><h2>My events</h2></div></header>
+        <div className="member-card-body member-event-summary">
+          <strong>{eventsResult.count ?? 0}</strong>
+          <div><h3>Events organised</h3><p>Event details and guest management remain available in the Tshelo mobile app.</p></div>
+        </div>
+      </section>
+
+      <section className="member-card" id="profile">
+        <header><div className="member-section-title"><span><UserRound size={18} /></span><h2>Account details</h2></div></header>
+        <div className="member-card-body member-profile-grid">
+          <div><span>Name</span><strong>{user.name}</strong></div>
+          <div><span>Phone</span><strong className="mono">{user.phone}</strong></div>
+          <div><span>Trust level</span><strong>{titleCase(user.trustLevel)}</strong></div>
+          <div><span>Trust points</span><strong>{user.trustScore.toLocaleString('en-BW')}</strong></div>
+          <div><span>Member since</span><strong>{formatDate(user.createdAt)}</strong></div>
+          <div><span>Profile</span><strong>{user.profileCompleted ? 'Complete' : 'Incomplete'}</strong></div>
+        </div>
+        <div className="member-web-note">This web dashboard is an overview. Use the Tshelo mobile app to create funds, record contributions, manage events and update account details.</div>
+      </section>
     </AccountShell>
   )
 }
