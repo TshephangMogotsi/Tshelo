@@ -3,13 +3,11 @@
 import { FormEvent, useState } from 'react'
 import Image from 'next/image'
 import { ArrowLeft, LockKeyhole, ShieldCheck } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 
 type Step = 'phone' | 'code'
 
 export function LoginForm() {
-  const router = useRouter()
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
@@ -28,7 +26,6 @@ export function LoginForm() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
-      options: { shouldCreateUser: false },
     })
     setLoading(false)
 
@@ -63,30 +60,23 @@ export function LoginForm() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const { data: admin } = user
-      ? await supabase
-          .from('platform_admins')
-          .select('user_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle()
-      : { data: null }
-
-    if (admin) {
-      router.replace('/')
-      router.refresh()
-      return
-    }
-
-    const { data: appUser } = user
-      ? await supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .eq('is_banned', false)
-          .is('deleted_at', null)
-          .maybeSingle()
-      : { data: null }
+    const [{ data: admin }, { data: appUser }] = user
+      ? await Promise.all([
+          supabase
+            .from('platform_admins')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle(),
+          supabase
+            .from('users')
+            .select('id')
+            .eq('id', user.id)
+            .eq('is_banned', false)
+            .is('deleted_at', null)
+            .maybeSingle(),
+        ])
+      : [{ data: null }, { data: null }]
 
     if (!appUser) {
       await supabase.auth.signOut()
@@ -95,8 +85,7 @@ export function LoginForm() {
       return
     }
 
-    router.replace('/account')
-    router.refresh()
+    window.location.replace(admin ? '/' : '/account')
   }
 
   return (
