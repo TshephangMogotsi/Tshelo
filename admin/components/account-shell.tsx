@@ -3,7 +3,17 @@ import Link from 'next/link'
 import { LogOut } from 'lucide-react'
 import type { AppUser } from '@/lib/app-user'
 
-export function AccountShell({ user, children }: { user: AppUser; children: React.ReactNode }) {
+type AccountSection = 'home' | 'contributions'
+
+export function AccountShell({
+  user,
+  children,
+  active = 'home',
+}: {
+  user: AppUser
+  children: React.ReactNode
+  active?: AccountSection
+}) {
   const initials = user.name
     .split(' ')
     .filter(Boolean)
@@ -32,14 +42,14 @@ export function AccountShell({ user, children }: { user: AppUser; children: Reac
       <div className="member-shell">
         <nav className="member-sidebar" aria-label="Account sections">
           <ul>
-            <li><a className="active" href="#home">Home</a></li>
-            <li><a href="#activity">My contributions</a></li>
-            <li><a href="#funds">My funds</a></li>
-            <li><a href="#events">My events</a></li>
+            <li><Link className={active === 'home' ? 'active' : undefined} href="/account">Home</Link></li>
+            <li><Link className={active === 'contributions' ? 'active' : undefined} href="/account/contributions">My contributions</Link></li>
+            <li><Link href="/account#funds">My funds</Link></li>
+            <li><Link href="/account#events">My events</Link></li>
           </ul>
           <p>Account</p>
           <ul>
-            <li><a href="#profile">Account details</a></li>
+            <li><Link href="/account#profile">Account details</Link></li>
             <li><span aria-disabled="true">Buy tokens</span></li>
             <li><span aria-disabled="true">Marketplace</span></li>
             <li><span aria-disabled="true">News</span></li>

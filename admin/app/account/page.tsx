@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { ArrowRight, CalendarDays, Coins, HandCoins, ListChecks, UserRound } from 'lucide-react'
 import { AccountShell } from '@/components/account-shell'
 import { StatusPill } from '@/components/status-pill'
@@ -98,7 +99,7 @@ export default async function AccountPage() {
   ]
 
   return (
-    <AccountShell user={user}>
+    <AccountShell user={user} active="home">
       <section className="member-pagehead" id="home">
         <div>
           <h1>Dumela, <em>{firstName}</em></h1>
@@ -119,7 +120,7 @@ export default async function AccountPage() {
         <header><div className="member-section-title"><span><ListChecks size={18} /></span><h2>Quick actions</h2></div></header>
         <div className="member-card-body member-actions">
           <a className="primary" href="#funds">View my funds</a>
-          <a href="#activity">My contributions</a>
+          <Link href="/account/contributions">My contributions</Link>
           <a href="#events">My events</a>
           <a href="#profile">Account details</a>
         </div>

@@ -257,6 +257,9 @@ tbody tr:hover { background: #fcfbfd; }
 .member-pagehead h1 em { color: var(--purple); font-style: italic; }
 .member-pagehead p { max-width: 58ch; margin: 8px 0 0; color: var(--muted); font-family: Fraunces, Georgia, serif; font-size: 15px; line-height: 1.55; }
 .member-profile-state { padding: 7px 12px; color: var(--green); background: var(--green-pale); border-radius: 999px; font-size: 10px; font-weight: 750; white-space: nowrap; }
+.member-page-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.member-page-actions button { padding: 9px 16px; color: var(--ink); background: transparent; border: 1px solid #d6d2c6; border-radius: 999px; font-size: 11px; font-weight: 650; }
+.member-page-actions button:disabled { color: #777181; background: rgba(255,255,255,.38); cursor: not-allowed; opacity: .78; }
 .member-card { margin-bottom: 22px; background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; scroll-margin-top: 92px; }
 .member-card > header { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
 .member-card > header > a { display: inline-flex; align-items: center; gap: 5px; color: var(--purple); font-size: 11px; font-weight: 750; }
@@ -275,6 +278,24 @@ tbody tr:hover { background: #fcfbfd; }
 .member-actions a { padding: 9px 16px; color: var(--ink); background: transparent; border: 1px solid #d6d2c6; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .member-actions a:hover { border-color: var(--ink); }
 .member-actions a.primary { color: white; background: var(--ink); border-color: var(--ink); }
+.member-contribution-filters { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.member-contribution-filters label { display: flex; flex: 1 1 150px; max-width: 230px; flex-direction: column; gap: 6px; }
+.member-contribution-filters label:first-child { flex-basis: 210px; }
+.member-contribution-filters label > span { color: #8e97a8; font-size: 8px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.member-contribution-filters select, .member-contribution-filters input { width: 100%; min-height: 36px; padding: 8px 11px; color: var(--ink); background: white; border: 1px solid #d6d2c6; border-radius: 9px; font: inherit; font-size: 11px; }
+.member-contribution-filters button, .member-contribution-filters > a { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 8px 15px; color: var(--ink); background: transparent; border: 1px solid #d6d2c6; border-radius: 999px; font-size: 10px; font-weight: 700; cursor: pointer; }
+.member-contribution-filters button:hover, .member-contribution-filters > a:hover { border-color: var(--ink); }
+.member-contribution-table-wrap { overflow-x: auto; }
+.member-contribution-table { min-width: 660px; }
+.member-contribution-table th { padding: 11px 12px; background: transparent; color: #8e97a8; font-size: 8px; letter-spacing: .1em; }
+.member-contribution-table td { padding: 14px 12px; color: var(--muted); font-size: 10px; }
+.member-contribution-table td:first-child, .member-contribution-table th:first-child { padding-left: 0; }
+.member-contribution-table td:last-child, .member-contribution-table th:last-child { padding-right: 0; }
+.member-contribution-table td strong { color: var(--ink); font-size: 11px; }
+.member-contribution-table .member-contribution-empty { padding: 30px 12px; color: var(--muted); text-align: center; }
+.member-contribution-error { margin: 14px 0 0; color: var(--red); font-size: 10px; }
+.member-year-note { margin-top: 20px; padding: 14px 16px; color: var(--muted); background: var(--purple-pale); border-radius: 10px; font-size: 10px; line-height: 1.6; }
+.member-year-note strong { color: var(--purple-dark); }
 .member-feed { list-style: none; margin: 0; padding: 0; }
 .member-feed li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .member-feed li:first-child { padding-top: 0; }
@@ -380,6 +401,7 @@ tbody tr:hover { background: #fcfbfd; }
   .member-profile-state { display: none; }
   .member-card > header { padding: 14px 16px; }
   .member-card-body { padding: 18px 16px; }
+  .member-contribution-filters label { max-width: none; }
   .member-feed li { grid-template-columns: 34px minmax(0, 1fr); }
   .member-feed time { grid-column: 2; }
   .member-footer { padding-left: 14px; padding-right: 14px; }
