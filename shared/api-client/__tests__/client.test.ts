@@ -191,6 +191,117 @@ describe('shared Tshelo API client', () => {
     )
   })
 
+  it('exposes profile, notification, invite, connection, and reward operations', async () => {
+    const calls: Array<{ url: string; options?: RequestInit }> = []
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      calls.push({ url: String(input), options })
+      return success({})
+    })
+    const client = createTsheloApiClient({
+      baseUrl: 'https://api.tshelo.example',
+      getAccessToken: async () => 'access-token',
+      fetch: fetchMock as typeof fetch,
+    })
+
+    await client.users.updateMe({ name: 'Naledi' })
+    await client.users.searchConnections({ q: 'na' })
+    await client.notifications.markRead(['00000000-0000-4000-8000-000000000001'])
+    await client.events.respondOrganiserInvite({
+      invite_id: '00000000-0000-4000-8000-000000000002',
+      accepted: true,
+    })
+    await client.rewards.markSeen('00000000-0000-4000-8000-000000000003')
+
+    expect(calls.map(call => [new URL(call.url).pathname, call.options?.method])).toEqual([
+      ['/api/v1/users/me', 'PATCH'],
+      ['/api/v1/users/connections', 'GET'],
+      ['/api/v1/notifications', 'PATCH'],
+      ['/api/v1/events/organiser-invites/respond', 'POST'],
+      ['/api/v1/rewards/00000000-0000-4000-8000-000000000003/seen', 'PATCH'],
+    ])
+    expect(new URL(calls[1].url).searchParams.get('q')).toBe('na')
+    expect(calls[2].options?.body).toBe(JSON.stringify({
+      notification_ids: ['00000000-0000-4000-8000-000000000001'],
+    }))
+  })
+
+  it('uses the financial mutation and receipt-session routes', async () => {
+    const calls: Array<{ url: string; options?: RequestInit }> = []
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      calls.push({ url: String(input), options })
+      return success({})
+    })
+    const client = createTsheloApiClient({
+      baseUrl: 'https://api.tshelo.example',
+      getAccessToken: async () => 'access-token',
+      fetch: fetchMock as typeof fetch,
+    })
+
+    await client.contributions.assignDetected({
+      fund_id: '00000000-0000-4000-8000-000000000001',
+      detected: { amount: 250 },
+    })
+    await client.expenses.create({
+      fund_id: '00000000-0000-4000-8000-000000000001',
+      items: [{ description: 'Catering', amount: '250.00', currency_code: 'BWP' }],
+    })
+    await client.receipts.createUploadSession({
+      fund_id: '00000000-0000-4000-8000-000000000001',
+      content_type: 'image/jpeg',
+      size_bytes: 1024,
+    })
+    await client.receipts.parse({
+      fund_id: '00000000-0000-4000-8000-000000000001',
+      object_path: '00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002/receipt.jpg',
+    })
+
+    expect(calls.map(call => [new URL(call.url).pathname, call.options?.method])).toEqual([
+      ['/api/v1/contributions/detected-assignment', 'POST'],
+      ['/api/v1/expenses', 'POST'],
+      ['/api/v1/receipts/upload-session', 'POST'],
+      ['/api/v1/receipts/parse', 'POST'],
+    ])
+  })
+
+  it('uses the Rich Auntie eligibility, award, history, celebration, and status routes', async () => {
+    const calls: Array<{ url: string; options?: RequestInit }> = []
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      calls.push({ url: String(input), options })
+      return success({})
+    })
+    const client = createTsheloApiClient({
+      baseUrl: 'https://api.tshelo.example',
+      getAccessToken: async () => 'access-token',
+      fetch: fetchMock as typeof fetch,
+    })
+    const fundId = '00000000-0000-4000-8000-000000000001'
+    const userId = '00000000-0000-4000-8000-000000000002'
+    const awardId = '00000000-0000-4000-8000-000000000003'
+
+    await client.richAuntie.eligibility(fundId, userId)
+    await client.richAuntie.listAwards({ recipient_user_id: userId })
+    await client.richAuntie.createAward({
+      fund_id: fundId,
+      recipient_user_id: userId,
+      reason_code: 'major_contribution',
+      reason_label: 'Major contribution',
+      notify_member: true,
+    })
+    await client.richAuntie.recipientHistory(userId)
+    await client.richAuntie.celebration(awardId)
+    await client.richAuntie.status()
+
+    expect(calls.map(call => [new URL(call.url).pathname, call.options?.method])).toEqual([
+      ['/api/v1/rich-auntie/eligibility', 'GET'],
+      ['/api/v1/rich-auntie/awards', 'GET'],
+      ['/api/v1/rich-auntie/awards', 'POST'],
+      [`/api/v1/rich-auntie/recipients/${userId}/history`, 'GET'],
+      [`/api/v1/rich-auntie/celebrations/${awardId}`, 'GET'],
+      ['/api/v1/rich-auntie/status', 'GET'],
+    ])
+    expect(new URL(calls[0].url).searchParams.get('fund_id')).toBe(fundId)
+  })
+
   it('adapts Supabase getSession and refreshSession without exposing refresh tokens', async () => {
     const provider = createSupabaseTokenProvider({
       getSession: async () => ({

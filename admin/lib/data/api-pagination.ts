@@ -1,7 +1,6 @@
 import 'server-only'
 
 import { createHash } from 'node:crypto'
-import type { PostgrestError } from '@supabase/supabase-js'
 import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
@@ -17,7 +16,7 @@ type CursorPayload = {
 
 export type ApiDataError =
   | { kind: 'validation'; message: string }
-  | { kind: 'database'; error: PostgrestError }
+  | { kind: 'database'; error: { code?: string; message?: string } }
 
 export type ApiDataResult<T> =
   | { data: T; error: null }

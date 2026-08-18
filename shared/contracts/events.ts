@@ -32,6 +32,7 @@ export type EventSummary = {
   event_type: EventType
   event_emoji: string | null
   event_date: IsoDate
+  event_time: IsoTime | null
   venue_name: string | null
   currency_code: CurrencyCode
   linked_fund_id: Uuid | null
@@ -41,7 +42,6 @@ export type EventSummary = {
 
 export type Event = EventSummary & {
   description: string | null
-  event_time: IsoTime | null
   event_end_date: IsoDate | null
   event_end_time: IsoTime | null
   venue_address: string | null
@@ -115,9 +115,26 @@ export type LeaveEventRequest = {
   event_id: Uuid
 }
 
+export type RespondOrganiserInviteRequest = {
+  invite_id: Uuid
+  accepted: boolean
+}
+
+export type RespondOrganiserInviteResult = {
+  event_id: Uuid
+  fund_id: Uuid
+  accepted: boolean
+}
+
+export type SyncOrganiserInvitesResult = {
+  synced_count: number
+}
+
 export type ListEventsResponse = PaginatedResponse<EventSummary>
 export type GetEventResponse = ApiResponse<{ event: Event; guests: EventGuest[] }>
 export type CreateEventResponse = ApiResponse<Event>
 export type UpdateEventResponse = ApiResponse<Event>
 export type JoinEventResponse = ApiResponse<{ event: EventSummary; guest: EventGuest }>
 export type LeaveEventResponse = EmptyResponse
+export type RespondOrganiserInviteResponse = ApiResponse<RespondOrganiserInviteResult>
+export type SyncOrganiserInvitesResponse = ApiResponse<SyncOrganiserInvitesResult>

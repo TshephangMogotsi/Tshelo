@@ -141,7 +141,7 @@ export async function getApiContribution(
 
   const { data, error } = await client
     .from('contributions')
-    .select('id, fund_id, user_id, contributor_name, contributor_phone, amount, pledged_amount, currency_code, payment_method, reference_number, status, detected_via, is_refunded, confirmed_at, receipt_number, notes, created_at, updated_at')
+    .select('id, fund_id, contributor_id, user_id, contributor_name, contributor_phone, amount, pledged_amount, currency_code, payment_method, reference_number, status, detected_via, is_refunded, confirmed_at, receipt_number, notes, created_at, updated_at')
     .eq('id', contributionId)
     .maybeSingle()
 
@@ -431,7 +431,7 @@ export async function listApiEvents(
   const ascending = (request.sort_direction ?? 'desc') === 'asc'
   let query = client
     .from('events')
-    .select('id, creator_id, event_code, name, event_type, event_emoji, event_date, venue_name, currency_code, linked_fund_id, status, created_at')
+    .select('id, creator_id, event_code, name, event_type, event_emoji, event_date, event_time, venue_name, currency_code, linked_fund_id, status, created_at')
     .is('deleted_at', null)
 
   if (request.q?.trim()) query = query.ilike('name', searchPattern(request.q))
@@ -475,7 +475,7 @@ export async function listApiContributions(
   const ascending = (request.sort_direction ?? 'desc') === 'asc'
   let query = client
     .from('contributions')
-    .select('id, fund_id, user_id, contributor_name, amount, pledged_amount, currency_code, payment_method, status, is_refunded, confirmed_at, created_at')
+    .select('id, fund_id, contributor_id, user_id, contributor_name, amount, pledged_amount, currency_code, payment_method, status, is_refunded, confirmed_at, created_at')
 
   if (request.fund_id) query = query.eq('fund_id', request.fund_id)
   if (request.user_id) query = query.eq('user_id', request.user_id)

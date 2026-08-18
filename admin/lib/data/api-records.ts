@@ -31,6 +31,7 @@ export function toEventSummary(row: EventRow): EventSummary {
     event_type: row.event_type,
     event_emoji: row.event_emoji,
     event_date: row.event_date,
+    event_time: row.event_time,
     venue_name: row.venue_name,
     currency_code: row.currency_code,
     linked_fund_id: row.linked_fund_id,
@@ -128,6 +129,7 @@ export function toContributionSummary(row: ContributionRow): ContributionSummary
   return {
     id: row.id,
     fund_id: row.fund_id,
+    contributor_id: row.contributor_id,
     user_id: row.user_id,
     contributor_name: row.contributor_name,
     amount: String(row.amount),

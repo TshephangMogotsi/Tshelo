@@ -9,6 +9,7 @@ import type {
   PaginatedResponse,
   PhoneNumber,
   Uuid,
+  JsonObject,
 } from './common'
 
 export const CONTRIBUTION_STATUSES = ['pledged', 'pending', 'confirmed', 'refunded', 'disputed'] as const
@@ -20,6 +21,7 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
 export type ContributionSummary = {
   id: Uuid
   fund_id: Uuid
+  contributor_id: Uuid
   user_id: Uuid | null
   contributor_name: string
   amount: MoneyAmount
@@ -57,6 +59,7 @@ export type GetContributionRequest = {
 
 export type CreateContributionRequest = {
   fund_id: Uuid
+  contributor_id?: Uuid | null
   contributor_user_id?: Uuid | null
   contributor_name: string
   contributor_phone: PhoneNumber
@@ -68,22 +71,82 @@ export type CreateContributionRequest = {
   status: 'pledged' | 'pending' | 'confirmed'
   notes?: string | null
   disclaimer_accepted?: boolean
+  detected_via?: 'manual' | 'sms'
 }
 
 export type UpdateContributionRequest = {
-  contribution_id: Uuid
   contributor_name?: string
   amount?: MoneyAmount
   pledged_amount?: MoneyAmount | null
   payment_method?: PaymentMethod | null
   reference_number?: string | null
-  status?: ContributionStatus
+  status?: 'pledged' | 'pending' | 'confirmed' | 'disputed'
   notes?: string | null
 }
 
 export type RefundContributionRequest = {
-  contribution_id: Uuid
   reason?: string
+}
+
+export type DetectedPaymentAssignmentRequest = {
+  fund_id: Uuid
+  detected: JsonObject
+  notification_id?: Uuid | null
+}
+
+export type DetectedPaymentAssignmentResult = {
+  recorded_contribution_id: Uuid
+  recorded_fund_id: Uuid
+  already_recorded: boolean
+}
+
+export type FundContributor = {
+  id: Uuid
+  fund_id: Uuid
+  user_id: Uuid | null
+  display_name: string
+  phone: PhoneNumber
+  contributor_type: 'member' | 'guest'
+  created_at: IsoDateTime
+}
+
+export type ContributorPledgeBalance = {
+  pledge_id: Uuid
+  fund_id: Uuid
+  contributor_id: Uuid
+  contributor_name: string
+  pledged_amount: MoneyAmount
+  allocated_amount: MoneyAmount
+  outstanding_amount: MoneyAmount
+  pledge_state: 'pledged' | 'partially_paid' | 'fulfilled'
+  created_at: IsoDateTime
+}
+
+export type CreatePledgeAllocationRequest = {
+  fund_id: Uuid
+  contributor_id: Uuid
+  pledge_contribution_id: Uuid
+  payment_contribution_id: Uuid
+  amount: MoneyAmount
+}
+
+export type PledgeAllocation = CreatePledgeAllocationRequest & {
+  id: Uuid
+  created_by: Uuid
+  created_at: IsoDateTime
+}
+
+export type CreateSponsorshipAllocationRequest = {
+  fund_id: Uuid
+  sponsorship_item_id: Uuid
+  contribution_id: Uuid
+  amount: MoneyAmount
+}
+
+export type SponsorshipAllocation = CreateSponsorshipAllocationRequest & {
+  id: Uuid
+  created_by: Uuid
+  created_at: IsoDateTime
 }
 
 export type ListContributionsResponse = PaginatedResponse<ContributionSummary>

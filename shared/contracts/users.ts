@@ -58,8 +58,31 @@ export type UpdateCurrentUserRequest = {
   country_code?: string
   preferred_currency?: CurrencyCode
   notifications_enabled?: boolean
+  mobile_money_provider?: string | null
+  bank_name?: string | null
+  bank_branch_code?: string | null
+  bank_account_number?: string | null
+  profile_completed?: boolean
+  onboarding_completed?: boolean
+  terms_accepted_at?: IsoDateTime
+  terms_version?: string
+  privacy_accepted_at?: IsoDateTime
+  privacy_version?: string
+  data_processing_consent?: boolean
+  data_processing_consent_at?: IsoDateTime
+}
+
+export type ConnectionSummary = {
+  user_id: Uuid
+  name: string
+  phone: PhoneNumber
+}
+
+export type SearchConnectionsRequest = {
+  q: string
 }
 
 export type ListUsersResponse = PaginatedResponse<UserSummary>
 export type GetUserResponse = ApiResponse<User>
 export type UpdateCurrentUserResponse = ApiResponse<User>
+export type SearchConnectionsResponse = ApiResponse<ConnectionSummary[]>

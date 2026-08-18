@@ -19,6 +19,9 @@ import {
   FUND_STATUSES,
   type ListFundsRequest,
 } from '@shared/contracts/funds'
+import type { ListNotificationsRequest } from '@shared/contracts/notifications'
+import type { ListExpensesRequest } from '@shared/contracts/expenses'
+import type { ListRichAuntieAwardsRequest } from '@shared/contracts/rich-auntie'
 import {
   TRUST_LEVELS,
   USER_ACCOUNT_STATUSES,
@@ -191,6 +194,20 @@ function parseDate(
   return value
 }
 
+function parseBoolean(
+  params: URLSearchParams,
+  key: string,
+  errors: ApiFieldError[],
+) {
+  const value = singleValue(params, key, errors)
+  if (value === undefined) return undefined
+  if (value !== 'true' && value !== 'false') {
+    errors.push(issue(key, 'invalid_boolean', 'Must be true or false.'))
+    return undefined
+  }
+  return value === 'true'
+}
+
 function finish<T>(value: T, errors: ApiFieldError[]): ValidationResult<T> {
   return errors.length ? { ok: false, fieldErrors: errors } : { ok: true, value }
 }
@@ -209,6 +226,33 @@ export function parseListUsersQuery(params: URLSearchParams): ValidationResult<L
     trust_level: parseClosedValues(params, 'trust_level', TRUST_LEVELS, errors),
     status: parseClosedValues(params, 'status', USER_ACCOUNT_STATUSES, errors),
   } as ListUsersRequest
+  return finish(value, errors)
+}
+
+export function parseConnectionSearchQuery(
+  params: URLSearchParams,
+): ValidationResult<{ q: string }> {
+  const errors: ApiFieldError[] = []
+  rejectUnknownQuery(params, ['q'], errors)
+  const q = singleValue(params, 'q', errors)
+  if (q === undefined || q.trim().length < 2 || q.trim().length > 100) {
+    errors.push(issue('q', 'invalid_search', 'Search text must contain between 2 and 100 characters.'))
+  }
+  return finish({ q: q?.trim() ?? '' }, errors)
+}
+
+export function parseListNotificationsQuery(
+  params: URLSearchParams,
+): ValidationResult<ListNotificationsRequest> {
+  const errors: ApiFieldError[] = []
+  rejectUnknownQuery(params, [
+    'cursor', 'limit', 'sort_by', 'sort_direction', 'type', 'unread_only',
+  ], errors)
+  const value = {
+    ...parseCommon(params, ['created_at'], errors),
+    type: parseExtensibleValues(params, 'type', errors),
+    unread_only: parseBoolean(params, 'unread_only', errors),
+  } as ListNotificationsRequest
   return finish(value, errors)
 }
 
@@ -263,6 +307,52 @@ export function parseListContributionsQuery(params: URLSearchParams): Validation
   if (value.from && value.to && value.from > value.to) {
     errors.push(issue('from', 'invalid_date_range', 'The from date cannot be after the to date.'))
   }
+  return finish(value, errors)
+}
+
+export function parseListExpensesQuery(params: URLSearchParams): ValidationResult<ListExpensesRequest> {
+  const errors: ApiFieldError[] = []
+  rejectUnknownQuery(params, ['cursor', 'limit', 'sort_by', 'sort_direction', 'fund_id', 'sponsored_by_user_id', 'from', 'to'], errors)
+  const value = {
+    ...parseCommon(params, ['created_at', 'amount'], errors),
+    fund_id: parseUuid(params, 'fund_id', errors),
+    sponsored_by_user_id: parseUuid(params, 'sponsored_by_user_id', errors),
+    from: parseDate(params, 'from', errors),
+    to: parseDate(params, 'to', errors),
+  } as ListExpensesRequest
+  if (!value.fund_id) errors.push(issue('fund_id', 'required', 'fund_id is required.'))
+  if (value.from && value.to && value.from > value.to) errors.push(issue('from', 'invalid_date_range', 'The from date cannot be after the to date.'))
+  return finish(value, errors)
+}
+
+export function parseRichAuntieEligibilityQuery(
+  params: URLSearchParams,
+): ValidationResult<{ fund_id: string; recipient_user_id: string }> {
+  const errors: ApiFieldError[] = []
+  rejectUnknownQuery(params, ['fund_id', 'recipient_user_id'], errors)
+  const value = {
+    fund_id: parseUuid(params, 'fund_id', errors) ?? '',
+    recipient_user_id: parseUuid(params, 'recipient_user_id', errors) ?? '',
+  }
+  if (!value.fund_id) errors.push(issue('fund_id', 'required', 'fund_id is required.'))
+  if (!value.recipient_user_id) errors.push(issue('recipient_user_id', 'required', 'recipient_user_id is required.'))
+  return finish(value, errors)
+}
+
+export function parseListRichAuntieAwardsQuery(
+  params: URLSearchParams,
+): ValidationResult<ListRichAuntieAwardsRequest> {
+  const errors: ApiFieldError[] = []
+  rejectUnknownQuery(params, [
+    'cursor', 'limit', 'sort_by', 'sort_direction',
+    'fund_id', 'recipient_user_id', 'awarded_by',
+  ], errors)
+  const value = {
+    ...parseCommon(params, ['created_at'], errors),
+    fund_id: parseUuid(params, 'fund_id', errors),
+    recipient_user_id: parseUuid(params, 'recipient_user_id', errors),
+    awarded_by: parseUuid(params, 'awarded_by', errors),
+  } as ListRichAuntieAwardsRequest
   return finish(value, errors)
 }
 

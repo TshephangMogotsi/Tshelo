@@ -1,27 +1,84 @@
 import type {
   AdminAuditEntry,
+  ConnectionSummary,
   Contribution,
   ContributionSummary,
+  ContributorPledgeBalance,
+  CreateContributionRequest,
+  CreateExpensesRequest,
+  CreateExpensesResult,
+  CreatePledgeAllocationRequest,
+  CreateReceiptUploadSessionRequest,
+  CreateSponsorshipAllocationRequest,
   CreateEventRequest,
   CreateFundRequest,
   Event,
   EventGuest,
   EventSummary,
+  EvaluateRewardsResult,
+  Expense,
+  FundContributor,
   Fund,
+  FundActivityDetail,
+  FundActivityEntry,
+  FundAdminPermissionRow,
   FundDetail,
+  FundInvitePreview,
+  FundMemberDetails,
+  FundMemberDirectoryItem,
+  FundPermission,
+  FundSponsorshipItem,
   FundSummary,
+  FundWorkspace,
+  FundReportBundle,
+  FundExport,
+  CreateFundExportRequest,
+  HomeSummary,
+  JoinFundRequest,
+  JoinFundResult,
+  LeaveFundResult,
+  ListFundActivityRequest,
   ListAdminAuditRequest,
   ListContributionsRequest,
   ListEventsRequest,
+  ListExpensesRequest,
   ListFundsRequest,
+  ListNotificationsRequest,
   ListSupportTicketsRequest,
   ListUsersRequest,
   ModerateFundRequest,
   ModerateUserRequest,
+  Notification,
   Paginated,
   PlatformAdmin,
+  ParsedReceipt,
+  ParseReceiptRequest,
+  PledgeAllocation,
+  ReceiptUploadSession,
+  RefundContributionRequest,
+  CreateRichAuntieAwardRequest,
+  ListRichAuntieAwardsRequest,
+  RichAuntieAward,
+  RichAuntieCelebration,
+  RichAuntieEligibility,
+  RichAuntieRecipientHistory,
+  RespondOrganiserInviteRequest,
+  RespondOrganiserInviteResult,
+  RewardProgressOverview,
+  RewardSnackbarItem,
+  SearchConnectionsRequest,
+  SyncOrganiserInvitesResult,
   SupportTicketSummary,
+  SponsorshipAllocation,
   UpdateSupportTicketRequest,
+  UpdateCurrentUserRequest,
+  UpdateFundMemberRequest,
+  UpdateFundRequest,
+  UpdateFundSponsorshipRequest,
+  UpdateContributionRequest,
+  UpdateExpenseRequest,
+  CreateFundSponsorshipRequest,
+  ConfigureFundAdminRequest,
   UpsertPlatformAdminRequest,
   User,
   UserSummary,
@@ -44,7 +101,7 @@ export type ApiCallOptions = {
 }
 
 type RequestOptions = ApiCallOptions & {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: object
 }
 
@@ -240,6 +297,18 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       get(userId: string, call?: ApiCallOptions) {
         return request<User>(`/api/v1/users/${encodeURIComponent(userId)}`, call)
       },
+      me(call?: ApiCallOptions) {
+        return request<User>('/api/v1/users/me', call)
+      },
+      updateMe(input: UpdateCurrentUserRequest, call?: ApiCallOptions) {
+        return request<User>('/api/v1/users/me', { ...call, method: 'PATCH', body: input })
+      },
+      searchConnections(input: SearchConnectionsRequest, call?: ApiCallOptions) {
+        return request<ConnectionSummary[]>(
+          `/api/v1/users/connections${toQueryString(input)}`,
+          call,
+        )
+      },
     },
     funds: {
       list(input: ListFundsRequest = {}, call?: ApiCallOptions) {
@@ -250,6 +319,77 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       },
       create(input: CreateFundRequest, call?: ApiCallOptions) {
         return request<Fund>('/api/v1/funds', { ...call, method: 'POST', body: input })
+      },
+      update(fundId: string, input: UpdateFundRequest, call?: ApiCallOptions) {
+        return request<Fund>(`/api/v1/funds/${encodeURIComponent(fundId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      remove(fundId: string, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/funds/${encodeURIComponent(fundId)}`, { ...call, method: 'DELETE' })
+      },
+      previewInvite(code: string, call?: ApiCallOptions) {
+        return request<FundInvitePreview>(`/api/v1/funds/invite-preview${toQueryString({ code })}`, call)
+      },
+      join(input: JoinFundRequest, call?: ApiCallOptions) {
+        return request<JoinFundResult>('/api/v1/funds/join', { ...call, method: 'POST', body: input })
+      },
+      leave(fundId: string, call?: ApiCallOptions) {
+        return request<LeaveFundResult>(`/api/v1/funds/${encodeURIComponent(fundId)}/leave`, { ...call, method: 'POST' })
+      },
+      workspace(fundId: string, call?: ApiCallOptions) {
+        return request<FundWorkspace>(`/api/v1/funds/${encodeURIComponent(fundId)}/workspace`, call)
+      },
+      listMembers(fundId: string, call?: ApiCallOptions) {
+        return request<FundMemberDirectoryItem[]>(`/api/v1/funds/${encodeURIComponent(fundId)}/members`, call)
+      },
+      getMember(fundId: string, memberId: string, call?: ApiCallOptions) {
+        return request<FundMemberDetails>(`/api/v1/funds/${encodeURIComponent(fundId)}/members/${encodeURIComponent(memberId)}`, call)
+      },
+      updateMember(fundId: string, memberId: string, input: UpdateFundMemberRequest, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/funds/${encodeURIComponent(fundId)}/members/${encodeURIComponent(memberId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      permissions(fundId: string, call?: ApiCallOptions) {
+        return request<FundPermission[]>(`/api/v1/funds/${encodeURIComponent(fundId)}/permissions`, call)
+      },
+      listAdminPermissions(fundId: string, call?: ApiCallOptions) {
+        return request<FundAdminPermissionRow[]>(`/api/v1/funds/${encodeURIComponent(fundId)}/admin-permissions`, call)
+      },
+      configureAdmin(fundId: string, memberId: string, input: ConfigureFundAdminRequest, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/funds/${encodeURIComponent(fundId)}/members/${encodeURIComponent(memberId)}/admin`, { ...call, method: 'PUT', body: input })
+      },
+      removeAdmin(fundId: string, memberId: string, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/funds/${encodeURIComponent(fundId)}/members/${encodeURIComponent(memberId)}/admin`, { ...call, method: 'DELETE' })
+      },
+      listSponsorships(fundId: string, call?: ApiCallOptions) {
+        return request<FundSponsorshipItem[]>(`/api/v1/funds/${encodeURIComponent(fundId)}/sponsorships`, call)
+      },
+      createSponsorship(fundId: string, input: CreateFundSponsorshipRequest, call?: ApiCallOptions) {
+        return request<FundSponsorshipItem>(`/api/v1/funds/${encodeURIComponent(fundId)}/sponsorships`, { ...call, method: 'POST', body: input })
+      },
+      updateSponsorship(fundId: string, itemId: string, input: UpdateFundSponsorshipRequest, call?: ApiCallOptions) {
+        return request<FundSponsorshipItem>(`/api/v1/funds/${encodeURIComponent(fundId)}/sponsorships/${encodeURIComponent(itemId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      claimSponsorship(fundId: string, itemId: string, call?: ApiCallOptions) {
+        return request<FundSponsorshipItem>(`/api/v1/funds/${encodeURIComponent(fundId)}/sponsorships/${encodeURIComponent(itemId)}/claim`, { ...call, method: 'POST' })
+      },
+      releaseSponsorship(fundId: string, itemId: string, call?: ApiCallOptions) {
+        return request<FundSponsorshipItem>(`/api/v1/funds/${encodeURIComponent(fundId)}/sponsorships/${encodeURIComponent(itemId)}/release`, { ...call, method: 'POST' })
+      },
+      activity(fundId: string, input: ListFundActivityRequest = {}, call?: ApiCallOptions) {
+        return request<Paginated<FundActivityEntry>>(`/api/v1/funds/${encodeURIComponent(fundId)}/activity${toQueryString(input)}`, call)
+      },
+      activityDetail(fundId: string, entryId: string, call?: ApiCallOptions) {
+        return request<FundActivityDetail>(`/api/v1/funds/${encodeURIComponent(fundId)}/activity/${encodeURIComponent(entryId)}`, call)
+      },
+      report(fundId: string, call?: ApiCallOptions) {
+        return request<FundReportBundle>(`/api/v1/funds/${encodeURIComponent(fundId)}/report`, call)
+      },
+      createExport(fundId: string, input: CreateFundExportRequest, call?: ApiCallOptions) {
+        return request<FundExport>(`/api/v1/funds/${encodeURIComponent(fundId)}/exports`, { ...call, method: 'POST', body: input })
+      },
+    },
+    home: {
+      summary(call?: ApiCallOptions) {
+        return request<HomeSummary>('/api/v1/home/summary', call)
       },
     },
     events: {
@@ -265,6 +405,60 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       create(input: CreateEventRequest, call?: ApiCallOptions) {
         return request<Event>('/api/v1/events', { ...call, method: 'POST', body: input })
       },
+      syncOrganiserInvites(call?: ApiCallOptions) {
+        return request<SyncOrganiserInvitesResult>('/api/v1/events/organiser-invites/sync', {
+          ...call,
+          method: 'POST',
+        })
+      },
+      respondOrganiserInvite(input: RespondOrganiserInviteRequest, call?: ApiCallOptions) {
+        return request<RespondOrganiserInviteResult>('/api/v1/events/organiser-invites/respond', {
+          ...call,
+          method: 'POST',
+          body: input,
+        })
+      },
+    },
+    notifications: {
+      list(input: ListNotificationsRequest = {}, call?: ApiCallOptions) {
+        return request<Paginated<Notification>>(
+          `/api/v1/notifications${toQueryString(input)}`,
+          call,
+        )
+      },
+      get(notificationId: string, call?: ApiCallOptions) {
+        return request<Notification>(
+          `/api/v1/notifications/${encodeURIComponent(notificationId)}`,
+          call,
+        )
+      },
+      markRead(notificationIds: string[], call?: ApiCallOptions) {
+        return request<{ updated_ids: string[] }>('/api/v1/notifications', {
+          ...call,
+          method: 'PATCH',
+          body: { notification_ids: notificationIds },
+        })
+      },
+    },
+    rewards: {
+      evaluate(call?: ApiCallOptions) {
+        return request<EvaluateRewardsResult>('/api/v1/rewards/evaluate', {
+          ...call,
+          method: 'POST',
+        })
+      },
+      progress(call?: ApiCallOptions) {
+        return request<RewardProgressOverview>('/api/v1/rewards/progress', call)
+      },
+      listUnseen(call?: ApiCallOptions) {
+        return request<RewardSnackbarItem[]>('/api/v1/rewards/unseen', call)
+      },
+      markSeen(rewardId: string, call?: ApiCallOptions) {
+        return request<Record<string, never>>(
+          `/api/v1/rewards/${encodeURIComponent(rewardId)}/seen`,
+          { ...call, method: 'PATCH' },
+        )
+      },
     },
     contributions: {
       list(input: ListContributionsRequest = {}, call?: ApiCallOptions) {
@@ -278,6 +472,69 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
           `/api/v1/contributions/${encodeURIComponent(contributionId)}`,
           call,
         )
+      },
+      create(input: CreateContributionRequest, call?: ApiCallOptions) {
+        return request<Contribution>('/api/v1/contributions', { ...call, method: 'POST', body: input })
+      },
+      update(contributionId: string, input: UpdateContributionRequest, call?: ApiCallOptions) {
+        return request<Contribution>(`/api/v1/contributions/${encodeURIComponent(contributionId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      refund(contributionId: string, input: RefundContributionRequest = {}, call?: ApiCallOptions) {
+        return request<Contribution>(`/api/v1/contributions/${encodeURIComponent(contributionId)}/refund`, { ...call, method: 'POST', body: input })
+      },
+      assignDetected(input: import('../contracts').DetectedPaymentAssignmentRequest, call?: ApiCallOptions) {
+        return request<import('../contracts').DetectedPaymentAssignmentResult>('/api/v1/contributions/detected-assignment', { ...call, method: 'POST', body: input })
+      },
+      listContributors(fundId: string, call?: ApiCallOptions) {
+        return request<FundContributor[]>(`/api/v1/funds/${encodeURIComponent(fundId)}/contributors`, call)
+      },
+      listPledgeBalances(fundId: string, contributorId?: string, call?: ApiCallOptions) {
+        return request<ContributorPledgeBalance[]>(`/api/v1/funds/${encodeURIComponent(fundId)}/pledges${toQueryString({ contributor_id: contributorId })}`, call)
+      },
+      createPledgeAllocation(input: CreatePledgeAllocationRequest, call?: ApiCallOptions) {
+        return request<PledgeAllocation>('/api/v1/pledge-allocations', { ...call, method: 'POST', body: input })
+      },
+      createSponsorshipAllocation(input: CreateSponsorshipAllocationRequest, call?: ApiCallOptions) {
+        return request<SponsorshipAllocation>('/api/v1/sponsorship-allocations', { ...call, method: 'POST', body: input })
+      },
+    },
+    expenses: {
+      list(input: ListExpensesRequest, call?: ApiCallOptions) {
+        return request<Paginated<Expense>>(`/api/v1/expenses${toQueryString(input)}`, call)
+      },
+      create(input: CreateExpensesRequest, call?: ApiCallOptions) {
+        return request<CreateExpensesResult>('/api/v1/expenses', { ...call, method: 'POST', body: input })
+      },
+      update(expenseId: string, input: UpdateExpenseRequest, call?: ApiCallOptions) {
+        return request<Expense>(`/api/v1/expenses/${encodeURIComponent(expenseId)}`, { ...call, method: 'PATCH', body: input })
+      },
+    },
+    receipts: {
+      createUploadSession(input: CreateReceiptUploadSessionRequest, call?: ApiCallOptions) {
+        return request<ReceiptUploadSession>('/api/v1/receipts/upload-session', { ...call, method: 'POST', body: input })
+      },
+      parse(input: ParseReceiptRequest, call?: ApiCallOptions) {
+        return request<ParsedReceipt>('/api/v1/receipts/parse', { ...call, method: 'POST', body: input })
+      },
+    },
+    richAuntie: {
+      eligibility(fundId: string, recipientUserId: string, call?: ApiCallOptions) {
+        return request<RichAuntieEligibility>(`/api/v1/rich-auntie/eligibility${toQueryString({ fund_id: fundId, recipient_user_id: recipientUserId })}`, call)
+      },
+      listAwards(input: ListRichAuntieAwardsRequest = {}, call?: ApiCallOptions) {
+        return request<Paginated<RichAuntieAward>>(`/api/v1/rich-auntie/awards${toQueryString(input)}`, call)
+      },
+      createAward(input: CreateRichAuntieAwardRequest, call?: ApiCallOptions) {
+        return request<RichAuntieAward>('/api/v1/rich-auntie/awards', { ...call, method: 'POST', body: input })
+      },
+      recipientHistory(recipientUserId: string, call?: ApiCallOptions) {
+        return request<RichAuntieRecipientHistory>(`/api/v1/rich-auntie/recipients/${encodeURIComponent(recipientUserId)}/history`, call)
+      },
+      celebration(awardId: string, call?: ApiCallOptions) {
+        return request<RichAuntieCelebration>(`/api/v1/rich-auntie/celebrations/${encodeURIComponent(awardId)}`, call)
+      },
+      status(call?: ApiCallOptions) {
+        return request<RichAuntieRecipientHistory>('/api/v1/rich-auntie/status', call)
       },
     },
     admin: {
