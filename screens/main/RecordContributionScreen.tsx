@@ -8,7 +8,7 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import ProviderLogo from '../../components/ProviderLogo'
 import { detectProvider, type MobileMoneyProvider } from '../../lib/providers'
@@ -106,36 +106,25 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
     let active = true
     async function loadMembers() {
       if (!userId || permissionsLoading) return
-      const [{ data: memberRows }, { data: profiles }, { data: contributorRows }] = await Promise.all([
-        supabase.from('fund_members').select('id, user_id').eq('fund_id', fundId).eq('status', 'joined'),
-        supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
-        supabase
-          .from('fund_contributors')
-          .select('id, user_id, display_name, phone, contributor_type')
-          .eq('fund_id', fundId)
-          .order('display_name', { ascending: true }),
+      const [memberRows, contributorRows] = await Promise.all([
+        api.funds.listMembers(fundId),
+        api.contributions.listContributors(fundId),
       ])
 
-      if (!active || !memberRows) return
+      if (!active) return
 
       const manager = canRecordReceived === true
       if (!manager) setEntryMode('pledge')
 
-      const profileByRowId = new Map<string, { userId: string; name: string; phone: string }>(
-        (profiles ?? []).map((p: any) => [p.member_row_id, { userId: p.user_id, name: p.name, phone: p.phone }])
-      )
-
-      const contributorByUserId = new Map<string, any>(
-        (contributorRows ?? [])
-          .filter((row: any) => Boolean(row.user_id))
-          .map((row: any) => [row.user_id, row])
+      const contributorByUserId = new Map(
+        contributorRows
+          .filter(row => Boolean(row.user_id))
+          .map(row => [row.user_id as string, row])
       )
 
       const memberOptions: ContributorOption[] = memberRows
         .flatMap(m => {
-          const profile = profileByRowId.get(m.id)
-          if (!profile) return []
-          const memberUserId = m.user_id ?? profile.userId
+          const memberUserId = m.user_id
           if (!memberUserId) return []
           const contributor = contributorByUserId.get(memberUserId)
           return [{
@@ -143,15 +132,15 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
             contributorId: contributor?.id ?? null,
             memberId: m.id,
             userId: memberUserId,
-            name: profile.name,
-            phone: profile.phone,
+            name: m.display_name,
+            phone: m.phone ?? contributor?.phone ?? '',
             kind: 'member' as const,
           }]
         })
 
-      const guestOptions: ContributorOption[] = (contributorRows ?? [])
-        .filter((row: any) => !row.user_id)
-        .map((row: any) => ({
+      const guestOptions: ContributorOption[] = contributorRows
+        .filter(row => !row.user_id)
+        .map(row => ({
           key: `guest:${row.id}`,
           contributorId: row.id,
           memberId: null,
@@ -180,7 +169,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
         }
       }
     }
-    loadMembers()
+    loadMembers().catch(() => { if (active) setContributorOptions([]) })
     return () => { active = false }
   }, [canRecordReceived, fundId, permissionsLoading, sponsorUserId, userId])
 
@@ -213,16 +202,10 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
 
     setIsLoadingPledges(true)
     setSelectedPledgeId(null)
-    supabase
-      .from('contributor_pledge_balances')
-      .select('pledge_id, pledged_amount, allocated_amount, outstanding_amount, pledge_state')
-      .eq('fund_id', fundId)
-      .eq('contributor_id', contributorId)
-      .gt('outstanding_amount', 0)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
+    api.contributions.listPledgeBalances(fundId, contributorId)
+      .then(data => {
         if (!active) return
-        setOpenPledges((data ?? []).map((pledge: any) => ({
+        setOpenPledges(data.filter(pledge => Number(pledge.outstanding_amount) > 0).map(pledge => ({
           pledge_id: pledge.pledge_id,
           pledged_amount: Number(pledge.pledged_amount ?? 0),
           allocated_amount: Number(pledge.allocated_amount ?? 0),
@@ -231,6 +214,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
         })))
         setIsLoadingPledges(false)
       })
+      .catch(() => { if (active) setIsLoadingPledges(false) })
 
     return () => { active = false }
   }, [entryMode, fundId, selectedContributor?.contributorId])
@@ -247,17 +231,12 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
     }
 
     setIsLoadingSponsorships(true)
-    supabase
-      .from('fund_sponsorship_item_progress')
-      .select('id, title, target_amount, allocated_amount, outstanding_amount')
-      .eq('fund_id', fundId)
-      .eq('claimed_by_user_id', selectedUserId)
-      .in('status', ['claimed', 'funded'])
-      .gt('outstanding_amount', 0)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
+    api.funds.listSponsorships(fundId)
+      .then(data => {
         if (!active) return
-        const loaded = (data ?? []).map((item: any) => ({
+        const loaded = data
+          .filter(item => item.claimed_by_user_id === selectedUserId && ['claimed', 'funded'].includes(item.status) && Number(item.outstanding_amount) > 0)
+          .map(item => ({
           id: item.id,
           title: item.title,
           target_amount: Number(item.target_amount ?? 0),
@@ -274,6 +253,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
         }
         setIsLoadingSponsorships(false)
       })
+      .catch(() => { if (active) setIsLoadingSponsorships(false) })
 
     return () => { active = false }
   }, [canManageSponsorships, entryMode, fundId, selectedContributor?.userId, sponsorshipItemId])
@@ -355,50 +335,34 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
     setIsSaving(true)
 
     try {
-      const now = new Date().toISOString()
-
-      const { data: savedContribution, error } = await supabase
-        .from('contributions')
-        .insert({
-          fund_id:            fundId,
-          contributor_id:     selectedContributor?.contributorId ?? null,
-          user_id:            selectedContributor?.userId ?? null,
-          contributor_name:   contributorName.trim(),
-          contributor_phone:  contributorPhone.trim(),
-          tagged_by:          userId,
-          amount:             parsedAmount,
-          pledged_amount:     isPledge ? parsedAmount : null,
-          currency_code:      currencyCode,
-          payment_method:     isPledge ? null : provider,
-          detected_via:       !isPledge && source === 'sms_detected' ? 'sms' : 'manual',
-          status:             isPledge ? 'pledged' : 'confirmed',
-          confirmed_by:       isPledge ? null : userId,
-          confirmed_at:       isPledge ? null : now,
+      const savedContribution = await api.contributions.create({
+          fund_id: fundId,
+          contributor_id: selectedContributor?.contributorId ?? null,
+          contributor_user_id: selectedContributor?.userId ?? null,
+          contributor_name: contributorName.trim(),
+          contributor_phone: contributorPhone.trim(),
+          amount: String(parsedAmount),
+          pledged_amount: isPledge ? String(parsedAmount) : null,
+          currency_code: currencyCode,
+          payment_method: isPledge ? null : provider,
+          detected_via: !isPledge && source === 'sms_detected' ? 'sms' : 'manual',
+          status: isPledge ? 'pledged' : 'confirmed',
           // The pasted SMS is used only for on-device review/provider detection.
           // Raw message bodies can contain balances and are never stored.
-          notes:              notes.trim() || null,
+          notes: notes.trim() || null,
         })
-        .select('id, contributor_id')
-        .single()
-
-      if (error) {
-        hapticError()
-        Alert.alert(isPledge ? 'Could not save pledge' : 'Could not save contribution', error.message)
-        return
-      }
 
       const selectedOpenPledge = openPledges.find(pledge => pledge.pledge_id === selectedPledgeId)
       if (!isPledge && openPledges.length > 1 && selectedOpenPledge && savedContribution) {
-        const { error: allocationError } = await supabase.from('pledge_allocations').insert({
+        try {
+          await api.contributions.createPledgeAllocation({
           fund_id: fundId,
           contributor_id: savedContribution.contributor_id,
           pledge_contribution_id: selectedOpenPledge.pledge_id,
           payment_contribution_id: savedContribution.id,
-          amount: Math.min(parsedAmount, selectedOpenPledge.outstanding_amount),
-          created_by: userId,
-        })
-
-        if (allocationError) {
+          amount: String(Math.min(parsedAmount, selectedOpenPledge.outstanding_amount)),
+          })
+        } catch {
           hapticError()
           Alert.alert(
             'Contribution saved without allocation',
@@ -413,17 +377,14 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
         item => item.id === selectedSponsorshipItemId
       )
       if (!isPledge && canManageSponsorships && selectedSponsorshipItem && savedContribution) {
-        const { error: sponsorshipAllocationError } = await supabase
-          .from('sponsorship_item_allocations')
-          .insert({
+        try {
+          await api.contributions.createSponsorshipAllocation({
             fund_id: fundId,
             sponsorship_item_id: selectedSponsorshipItem.id,
             contribution_id: savedContribution.id,
-            amount: Math.min(parsedAmount, selectedSponsorshipItem.outstanding_amount),
-            created_by: userId,
+            amount: String(Math.min(parsedAmount, selectedSponsorshipItem.outstanding_amount)),
           })
-
-        if (sponsorshipAllocationError) {
+        } catch {
           hapticError()
           Alert.alert(
             'Contribution saved without item allocation',

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
 import { hapticSuccess, hapticError } from '../../../lib/haptics'
 import { makeCommonStyles } from '../recordExpense/common'
 import { CATEGORIES, CategoryOption, MAX_EXPENSE_BWP } from '../recordExpense/categories'
@@ -46,38 +46,31 @@ export default function EditExpenseModal({ expense, currencySymbol, onClose, onS
     if (!expense || !isValid || isSaving) return
     setIsSaving(true)
 
-    const { data, error } = await supabase
-      .from('expenses')
-      .update({
+    try {
+      const updated = await api.expenses.update(expense.id, {
         description: name.trim(),
         item_name:   name.trim(),
         vendor_name: vendor.trim() || null,
-        amount:      parsedAmount,
+        amount:      String(parsedAmount),
         category:    category?.value ?? null,
-        updated_at:  new Date().toISOString(),
       })
-      .eq('id', expense.id)
-      .select('id')
-
-    setIsSaving(false)
-
-    if (error || !data || data.length === 0) {
+      hapticSuccess()
+      onSaved({
+        ...expense,
+        description: updated.description,
+        vendor_name: updated.vendor_name,
+        amount: Number(updated.amount),
+        category: updated.category,
+      })
+    } catch (error) {
       hapticError()
       Alert.alert(
         'Could not save changes',
-        error?.message ?? 'You need organiser permissions to edit expenses.'
+        error instanceof Error ? error.message : 'You need organiser permissions to edit expenses.'
       )
-      return
+    } finally {
+      setIsSaving(false)
     }
-
-    hapticSuccess()
-    onSaved({
-      ...expense,
-      description: name.trim(),
-      vendor_name: vendor.trim() || null,
-      amount:      parsedAmount,
-      category:    category?.value ?? null,
-    })
   }
 
   return (

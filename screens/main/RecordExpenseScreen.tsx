@@ -9,7 +9,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { CategoryOption, MAX_EXPENSE_BWP } from './recordExpense/categories'
@@ -78,23 +78,15 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   useEffect(() => {
     let active = true
     async function loadPayers() {
-      const [{ data: memberRows }, { data: profiles }] = await Promise.all([
-        supabase.from('fund_members').select('user_id').eq('fund_id', fundId).eq('status', 'joined'),
-        supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
-      ])
-
-      if (!active || !memberRows) return
-
-      const nameByUserId = new Map<string, string>(
-        (profiles ?? []).map((p: any) => [p.user_id, p.name])
-      )
+      const memberRows = await api.funds.listMembers(fundId)
+      if (!active) return
 
       const others = memberRows
         .filter(m => m.user_id && m.user_id !== userId)
         .map(m => ({
           id:     m.user_id as string,
           userId: m.user_id as string,
-          name:   nameByUserId.get(m.user_id as string) ?? 'Member',
+          name:   m.display_name,
         }))
 
       setPayers(others)
@@ -102,7 +94,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
         setPaidBy(sponsorUserId)
       }
     }
-    loadPayers()
+    loadPayers().catch(() => { if (active) setPayers([]) })
     return () => { active = false }
   }, [fundId, sponsorUserId, userId])
 
@@ -150,22 +142,6 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
     return true
   })
 
-  async function completeSponsorshipItem(expenseId: string | undefined) {
-    if (!sponsorshipItemId || !expenseId) return null
-    if (!can('manage_sponsorships')) return new Error('Sponsorship permission is required.')
-    const { error } = await supabase
-      .from('fund_sponsorship_items')
-      .update({
-        status: 'fulfilled',
-        linked_expense_id: expenseId,
-        fulfilled_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', sponsorshipItemId)
-      .eq('fund_id', fundId)
-    return error
-  }
-
   async function handleSaveManual() {
     if (!canRecordExpense || !canCompleteSponsorship || !isManualValid || isSaving || !userId) return
     if (!requireOnline()) return
@@ -179,34 +155,22 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
 
       const payer = paidBy !== 'self' ? payers.find(p => p.id === paidBy) : null
 
-      const { data: savedExpense, error } = await supabase
-        .from('expenses')
-        .insert({
-          fund_id:       fundId,
-          added_by:      userId,
+      const result = await api.expenses.create({
+        fund_id: fundId,
+        fulfill_sponsorship_item_id: sponsorshipItemId ?? null,
+        items: [{
           description:   finalDescription,
           vendor_name:   vendor.trim(),
-          amount:        parsedAmount,
+          amount:        String(parsedAmount),
           currency_code: currencyCode,
           ...(category   ? { category: category.value } : {}),
-          ...(payer      ? { is_sponsored: true, sponsored_by_user_id: payer.userId, sponsored_by_name: payer.name } : {}),
-        })
-        .select('id')
-        .single()
+          ...(payer ? { sponsored_by_user_id: payer.userId, sponsored_by_name: payer.name } : {}),
+        }],
+      })
 
-      if (error) {
+      if (!result.sponsorship_fulfilled) {
         hapticError()
-        Alert.alert('Could not save expense', error.message)
-        return
-      }
-
-      const sponsorshipError = await completeSponsorshipItem(savedExpense?.id)
-      if (sponsorshipError) {
-        hapticError()
-        Alert.alert(
-          'Expense saved',
-          'The expense was recorded, but the sponsorship item could not be marked complete. Please try again from the fund.',
-        )
+        Alert.alert('Expense saved', 'The expense was recorded, but the sponsorship item could not be marked complete. Please try again from the fund.')
         navigation.goBack()
         return
       }
@@ -228,44 +192,35 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
     try {
       let receiptUrl: string | null = null
       if (receiptUri) {
-        receiptUrl = await uploadReceipt(fundId, userId, receiptUri)
+        receiptUrl = parsedReceipt?.objectPath ?? await uploadReceipt(fundId, receiptUri)
       }
 
       const payer = sponsorUserId ? payers.find(option => option.userId === sponsorUserId) : null
       const rows = includedItems.map(item => ({
-        fund_id:       fundId,
-        added_by:      userId,
         description:   item.name.trim(),
         item_name:     item.name.trim(),
         vendor_name:   shopName.trim(),
-        amount:        parseFloat(item.amount),
-        quantity:      1,
-        unit_price:    parseFloat(item.amount),
+        amount:        String(parseFloat(item.amount)),
+        quantity:      '1',
+        unit_price:    String(parseFloat(item.amount)),
         currency_code: currencyCode,
         ...(item.category ? { category: item.category.value } : {}),
-        ...(receiptUrl    ? { receipt_url: receiptUrl }        : {}),
+        ...(receiptUrl    ? { receipt_path: receiptUrl }       : {}),
         ...(payer ? {
-          is_sponsored: true,
           sponsored_by_user_id: payer.userId,
           sponsored_by_name: payer.name,
         } : {}),
       }))
 
-      const { data: savedExpenses, error } = await supabase.from('expenses').insert(rows).select('id')
+      const result = await api.expenses.create({
+        fund_id: fundId,
+        items: rows,
+        fulfill_sponsorship_item_id: sponsorshipItemId ?? null,
+      })
 
-      if (error) {
+      if (!result.sponsorship_fulfilled) {
         hapticError()
-        Alert.alert('Could not save expense', error.message)
-        return
-      }
-
-      const sponsorshipError = await completeSponsorshipItem(savedExpenses?.[0]?.id)
-      if (sponsorshipError) {
-        hapticError()
-        Alert.alert(
-          'Expenses saved',
-          'The receipt was recorded, but the sponsorship item could not be marked complete. Please try again from the fund.',
-        )
+        Alert.alert('Expenses saved', 'The receipt was recorded, but the sponsorship item could not be marked complete. Please try again from the fund.')
         navigation.goBack()
         return
       }

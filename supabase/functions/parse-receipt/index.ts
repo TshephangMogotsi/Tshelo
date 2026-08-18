@@ -2,8 +2,8 @@ import Anthropic from 'npm:@anthropic-ai/sdk'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Parses a receipt photo into structured expense data using Claude vision.
-// Called from the app via supabase.functions.invoke('parse-receipt') with
-// { fundId: <uuid>, image: <base64 jpeg/png>, mediaType: 'image/jpeg' | 'image/png' }.
+// Called by the authenticated API with a caller-owned private Storage path.
+// Legacy base64 input remains accepted temporarily for deployed older clients.
 // Requires the ANTHROPIC_API_KEY function secret.
 
 const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY') ?? Deno.env.get('Tshelo_key')
@@ -13,6 +13,15 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const MAX_REQUEST_BYTES = 7_000_000
 const MAX_IMAGE_BYTES = 5_000_000
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function base64(bytes: Uint8Array) {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return btoa(binary)
+}
 
 // Mirrors CATEGORIES in screens/main/recordExpense/categories.ts
 const CATEGORY_VALUES = [
@@ -112,12 +121,13 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authError } = await callerClient.auth.getUser()
   if (authError || !user) return json({ error: 'Unauthorized' }, 401)
 
-  let image: string, mediaType: string, fundId: string
+  let image: string | undefined, mediaType: string, fundId: string, receiptPath: string | undefined
   try {
     const body = await req.json()
     image = body.image
     mediaType = body.mediaType ?? 'image/jpeg'
     fundId = body.fundId
+    receiptPath = body.receiptPath
   } catch {
     return json({ error: 'Invalid JSON' }, 400)
   }
@@ -125,14 +135,17 @@ Deno.serve(async (req) => {
   if (typeof fundId !== 'string' || !UUID_PATTERN.test(fundId)) {
     return json({ error: 'Invalid fund' }, 400)
   }
-  if (typeof image !== 'string' || image.length === 0) {
+  const expectedPrefix = `${fundId}/${user.id}/`
+  const usesStoredReceipt = typeof receiptPath === 'string' && receiptPath.length > 0
+  if (usesStoredReceipt && (
+    !receiptPath!.startsWith(expectedPrefix)
+    || !/^[0-9a-f/-]+\.(?:jpg|png)$/i.test(receiptPath!)
+  )) return json({ error: 'Invalid receipt path' }, 400)
+  if (!usesStoredReceipt && (typeof image !== 'string' || image.length === 0)) {
     return json({ error: 'Missing image' }, 400)
   }
-  if (image.startsWith('data:') || Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) {
+  if (!usesStoredReceipt && (image!.startsWith('data:') || Math.floor(image!.length * 3 / 4) > MAX_IMAGE_BYTES)) {
     return json({ error: 'Image is too large' }, 413)
-  }
-  if (mediaType !== 'image/jpeg' && mediaType !== 'image/png') {
-    return json({ error: 'Unsupported media type' }, 400)
   }
 
   const { data: allowed, error: allowanceError } = await callerClient
@@ -143,6 +156,19 @@ Deno.serve(async (req) => {
   }
   if (!allowed) return json({ error: 'Receipt scan limit reached or fund access denied' }, 429)
 
+  if (usesStoredReceipt) {
+    const { data: storedReceipt, error: downloadError } = await callerClient.storage
+      .from('receipts')
+      .download(receiptPath!)
+    if (downloadError || !storedReceipt) return json({ error: 'Receipt upload was not found' }, 404)
+    if (storedReceipt.size > MAX_IMAGE_BYTES) return json({ error: 'Image is too large' }, 413)
+    mediaType = storedReceipt.type || (receiptPath!.endsWith('.png') ? 'image/png' : 'image/jpeg')
+    image = base64(new Uint8Array(await storedReceipt.arrayBuffer()))
+  }
+  if (mediaType !== 'image/jpeg' && mediaType !== 'image/png') {
+    return json({ error: 'Unsupported media type' }, 400)
+  }
+
   try {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
@@ -152,7 +178,7 @@ Deno.serve(async (req) => {
         {
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image! } },
             { type: 'text', text: PROMPT },
           ],
         },

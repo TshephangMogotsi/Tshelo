@@ -13,12 +13,12 @@ import {
   View,
 } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
-import { useAuth } from '../../../context/AuthContext'
 import type { AppColors } from '../../../theme/themes'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
 import { hapticError, hapticSuccess } from '../../../lib/haptics'
 import { makeCommonStyles } from '../recordExpense/common'
 import type { Contribution } from './types'
+import type { PaymentMethod } from '@shared/contracts'
 
 type Props = {
   contribution: Contribution | null
@@ -47,13 +47,12 @@ const STATUSES = [
 
 export default function EditContributionModal({ contribution, currencySymbol, canRefund, onClose, onSaved }: Props) {
   const { colors } = useTheme()
-  const { userId } = useAuth()
   const common = makeCommonStyles(colors)
   const styles = makeStyles(colors)
 
   const [amount, setAmount] = useState('')
   const [pledgedAmount, setPledgedAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<string>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [reference, setReference] = useState('')
   const [status, setStatus] = useState<string>('pending')
   const [isSaving, setIsSaving] = useState(false)
@@ -62,7 +61,9 @@ export default function EditContributionModal({ contribution, currencySymbol, ca
     if (!contribution) return
     setAmount(String(contribution.amount))
     setPledgedAmount(contribution.pledged_amount == null ? '' : String(contribution.pledged_amount))
-    setPaymentMethod(contribution.payment_method ?? 'cash')
+    setPaymentMethod(PAYMENT_METHODS.some(([value]) => value === contribution.payment_method)
+      ? contribution.payment_method as PaymentMethod
+      : 'other')
     setReference(contribution.reference_number ?? '')
     setStatus(contribution.is_refunded ? 'refunded' : contribution.status)
   }, [contribution?.id])
@@ -75,46 +76,36 @@ export default function EditContributionModal({ contribution, currencySymbol, ca
   async function handleSave() {
     if (!contribution || !isValid || isSaving) return
     setIsSaving(true)
-    const now = new Date().toISOString()
-    const isConfirmed = status === 'confirmed'
     const isRefunded = status === 'refunded'
     const nextPledgedAmount = status === 'pledged' ? parsedAmount : parsedPledgedAmount
-
-    const { data, error } = await supabase
-      .from('contributions')
-      .update({
-        amount: parsedAmount,
-        pledged_amount: nextPledgedAmount,
+    try {
+      let updated = await api.contributions.update(contribution.id, {
+        amount: String(parsedAmount),
+        pledged_amount: nextPledgedAmount === null ? null : String(nextPledgedAmount),
         payment_method: status === 'pledged' ? null : paymentMethod,
         reference_number: reference.trim() || null,
-        status,
-        is_refunded: isRefunded,
-        refunded_at: isRefunded ? now : null,
-        confirmed_by: isConfirmed ? userId : null,
-        confirmed_at: isConfirmed ? (contribution.confirmed_at ?? now) : null,
-        updated_at: now,
+        ...(isRefunded ? {} : { status: status as 'pledged' | 'pending' | 'confirmed' | 'disputed' }),
       })
-      .eq('id', contribution.id)
-      .select('id')
-
-    setIsSaving(false)
-    if (error || !data?.length) {
+      if (isRefunded && !contribution.is_refunded) {
+        updated = await api.contributions.refund(contribution.id)
+      }
+      hapticSuccess()
+      onSaved({
+        ...contribution,
+        amount: Number(updated.amount),
+        pledged_amount: updated.pledged_amount === null ? null : Number(updated.pledged_amount),
+        payment_method: updated.payment_method,
+        reference_number: updated.reference_number,
+        status: updated.status,
+        is_refunded: updated.is_refunded,
+        confirmed_at: updated.confirmed_at,
+      })
+    } catch (error) {
       hapticError()
-      Alert.alert('Could not save changes', error?.message ?? 'You need organiser permissions to edit contributions.')
-      return
+      Alert.alert('Could not save changes', error instanceof Error ? error.message : 'You need organiser permissions to edit contributions.')
+    } finally {
+      setIsSaving(false)
     }
-
-    hapticSuccess()
-    onSaved({
-      ...contribution,
-      amount: parsedAmount,
-      pledged_amount: nextPledgedAmount,
-      payment_method: status === 'pledged' ? null : paymentMethod,
-      reference_number: reference.trim() || null,
-      status,
-      is_refunded: isRefunded,
-      confirmed_at: isConfirmed ? (contribution.confirmed_at ?? now) : null,
-    })
   }
 
   return (

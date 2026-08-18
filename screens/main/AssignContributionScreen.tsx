@@ -9,7 +9,7 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import { describeSender, getDetectedSmsKey } from '../../lib/smsWatcher'
 import { PROVIDER_LABELS } from '../../lib/providers'
@@ -63,18 +63,15 @@ export default function AssignContributionScreen({ navigation, route }: Props) {
       // payment was assigned elsewhere. Resolve its current server state before
       // allowing another save.
       if (notificationId) {
-        supabase
-          .from('notifications')
-          .select('fund_id, response_action, data')
-          .eq('id', notificationId)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (!active || data?.response_action !== 'recorded') return
+        api.notifications.get(notificationId)
+          .then(data => {
+            if (!active || data.response_action !== 'recorded') return
             const recordedFundId = data.fund_id ?? data.data?.recordedFundId
             if (typeof recordedFundId === 'string') {
               navigation.replace('FundDetail', { fundId: recordedFundId })
             }
           })
+          .catch(() => {})
       }
       return () => { active = false }
     }, [userId, notificationId])
@@ -99,21 +96,11 @@ export default function AssignContributionScreen({ navigation, route }: Props) {
 
     setIsSaving(true)
     try {
-      const { data, error } = await supabase
-        .rpc('record_detected_contribution', {
-          p_fund_id: selected.fundId,
-          p_detected: { ...detected, detectionKey: getDetectedSmsKey(detected) },
-          p_notification_id: notificationId ?? null,
-        })
-        .single()
-
-      if (error || !data) {
-        hapticError()
-        Alert.alert('Could not save contribution', error?.message ?? 'The payment could not be recorded.')
-        return
-      }
-
-      const result = data as { recorded_fund_id: string; already_recorded: boolean }
+      const result = await api.contributions.assignDetected({
+        fund_id: selected.fundId,
+        detected: { ...detected, detectionKey: getDetectedSmsKey(detected) },
+        notification_id: notificationId ?? null,
+      })
       hapticSuccess()
       if (result.already_recorded) {
         Alert.alert('Already recorded', 'This detected payment was already added to a fund.')
