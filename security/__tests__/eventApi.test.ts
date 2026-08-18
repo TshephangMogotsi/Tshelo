@@ -83,4 +83,23 @@ describe('event API slice', () => {
         .toEqual({ file, directData: false })
     }
   })
+
+  it('keeps the website event flow behind the typed API boundary', () => {
+    const websiteFiles = [
+      'admin/components/account-events/event-list.tsx',
+      'admin/components/account-events/create-event-form.tsx',
+      'admin/components/account-events/join-event-form.tsx',
+      'admin/components/account-events/event-workspace.tsx',
+    ]
+
+    for (const file of websiteFiles) {
+      const source = read(file)
+      expect({ file, importsBrowserApi: source.includes("from '@/lib/api-client'") })
+        .toEqual({ file, importsBrowserApi: true })
+      expect({ file, importsSupabase: /from\s+['"][^'"]*supabase['"]/.test(source) })
+        .toEqual({ file, importsSupabase: false })
+      expect({ file, directData: /\bsupabase\s*\.\s*(?:from|rpc|functions|storage)\b/.test(source) })
+        .toEqual({ file, directData: false })
+    }
+  })
 })

@@ -60,9 +60,10 @@ export default async function AccountPage() {
         <header><div className="member-section-title"><span><ListChecks size={18} /></span><h2>Quick actions</h2></div></header>
         <div className="member-card-body member-actions">
           <Link className="primary" href={'/account/funds/new' as Route}>Create a fund</Link>
+          <Link className="primary" href={'/account/events/new' as Route}>Create an event</Link>
           <Link href="/account/funds">Manage my funds</Link>
+          <Link href={'/account/events' as Route}>Manage my events</Link>
           <Link href="/account/contributions">My contributions</Link>
-          <a href="#events">My events</a>
           <a href="#profile">Account details</a>
         </div>
       </section>
@@ -108,10 +109,10 @@ export default async function AccountPage() {
       </section>
 
       <section className="member-card" id="events">
-        <header><div className="member-section-title"><span><CalendarDays size={18} /></span><h2>My events</h2></div></header>
+        <header><div className="member-section-title"><span><CalendarDays size={18} /></span><h2>My events</h2></div><Link href={'/account/events' as Route}>Manage events <ArrowRight size={14} /></Link></header>
         <div className="member-card-body member-event-summary">
           <strong>{eventCount}</strong>
-          <div><h3>Events organised</h3><p>Event details and guest management remain available in the Tshelo mobile app.</p></div>
+          <div><h3>Events organised</h3><p>Create events, share invitations, view guests, post announcements and update budgets on the website.</p></div>
         </div>
       </section>
 
@@ -125,7 +126,7 @@ export default async function AccountPage() {
           <div><span>Member since</span><strong>{formatDate(user.createdAt)}</strong></div>
           <div><span>Profile</span><strong>{user.profileCompleted ? 'Complete' : 'Incomplete'}</strong></div>
         </div>
-        <div className="member-web-note">You can now create and manage funds on the website. Contribution recording, event management, and account updates remain in the Tshelo mobile app for now.</div>
+        <div className="member-web-note">You can now create and manage funds and events on the website. Contribution recording and account updates remain in the Tshelo mobile app for now.</div>
       </section>
     </>
   )

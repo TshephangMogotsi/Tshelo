@@ -7,6 +7,7 @@ const accountLinks = [
   { href: '/account', label: 'Home' },
   { href: '/account/contributions', label: 'My contributions' },
   { href: '/account/funds', label: 'My funds' },
+  { href: '/account/events', label: 'My events' },
 ] as const
 
 export function AccountNavigation() {
@@ -17,7 +18,7 @@ export function AccountNavigation() {
       {accountLinks.map((link) => (
         <li key={link.href}>
           <Link
-            className={pathname === link.href ? 'active' : undefined}
+            className={pathname === link.href || (link.href !== '/account' && pathname.startsWith(`${link.href}/`)) ? 'active' : undefined}
             href={link.href}
             prefetch
           >
@@ -25,7 +26,6 @@ export function AccountNavigation() {
           </Link>
         </li>
       ))}
-      <li><Link href="/account#events" prefetch>My events</Link></li>
     </ul>
   )
 }
