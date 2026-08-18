@@ -42,10 +42,6 @@ const authStorage = Platform.OS === 'web'
       },
     }
 
-export function fundPreviewUrl(fundCode: string): string {
-  return `${supabaseUrl}/functions/v1/fund-preview?code=${encodeURIComponent(fundCode)}`
-}
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: authStorage,

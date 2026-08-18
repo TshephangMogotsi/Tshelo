@@ -5,7 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
-import { fundPreviewUrl } from '../../lib/supabase'
+import { fundPreviewUrl } from '../../lib/fundLinks'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
