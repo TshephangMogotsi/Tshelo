@@ -7,7 +7,8 @@ import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 import LoadingOverlay from '../../components/LoadingOverlay'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { createLatestApiRequest, runApiRead } from '../../lib/apiScreen'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -73,24 +74,30 @@ export default function ActivityScreen({ navigation }: { navigation: any }) {
   const [loadError, setLoadError] = useState(false)
   const hasLoadedRef = useRef(false)
   const lastLoadedAtRef = useRef(0)
+  const eventsRequest = useRef(createLatestApiRequest())
 
   useFocusEffect(useCallback(() => {
-    let active = true
+    const signal = eventsRequest.current.start()
     async function loadEvents() {
       if (hasLoadedRef.current && Date.now() - lastLoadedAtRef.current < 30_000) return
       if (!hasLoadedRef.current) setIsLoading(true)
       setLoadError(false)
       try {
-        const { data, error } = await supabase
-          .from('events')
-          .select('id, name, event_emoji, event_date, event_time, venue_name, linked_fund_id, status')
-          .is('deleted_at', null)
-          .eq('status', 'active')
-          .order('event_date', { ascending: true })
-          .order('event_time', { ascending: true })
-        if (!active) return
-        if (error) throw error
-        setEvents((data ?? []).map(row => ({
+        const data: Awaited<ReturnType<typeof api.events.list>>['items'] = []
+        let cursor: string | undefined
+        do {
+          const page = await runApiRead(call => api.events.list({
+            cursor,
+            limit: 100,
+            status: 'active',
+            sort_by: 'event_date',
+            sort_direction: 'asc',
+          }, call), { signal })
+          data.push(...page.items)
+          cursor = page.page.next_cursor ?? undefined
+        } while (cursor && !signal.aborted)
+        if (!eventsRequest.current.isCurrent(signal)) return
+        setEvents(data.map(row => ({
           id: row.id,
           title: row.name,
           emoji: row.event_emoji ?? '🎉',
@@ -102,14 +109,14 @@ export default function ActivityScreen({ navigation }: { navigation: any }) {
         hasLoadedRef.current = true
         lastLoadedAtRef.current = Date.now()
       } catch {
-        if (active && !hasLoadedRef.current) setLoadError(true)
+        if (eventsRequest.current.isCurrent(signal) && !hasLoadedRef.current) setLoadError(true)
       } finally {
-        if (active) setIsLoading(false)
+        if (eventsRequest.current.isCurrent(signal)) setIsLoading(false)
       }
     }
-    loadEvents()
+    void loadEvents()
 
-    return () => { active = false }
+    return () => eventsRequest.current.cancel()
   }, []))
 
   const days = useMemo(() => calendarDays(month), [month])

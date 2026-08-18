@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -9,7 +9,8 @@ import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { createLatestApiRequest, runApiRead, toApiUiError } from '../../lib/apiScreen'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'Notifications'>
@@ -64,35 +65,34 @@ export default function NotificationsScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [respondingTo, setRespondingTo] = useState<string | null>(null)
+  const notificationsRequest = useRef(createLatestApiRequest())
 
   useFocusEffect(
     useCallback(() => {
-      let active = true
+      const signal = notificationsRequest.current.start()
 
       async function load() {
         if (!userId) return
         setIsLoading(true)
         setLoadError(null)
 
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('id, fund_id, type, title, body, data, is_read, response_action, created_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(100)
-
-        if (!active) return
-
-        if (error) {
-          setLoadError(error.message)
-        } else {
-          setItems(data ?? [])
+        try {
+          const page = await runApiRead(
+            call => api.notifications.list({ limit: 100, sort_by: 'created_at', sort_direction: 'desc' }, call),
+            { signal },
+          )
+          if (!notificationsRequest.current.isCurrent(signal)) return
+          setItems(page.items as NotificationRow[])
+        } catch (error) {
+          if (notificationsRequest.current.isCurrent(signal)) {
+            setLoadError(toApiUiError(error).message)
+          }
         }
-        setIsLoading(false)
+        if (notificationsRequest.current.isCurrent(signal)) setIsLoading(false)
       }
 
-      load()
-      return () => { active = false }
+      void load()
+      return () => notificationsRequest.current.cancel()
     }, [userId])
   )
 
@@ -100,12 +100,14 @@ export default function NotificationsScreen({ navigation }: Props) {
 
   async function markRead(ids: string[]) {
     if (ids.length === 0) return
-    const now = new Date().toISOString()
+    const previouslyUnread = new Set(items.filter(item => !item.is_read).map(item => item.id))
     setItems(prev => prev.map(i => (ids.includes(i.id) ? { ...i, is_read: true } : i)))
-    await supabase
-      .from('notifications')
-      .update({ is_read: true, read_at: now })
-      .in('id', ids)
+    try {
+      await api.notifications.markRead(ids)
+    } catch (error) {
+      setItems(prev => prev.map(i => (previouslyUnread.has(i.id) ? { ...i, is_read: false } : i)))
+      Alert.alert('Could not mark notifications read', toApiUiError(error).message)
+    }
   }
 
   function handleMarkAllRead() {
@@ -161,17 +163,15 @@ export default function NotificationsScreen({ navigation }: Props) {
     const inviteId = item.data?.organiserInviteId
     if (typeof inviteId !== 'string' || respondingTo) return
     setRespondingTo(item.id)
-    const { data, error } = await supabase
-      .rpc('respond_to_event_fund_organiser_invite', { p_invite_id: inviteId, p_accept: accept })
-      .single()
-    setRespondingTo(null)
-
-    if (error || !data) {
-      Alert.alert('Could not respond', error?.message ?? 'The invitation is no longer available.')
+    let response
+    try {
+      response = await api.events.respondOrganiserInvite({ invite_id: inviteId, accepted: accept })
+    } catch (error) {
+      setRespondingTo(null)
+      Alert.alert('Could not respond', toApiUiError(error).message)
       return
     }
-
-    const response = data as { fund_id: string }
+    setRespondingTo(null)
     setItems(previous => previous.map(notification => notification.id === item.id
       ? { ...notification, is_read: true, response_action: accept ? 'accepted' : 'declined' }
       : notification

@@ -8,6 +8,8 @@ import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { toApiUiError } from '../../lib/apiScreen'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import BankPicker, { BankFormValue } from '../../components/BankPicker'
@@ -64,24 +66,29 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     }
 
     const now = new Date().toISOString()
-    const { error } = await supabase.from('users').update({
-      name: displayName.trim(),
-      mobile_money_provider: provider,
-      bank_name:           bank.bankName,
-      bank_branch_code:    bank.branchCode,
-      bank_account_number: bank.accountNumber,
-      profile_completed: true,
-      onboarding_completed: true,
-      terms_accepted_at: now,
-      terms_version: '1.0',
-      privacy_accepted_at: now,
-      privacy_version: '1.0',
-      data_processing_consent: true,
-      data_processing_consent_at: now,
-    }).eq('id', user.id)
+    try {
+      await api.users.updateMe({
+        name: displayName.trim(),
+        mobile_money_provider: provider,
+        bank_name: bank.bankName,
+        bank_branch_code: bank.branchCode,
+        bank_account_number: bank.accountNumber,
+        profile_completed: true,
+        onboarding_completed: true,
+        terms_accepted_at: now,
+        terms_version: '1.0',
+        privacy_accepted_at: now,
+        privacy_version: '1.0',
+        data_processing_consent: true,
+        data_processing_consent_at: now,
+      })
+    } catch (profileError) {
+      setLoading(false)
+      Alert.alert('Could not save profile', toApiUiError(profileError).message)
+      return
+    }
 
     setLoading(false)
-    if (error) { Alert.alert('Error', error.message); return }
     await refreshProfile()
   }
 

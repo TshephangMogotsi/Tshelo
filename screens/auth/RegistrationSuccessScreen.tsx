@@ -8,6 +8,8 @@ import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { toApiUiError } from '../../lib/apiScreen'
 import { useAuth } from '../../context/AuthContext'
 
 type Props = {
@@ -34,14 +36,14 @@ export default function RegistrationSuccessScreen({ navigation }: Props) {
       return
     }
 
-    const { error } = await supabase.from('users').update({
-      profile_completed: true,
-      onboarding_completed: true,
-    }).eq('id', user.id)
-
-    if (error) {
+    try {
+      await api.users.updateMe({
+        profile_completed: true,
+        onboarding_completed: true,
+      })
+    } catch (profileError) {
       setLoading(false)
-      Alert.alert('Error', error.message)
+      Alert.alert('Could not finish setup', toApiUiError(profileError).message)
       return
     }
 

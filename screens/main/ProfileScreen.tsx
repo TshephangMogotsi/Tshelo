@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -6,7 +6,8 @@ import { useFocusEffect } from '@react-navigation/native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { createLatestApiRequest, runApiRead, toApiUiError } from '../../lib/apiScreen'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
@@ -33,19 +34,17 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const [editName,    setEditName]    = useState('')
   const [editEmail,   setEditEmail]   = useState('')
   const [isSaving,    setIsSaving]    = useState(false)
+  const profileRequest = useRef(createLatestApiRequest())
 
   useFocusEffect(
     useCallback(() => {
-      let active = true
+      const signal = profileRequest.current.start()
       async function loadProfile() {
         if (!userId) return
         setIsLoading(true)
-        const { data } = await supabase
-          .from('users')
-          .select('name, email, phone')
-          .eq('id', userId)
-          .single()
-        if (active && data) {
+        try {
+          const data = await runApiRead(call => api.users.me(call), { signal })
+          if (!profileRequest.current.isCurrent(signal)) return
           const loadedName = data.name ?? ''
           setProfile({
             name:  loadedName,
@@ -57,11 +56,15 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             setEditEmail(data.email ?? '')
             setShowEdit(true)
           }
+        } catch (error) {
+          if (profileRequest.current.isCurrent(signal)) {
+            Alert.alert('Could not load profile', toApiUiError(error).message)
+          }
         }
-        if (active) setIsLoading(false)
+        if (profileRequest.current.isCurrent(signal)) setIsLoading(false)
       }
-      loadProfile()
-      return () => { active = false }
+      void loadProfile()
+      return () => profileRequest.current.cancel()
     }, [userId])
   )
 
@@ -79,12 +82,10 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       return
     }
     setIsSaving(true)
-    const { error } = await supabase
-      .from('users')
-      .update({ name: trimmedName, email: editEmail.trim() || null })
-      .eq('id', userId)
-    if (error) {
-      Alert.alert('Error', 'Could not save changes. Please try again.')
+    try {
+      await api.users.updateMe({ name: trimmedName, email: editEmail.trim() || null })
+    } catch (error) {
+      Alert.alert('Could not save changes', toApiUiError(error).message)
       setIsSaving(false)
       return
     }

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   RefreshControl,
@@ -15,27 +15,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { createLatestApiRequest, runApiRead, toApiUiError } from '../../lib/apiScreen'
 import type { MainStackParamList } from '../../navigation/types'
+import type { RewardProgress } from '../../shared/contracts'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'Rewards'>
-}
-
-type RewardProgress = {
-  reward_code: string
-  reward_name: string
-  reward_description: string
-  category: string
-  trust_points_reward: number
-  threshold: number
-  progress_unit: string
-  icon_name: string
-  current_progress: number
-  is_earned: boolean
-  earned_at: string | null
 }
 
 type TrustProfile = {
@@ -55,7 +43,7 @@ function progressCopy(reward: RewardProgress) {
   if (reward.reward_code === 'transparent_organiser') {
     return '80% receipts across 5 expenses'
   }
-  return `${Math.min(reward.current_progress, reward.threshold)} of ${reward.threshold} ${reward.progress_unit}`
+  return `${Math.min(reward.current, reward.threshold)} of ${reward.threshold} ${reward.unit}`
 }
 
 export default function RewardsScreen({ navigation }: Props) {
@@ -67,41 +55,43 @@ export default function RewardsScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const rewardsRequest = useRef(createLatestApiRequest())
 
-  const load = useCallback(async (refreshing = false) => {
+  const load = useCallback(async (refreshing = false, signal?: AbortSignal) => {
     if (!userId) return
     refreshing ? setIsRefreshing(true) : setIsLoading(true)
     setLoadError(null)
 
-    const { error: evaluateError } = await supabase.rpc('evaluate_my_rewards')
-    const [progressResult, profileResult] = await Promise.all([
-      supabase.rpc('get_my_reward_progress'),
-      supabase.from('users').select('trust_score, trust_level').eq('id', userId).single(),
-    ])
-
-    if (evaluateError || progressResult.error || profileResult.error) {
-      setLoadError(
-        evaluateError?.message
-          ?? progressResult.error?.message
-          ?? profileResult.error?.message
-          ?? 'Rewards could not be loaded.',
-      )
-    } else {
-      setRewards((progressResult.data ?? []) as RewardProgress[])
+    try {
+      await api.rewards.evaluate({ signal })
+      const overview = await runApiRead(call => api.rewards.progress(call), { signal })
+      if (signal?.aborted) return
+      setRewards(overview.rewards)
+      const level = overview.trust.trust_level
       setTrust({
-        trust_score: Number(profileResult.data?.trust_score ?? 0),
-        trust_level: (profileResult.data?.trust_level ?? 'new') as TrustProfile['trust_level'],
+        trust_score: overview.trust.trust_score,
+        trust_level: (level in TRUST_LABELS ? level : 'new') as TrustProfile['trust_level'],
       })
       await refreshProfile()
+    } catch (error) {
+      if (!signal?.aborted) setLoadError(toApiUiError(error, signal).message)
     }
 
-    setIsLoading(false)
-    setIsRefreshing(false)
+    if (!signal?.aborted) {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
   }, [refreshProfile, userId])
 
+  const startLoad = useCallback((refreshing = false) => {
+    const signal = rewardsRequest.current.start()
+    void load(refreshing, signal)
+  }, [load])
+
   useFocusEffect(useCallback(() => {
-    void load()
-  }, [load]))
+    startLoad()
+    return () => rewardsRequest.current.cancel()
+  }, [startLoad]))
 
   const earned = rewards.filter(reward => reward.is_earned)
   const inProgress = rewards.filter(reward => !reward.is_earned)
@@ -110,20 +100,20 @@ export default function RewardsScreen({ navigation }: Props) {
   function RewardCard({ reward }: { reward: RewardProgress }) {
     const ratio = reward.is_earned
       ? 1
-      : Math.max(0, Math.min(1, reward.current_progress / reward.threshold))
+      : Math.max(0, Math.min(1, reward.current / reward.threshold))
 
     return (
       <View style={[styles.rewardCard, reward.is_earned && styles.rewardCardEarned]}>
         <View style={[styles.rewardIcon, reward.is_earned && styles.rewardIconEarned]}>
           <Ionicons
-            name={(reward.icon_name || 'trophy-outline') as keyof typeof Ionicons.glyphMap}
+            name={(reward.icon || 'trophy-outline') as keyof typeof Ionicons.glyphMap}
             size={21}
             color={reward.is_earned ? colors.primary : colors.textMuted}
           />
         </View>
         <View style={styles.rewardBody}>
           <View style={styles.rewardTitleRow}>
-            <Text style={styles.rewardName}>{reward.reward_name}</Text>
+            <Text style={styles.rewardName}>{reward.name}</Text>
             {reward.is_earned ? (
               <View style={styles.earnedPill}>
                 <Ionicons name="checkmark" size={11} color={colors.primary} />
@@ -131,7 +121,7 @@ export default function RewardsScreen({ navigation }: Props) {
               </View>
             ) : null}
           </View>
-          <Text style={styles.rewardDescription}>{reward.reward_description}</Text>
+          <Text style={styles.rewardDescription}>{reward.description}</Text>
           <View style={styles.progressRow}>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${ratio * 100}%` }]} />
@@ -167,14 +157,14 @@ export default function RewardsScreen({ navigation }: Props) {
           <Ionicons name="cloud-offline-outline" size={34} color={colors.textMuted} />
           <Text style={styles.errorTitle}>Rewards unavailable</Text>
           <Text style={styles.errorText}>{loadError}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => void load()}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => startLoad()}>
             <Text style={styles.retryText}>Try again</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => startLoad(true)} tintColor={colors.primary} />}
           contentContainerStyle={styles.scroll}
         >
           <View style={styles.hero}>

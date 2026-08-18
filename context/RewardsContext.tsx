@@ -1,34 +1,17 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
+import { runApiRead } from '../lib/apiScreen'
 import { useAuth } from './AuthContext'
 import { hapticSuccess } from '../lib/haptics'
 import RewardSnackbar, { RewardSnackbarItem } from '../components/RewardSnackbar'
 
-type RewardRow = {
-  id: string
-  trust_points_awarded: number
-  reward_definitions: {
-    name: string
-    description: string
-    icon_name: string
-  } | Array<{
-    name: string
-    description: string
-    icon_name: string
-  }> | null
-}
-
-function toSnackbarItem(row: RewardRow): RewardSnackbarItem | null {
-  const joined = Array.isArray(row.reward_definitions)
-    ? row.reward_definitions[0]
-    : row.reward_definitions
-  if (!joined) return null
+function toSnackbarItem(row: Awaited<ReturnType<typeof api.rewards.listUnseen>>[number]): RewardSnackbarItem {
   return {
-    id: row.id,
-    name: joined.name,
-    description: joined.description,
-    points: row.trust_points_awarded ?? 0,
-    iconName: joined.icon_name,
+    id: row.user_reward_id,
+    name: row.name,
+    description: row.description,
+    points: row.trust_points_awarded,
+    iconName: row.icon ?? 'trophy-outline',
   }
 }
 
@@ -51,19 +34,6 @@ export function RewardsProvider({
     setQueue(previous => [...previous, item])
   }, [])
 
-  const loadReward = useCallback(async (rewardId: string) => {
-    const { data } = await supabase
-      .from('user_rewards')
-      .select(`
-        id,
-        trust_points_awarded,
-        reward_definitions!inner(name, description, icon_name)
-      `)
-      .eq('id', rewardId)
-      .maybeSingle()
-    if (data) enqueueReward(toSnackbarItem(data as RewardRow))
-  }, [enqueueReward])
-
   useEffect(() => {
     if (!isAuthenticated || !profileCompleted || !userId) {
       setQueue([])
@@ -74,45 +44,40 @@ export function RewardsProvider({
     }
 
     let active = true
-    const channel = supabase
-      .channel(`user-rewards-${userId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'user_rewards', filter: `user_id=eq.${userId}` },
-        payload => {
-          if (active && typeof payload.new?.id === 'string') void loadReward(payload.new.id)
-        },
+    const controller = new AbortController()
+
+    async function enqueueUnseenRewards() {
+      const unseen = await runApiRead(
+        call => api.rewards.listUnseen(call),
+        { signal: controller.signal },
       )
-      .subscribe()
+      if (!active) return
+      for (const reward of unseen) enqueueReward(toSnackbarItem(reward))
+    }
 
     async function initialiseRewards() {
       // This safely backfills achievements earned before the reward system was
       // introduced and catches aggregate thresholds after offline activity.
-      await supabase.rpc('evaluate_my_rewards')
-      if (!active) return
-
-      const { data } = await supabase
-        .from('user_rewards')
-        .select(`
-          id,
-          trust_points_awarded,
-          reward_definitions!inner(name, description, icon_name)
-        `)
-        .eq('user_id', userId)
-        .is('snackbar_seen_at', null)
-        .order('earned_at', { ascending: true })
-
-      if (!active) return
-      for (const row of data ?? []) enqueueReward(toSnackbarItem(row as RewardRow))
-      await refreshProfile()
+      try {
+        await api.rewards.evaluate({ signal: controller.signal })
+        if (!active) return
+        await enqueueUnseenRewards()
+        await refreshProfile()
+      } catch {
+        // The poll or a later session will retry rewards that remain unseen.
+      }
     }
 
     void initialiseRewards()
+    const poll = setInterval(() => {
+      void enqueueUnseenRewards().catch(() => undefined)
+    }, 30_000)
     return () => {
       active = false
-      void supabase.removeChannel(channel)
+      controller.abort()
+      clearInterval(poll)
     }
-  }, [enqueueReward, isAuthenticated, loadReward, profileCompleted, refreshProfile, userId])
+  }, [enqueueReward, isAuthenticated, profileCompleted, refreshProfile, userId])
 
   useEffect(() => {
     if (current || queue.length === 0 || isClaimingReward.current) return
@@ -125,15 +90,18 @@ export function RewardsProvider({
       // Persist first, then animate. Previously this happened only on dismiss,
       // so closing or backgrounding the app could replay the same reward on
       // every login.
-      const { error } = await supabase.rpc('mark_reward_snackbar_seen', {
-        p_reward_id: next.id,
-      })
+      let failed = false
+      try {
+        await api.rewards.markSeen(next.id)
+      } catch {
+        failed = true
+      }
 
       if (!active) return
       isClaimingReward.current = false
       setQueue(previous => previous.filter(item => item.id !== next.id))
 
-      if (error) {
+      if (failed) {
         // Do not show a reward we could not durably claim. Removing it from
         // this in-memory queue avoids a retry loop; a later session can retry.
         knownIds.current.delete(next.id)

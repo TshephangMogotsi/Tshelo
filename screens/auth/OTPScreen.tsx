@@ -9,6 +9,8 @@ import { AuthStackParamList } from '../../navigation/types'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { toApiUiError } from '../../lib/apiScreen'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
@@ -102,23 +104,24 @@ export default function OTPScreen({ navigation, route }: Props) {
 
     if (registration) {
       const now = new Date().toISOString()
-      const { error: updateError } = await supabase.from('users').update({
-        name:  registration.name,
-        mobile_money_provider: registration.provider,
-        bank_name:           registration.bank.bankName,
-        bank_branch_code:    registration.bank.branchCode,
-        bank_account_number: registration.bank.accountNumber,
-        profile_completed:          true,
-        onboarding_completed:       true,
-        terms_accepted_at:          now,
-        terms_version:              '1.0',
-        privacy_accepted_at:        now,
-        privacy_version:            '1.0',
-        data_processing_consent:    true,
-        data_processing_consent_at: now,
-      }).eq('id', userId)
-      if (updateError) {
-        Alert.alert('Registration error', updateError.message)
+      try {
+        await api.users.updateMe({
+          name: registration.name,
+          mobile_money_provider: registration.provider,
+          bank_name: registration.bank.bankName,
+          bank_branch_code: registration.bank.branchCode,
+          bank_account_number: registration.bank.accountNumber,
+          profile_completed: true,
+          onboarding_completed: true,
+          terms_accepted_at: now,
+          terms_version: '1.0',
+          privacy_accepted_at: now,
+          privacy_version: '1.0',
+          data_processing_consent: true,
+          data_processing_consent_at: now,
+        })
+      } catch (profileError) {
+        Alert.alert('Registration error', toApiUiError(profileError).message)
         setLoading(false)
         return
       }
@@ -135,15 +138,18 @@ export default function OTPScreen({ navigation, route }: Props) {
       return
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('profile_completed')
-      .eq('id', userId)
-      .single()
+    let profile
+    try {
+      profile = await api.users.me()
+    } catch (profileError) {
+      Alert.alert('Could not load profile', toApiUiError(profileError).message)
+      setLoading(false)
+      return
+    }
 
     setLoading(false)
 
-    if (!profile?.profile_completed) {
+    if (!profile.profile_completed) {
       navigation.navigate('ProfileSetup')
       return
     }

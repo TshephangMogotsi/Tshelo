@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { unregisterPushToken } from '../lib/pushNotifications'
 
 type AuthContextType = {
@@ -27,16 +28,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserId(uid)
     // Attach any Event + Fund organiser invitations that were sent to this
     // account's verified profile phone before the user next opened the app.
-    await supabase.rpc('sync_my_event_fund_organiser_invites')
-    const { data } = await supabase
-      .from('users')
-      .select('profile_completed, name, token_balance, trust_score')
-      .eq('id', uid)
-      .single()
-    setProfileCompleted(data?.profile_completed ?? false)
-    setUserName(data?.name ?? '')
-    setTokenBalance(data?.token_balance ?? 0)
-    setTrustScore(data?.trust_score ?? 0)
+    try {
+      const [, profile] = await Promise.all([
+        api.events.syncOrganiserInvites().catch(() => undefined),
+        api.users.me(),
+      ])
+      setProfileCompleted(profile.profile_completed)
+      setUserName(profile.name ?? '')
+      setTokenBalance(profile.token_balance ?? 0)
+      setTrustScore(profile.trust_score ?? 0)
+    } catch {
+      // Keep the existing auth state; a foreground refresh can retry the API.
+    }
   }, [])
 
   useEffect(() => {

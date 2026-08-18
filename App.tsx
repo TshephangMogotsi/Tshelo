@@ -23,7 +23,8 @@ import MainNavigator from './navigation/MainNavigator'
 import OnboardingScreen from './screens/onboarding/OnboardingScreen'
 import { registerForPushNotificationsAsync } from './lib/pushNotifications'
 import { startSmsWatcher } from './lib/smsWatcher'
-import { supabase } from './lib/supabase'
+import { api } from './lib/api'
+import { runApiRead } from './lib/apiScreen'
 import { appLinking } from './navigation/linking'
 import type { MainStackParamList } from './navigation/types'
 
@@ -53,15 +54,16 @@ async function navigateFromNotificationData(data: Record<string, any> | undefine
   if (detected && typeof detected.amount === 'number' && typeof detected.receivedAt === 'string') {
     const notificationId = typeof data?.notificationId === 'string' ? data.notificationId : undefined
     if (notificationId) {
-      const { data: notification } = await supabase
-        .from('notifications')
-        .select('fund_id, response_action, data')
-        .eq('id', notificationId)
-        .maybeSingle()
-      const recordedFundId = notification?.fund_id ?? notification?.data?.recordedFundId
-      if (notification?.response_action === 'recorded' && typeof recordedFundId === 'string') {
-        if (navigationRef.isReady()) navigationRef.navigate('FundDetail', { fundId: recordedFundId })
-        return
+      try {
+        const notification = await runApiRead(call => api.notifications.get(notificationId, call))
+        const notificationData = notification.data as Record<string, any> | null
+        const recordedFundId = notification.fund_id ?? notificationData?.recordedFundId
+        if (notification.response_action === 'recorded' && typeof recordedFundId === 'string') {
+          if (navigationRef.isReady()) navigationRef.navigate('FundDetail', { fundId: recordedFundId })
+          return
+        }
+      } catch {
+        // Fall through to the assignment flow when the detail read is unavailable.
       }
     }
     if (navigationRef.isReady()) navigationRef.navigate('AssignContribution', { detected, notificationId })

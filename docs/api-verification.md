@@ -36,6 +36,7 @@ Detail reads can be enabled with caller-visible fixture IDs:
 - `API_TEST_FUND_ID`
 - `API_TEST_EVENT_ID`
 - `API_TEST_CONTRIBUTION_ID`
+- `API_TEST_NOTIFICATION_ID`
 
 Never commit tokens or place them in checked-in environment files.
 
