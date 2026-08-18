@@ -1,25 +1,12 @@
 import { useCallback, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { supabase } from './supabase'
-import {
-  FUND_PERMISSION_KEYS,
-  type FundPermission,
-} from './fundPermissions'
+import { api } from './api'
+import { runApiRead } from './apiScreen'
+import type { FundPermission } from './fundPermissions'
 
-export async function loadMyFundPermissions(fundId: string): Promise<Set<FundPermission>> {
-  const { data, error } = await supabase.rpc('get_my_fund_permissions', {
-    p_fund_id: fundId,
-  })
-  if (error) throw error
-
-  return new Set(
-    (data ?? [])
-      .map((row: { permission_key?: unknown }) => row.permission_key)
-      .filter((key: unknown): key is FundPermission => (
-        typeof key === 'string'
-        && FUND_PERMISSION_KEYS.includes(key as FundPermission)
-      )),
-  )
+export async function loadMyFundPermissions(fundId: string, signal?: AbortSignal): Promise<Set<FundPermission>> {
+  const permissions = await runApiRead(call => api.funds.permissions(fundId, call), { signal })
+  return new Set(permissions)
 }
 
 export function useFundPermissions(fundId: string | null | undefined) {
@@ -28,31 +15,31 @@ export function useFundPermissions(fundId: string | null | undefined) {
   const [error, setError] = useState<string | null>(null)
 
   useFocusEffect(useCallback(() => {
-    let active = true
+    const controller = new AbortController()
     if (!fundId) {
       setPermissions(new Set())
       setLoadedFundId(null)
       setError(null)
-      return () => { active = false }
+      return () => controller.abort()
     }
 
     setError(null)
     setPermissions(new Set())
     setLoadedFundId(null)
-    loadMyFundPermissions(fundId)
+    loadMyFundPermissions(fundId, controller.signal)
       .then(next => {
-        if (!active) return
+        if (controller.signal.aborted) return
         setPermissions(next)
         setLoadedFundId(fundId)
       })
       .catch(loadError => {
-        if (!active) return
+        if (controller.signal.aborted) return
         setPermissions(new Set())
         setLoadedFundId(fundId)
         setError(loadError instanceof Error ? loadError.message : 'Permissions could not be loaded.')
       })
 
-    return () => { active = false }
+    return () => controller.abort()
   }, [fundId]))
 
   const isLoading = Boolean(fundId && loadedFundId !== fundId)

@@ -70,7 +70,9 @@ describe('security hardening invariants', () => {
 
   it('routes mobile joins through the authorized RPC', () => {
     const joinScreen = read('screens/main/JoinFundScreen.tsx')
-    expect(joinScreen).toContain(".rpc('join_fund_by_code'")
+    const fundApi = read('admin/lib/data/api-funds.ts')
+    expect(joinScreen).toContain('api.funds.join(')
+    expect(fundApi).toContain(".rpc('join_fund_by_code'")
     expect(joinScreen).not.toContain(".from('fund_members')\n      .insert")
     expect(migration).toContain("substr(replace(gen_random_uuid()::text, '-', ''), 1, 20)")
     expect(joinScreen).toContain('maxLength={32}')
@@ -90,12 +92,13 @@ describe('security hardening invariants', () => {
     expect(joinScreen).toContain(".rpc('find_event_by_code'")
     expect(joinScreen).toContain(".rpc('join_event_by_code'")
     expect(joinScreen).not.toContain(".from('event_guests')")
-    expect(homeLoader).toContain(".from('event_guests')")
-    expect(homeLoader).toContain('guestEventIds')
+    expect(homeLoader).toContain('api.home.summary')
+    expect(read('admin/lib/data/api-funds.ts')).toContain("from('event_guests')")
   })
 
   it('lets non-owners leave funds and non-creators leave events without crossing access boundaries', () => {
     const fundScreen = read('screens/main/FundDetailScreen.tsx')
+    const fundApi = read('admin/lib/data/api-funds.ts')
     const eventScreen = read('screens/main/EventDetailScreen.tsx')
 
     expect(leaveMigration).toContain('CREATE OR REPLACE FUNCTION public.leave_fund')
@@ -108,8 +111,9 @@ describe('security hardening invariants', () => {
     expect(leaveMigration).not.toContain('DELETE FROM public.funds')
     expect(leaveMigration).not.toContain('DELETE FROM public.events')
     expect(leaveMigration).toContain('GRANT EXECUTE ON FUNCTION public.leave_fund(uuid) TO authenticated, service_role')
+    expect(fundScreen).toContain('api.funds.leave(')
+    expect(fundApi).toContain(".rpc('leave_fund'")
     expect(leaveMigration).toContain('GRANT EXECUTE ON FUNCTION public.leave_event(uuid) TO authenticated, service_role')
-    expect(fundScreen).toContain("supabase.rpc('leave_fund'")
     expect(eventScreen).toContain("supabase.rpc('leave_event'")
     expect(fundScreen).toContain('This will not remove you from the linked event.')
     expect(eventScreen).toContain('This will not remove you from the linked contribution fund.')
@@ -241,12 +245,16 @@ describe('security hardening invariants', () => {
   it('routes the owner-facing admin editor through audited permission RPCs', () => {
     const settings = read('screens/main/fundDetail/FundSettingsModal.tsx')
     const editor = read('screens/main/fundDetail/AdminPermissionEditorModal.tsx')
+    const fundApi = read('admin/lib/data/api-funds.ts')
 
-    expect(settings).toContain(".rpc('get_fund_admin_permissions'")
+    expect(settings).toContain('api.funds.listAdminPermissions(')
+    expect(fundApi).toContain(".rpc('get_fund_admin_permissions'")
     expect(settings).toContain('Admins & permissions')
     expect(settings).not.toMatch(/from\('fund_members'\)\.update/)
-    expect(editor).toContain(".rpc('configure_fund_admin'")
-    expect(editor).toContain(".rpc('remove_fund_admin'")
+    expect(editor).toContain('api.funds.configureAdmin(')
+    expect(editor).toContain('api.funds.removeAdmin(')
+    expect(fundApi).toContain(".rpc('configure_fund_admin'")
+    expect(fundApi).toContain(".rpc('remove_fund_admin'")
     expect(editor).toContain('FUND_PERMISSION_PRESETS.map')
     expect(editor).toContain('Custom permissions')
     expect(editor).toContain('They cannot manage admins')
@@ -264,9 +272,11 @@ describe('security hardening invariants', () => {
     const guestList = read('screens/main/GuestListScreen.tsx')
     const assignment = read('screens/main/AssignContributionScreen.tsx')
     const permissionPolicy = read('lib/fundPermissionPolicy.ts')
+    const fundApi = read('admin/lib/data/api-funds.ts')
 
-    expect(loader).toContain("supabase.rpc('get_my_fund_permissions'")
-    expect(loader).toContain('FUND_PERMISSION_KEYS.includes')
+    expect(loader).toContain('api.funds.permissions(')
+    expect(fundApi).toContain(".rpc('get_my_fund_permissions'")
+    expect(fundApi).toContain('FUND_PERMISSION_KEYS')
     expect(fundDetail).toContain("can('record_contributions')")
     expect(fundDetail).toContain("can('edit_contributions')")
     expect(fundDetail).toContain("can('record_expenses')")
@@ -341,7 +351,7 @@ describe('security hardening invariants', () => {
     expect(smsIdempotencyMigration).not.toMatch(/GRANT UPDATE \([^)]*response_action/s)
 
     const assignScreen = read('screens/main/AssignContributionScreen.tsx')
-    expect(assignScreen).toContain(".rpc('record_detected_contribution'")
+    expect(assignScreen).toContain('api.contributions.assignDetected(')
     expect(assignScreen).not.toContain(".from('contributions').insert")
   })
 

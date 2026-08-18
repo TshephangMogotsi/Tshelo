@@ -9,8 +9,8 @@ import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
-import { supabase } from '../../lib/supabase'
-import { fundMemberCount } from '../../lib/fundMembers'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
@@ -71,12 +71,10 @@ export default function JoinFundScreen({ navigation, route }: Props) {
     setPhase('searching')
     setError(null)
 
-    const { data: rows, error: rpcError } = await supabase
-      .rpc('find_fund_by_code', { p_code: cleanedCode })
-
-    const fund = rows?.[0] ?? null
-
-    if (rpcError || !fund) {
+    let fund
+    try {
+      fund = await runApiRead(call => api.funds.previewInvite(cleanedCode, call))
+    } catch (findError) {
       setError('No fund found with that code. Double-check with the organiser.')
       setPhase('input')
       return
@@ -88,35 +86,20 @@ export default function JoinFundScreen({ navigation, route }: Props) {
       return
     }
 
-    const { data: existingMember } = await supabase
-      .from('fund_members')
-      .select('id')
-      .eq('fund_id', fund.id)
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (existingMember) {
+    if (fund.existing_membership_status && !['left', 'removed', 'declined'].includes(fund.existing_membership_status)) {
       setError("You're already a member of this fund.")
       setPhase('input')
       return
     }
 
-    const [{ count: memberCount }, { data: isPrivate }] = await Promise.all([
-      supabase
-        .from('fund_members')
-        .select('id', { count: 'exact', head: true })
-        .eq('fund_id', fund.id),
-      supabase.rpc('get_fund_privacy', { p_fund_id: fund.id }),
-    ])
-
     setPreview({
-      id:            fund.id,
+      id:            fund.fund_id,
       title:         fund.title,
       organiserName: fund.organiser_name ?? 'Unknown',
-      goalAmount:    fund.goal_amount ?? 0,
+      goalAmount:    Number(fund.goal_amount),
       currencyCode:  fund.currency_code,
-      memberCount:   fundMemberCount(memberCount),
-      isPrivate:     isPrivate ?? false,
+      memberCount:   fund.member_count,
+      isPrivate:     fund.is_private,
     })
     setPhase('preview')
   }
@@ -126,18 +109,17 @@ export default function JoinFundScreen({ navigation, route }: Props) {
     if (!requireOnline()) return
     setPhase('joining')
 
-    const { data: joinedRows, error: insertError } = await supabase
-      .rpc('join_fund_by_code', { p_code: cleanedCode })
-
-    if (insertError) {
+    let membership
+    try {
+      membership = await api.funds.join({ code: cleanedCode })
+    } catch (joinError) {
       hapticError()
-      Alert.alert('Error', 'Could not join the fund. Please try again.')
+      Alert.alert('Error', toApiUiError(joinError).message)
       setPhase('preview')
       return
     }
 
     hapticSuccess()
-    const membership = joinedRows?.[0]
     if (membership?.membership_status === 'pending') {
       setPhase('requested')
       return

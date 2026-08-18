@@ -6,7 +6,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
+import { toApiUiError } from '../../../lib/apiScreen'
 import { hapticError, hapticSuccess } from '../../../lib/haptics'
 import {
   FUND_PERMISSION_CATEGORIES,
@@ -19,6 +20,7 @@ import {
 import type { Member } from './types'
 
 type Props = {
+  fundId: string
   visible: boolean
   member: Member | null
   initialPermissions: readonly FundPermission[]
@@ -31,6 +33,7 @@ type Props = {
 type SelectionMode = FundPermissionPresetId | 'custom'
 
 export default function AdminPermissionEditorModal({
+  fundId,
   visible,
   member,
   initialPermissions,
@@ -89,16 +92,15 @@ export default function AdminPermissionEditorModal({
     const permissions = FUND_PERMISSION_DEFINITIONS
       .map(definition => definition.key)
       .filter(permission => selected.has(permission))
-    const { data, error } = await supabase.rpc('configure_fund_admin', {
-      p_member_id: member.id,
-      p_permissions: permissions,
-    })
-    setIsSaving(false)
-    if (error || !data?.length) {
+    try {
+      await api.funds.configureAdmin(fundId, member.id, { permissions })
+    } catch (error) {
+      setIsSaving(false)
       hapticError()
-      Alert.alert('Could not save admin access', error?.message ?? 'Only the fund owner can manage admins.')
+      Alert.alert('Could not save admin access', toApiUiError(error).message)
       return
     }
+    setIsSaving(false)
     hapticSuccess()
     onSaved(member.id, permissions)
   }
@@ -118,13 +120,15 @@ export default function AdminPermissionEditorModal({
   async function removeAdmin() {
     if (!member || isSaving) return
     setIsSaving(true)
-    const { error } = await supabase.rpc('remove_fund_admin', { p_member_id: member.id })
-    setIsSaving(false)
-    if (error) {
+    try {
+      await api.funds.removeAdmin(fundId, member.id)
+    } catch (error) {
+      setIsSaving(false)
       hapticError()
-      Alert.alert('Could not remove admin access', error.message)
+      Alert.alert('Could not remove admin access', toApiUiError(error).message)
       return
     }
+    setIsSaving(false)
     hapticSuccess()
     onRemoved(member.id)
   }

@@ -1,20 +1,16 @@
-jest.mock('../supabase', () => ({
-  supabase: { rpc: jest.fn() },
+jest.mock('../api', () => ({
+  api: { funds: { permissions: jest.fn() } },
 }))
 
-import { supabase } from '../supabase'
+import { api } from '../api'
 import { loadMyFundPermissions } from '../useFundPermissions'
 
 describe('loadMyFundPermissions', () => {
-  it('returns only known capabilities from the effective-permissions RPC', async () => {
-    ;(supabase.rpc as jest.Mock).mockResolvedValue({
-      data: [
-        { permission_key: 'record_contributions' },
-        { permission_key: 'manage_members' },
-        { permission_key: 'unexpected_power' },
-      ],
-      error: null,
-    })
+  it('returns effective capabilities from the typed API', async () => {
+    ;(api.funds.permissions as jest.Mock).mockResolvedValue([
+      'record_contributions',
+      'manage_members',
+    ])
 
     await expect(loadMyFundPermissions('fund-1')).resolves.toEqual(new Set([
       'record_contributions',
@@ -23,7 +19,7 @@ describe('loadMyFundPermissions', () => {
   })
 
   it('fails closed when permission loading fails', async () => {
-    ;(supabase.rpc as jest.Mock).mockResolvedValue({ data: null, error: new Error('offline') })
+    ;(api.funds.permissions as jest.Mock).mockRejectedValue(new Error('offline'))
     await expect(loadMyFundPermissions('fund-1')).rejects.toThrow('offline')
   })
 })

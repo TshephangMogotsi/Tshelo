@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
+import { runApiRead } from '../../../lib/apiScreen'
 import { formatMoney } from './types'
 import type { AuditEntry } from './ActivityLogModal'
 
 type Props = {
+  fundId: string
   entry: AuditEntry | null
   actorName: string
   currencyCode: string
@@ -29,7 +31,7 @@ function labelFor(key: string) {
   return LABELS[key] ?? key.replace(/_/g, ' ').replace(/^./, value => value.toUpperCase())
 }
 
-export default function ActivityDetailsModal({ entry, actorName, currencyCode, onClose }: Props) {
+export default function ActivityDetailsModal({ fundId, entry, actorName, currencyCode, onClose }: Props) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
   const [related, setRelated] = useState<RelatedRecord>(null)
@@ -42,16 +44,15 @@ export default function ActivityDetailsModal({ entry, actorName, currencyCode, o
     }
     let active = true
     setIsLoading(true)
-    const query = entry.entity_type === 'contribution'
-      ? supabase.from('contributions').select('contributor_name, amount, pledged_amount, payment_method, reference_number, receipt_number, status, is_refunded, notes').eq('id', entry.entity_id).maybeSingle()
-      : supabase.from('expenses').select('description, vendor_name, amount, category, receipt_url, related_contribution_id, related_expense_id, notes').eq('id', entry.entity_id).maybeSingle()
-    query.then(({ data }) => {
-      if (!active) return
-      setRelated((data as RelatedRecord) ?? null)
-      setIsLoading(false)
-    })
+    runApiRead(call => api.funds.activityDetail(fundId, entry.id, call))
+      .then(detail => {
+        if (!active) return
+        setRelated((detail.current_record as RelatedRecord) ?? null)
+        setIsLoading(false)
+      })
+      .catch(() => { if (active) setIsLoading(false) })
     return () => { active = false }
-  }, [entry?.id])
+  }, [entry?.id, fundId])
 
   if (!entry) return null
   const keys = Array.from(new Set([...Object.keys(entry.old_values ?? {}), ...Object.keys(entry.new_values ?? {})]))

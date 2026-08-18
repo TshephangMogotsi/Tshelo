@@ -17,7 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useTheme } from '../../../context/ThemeContext'
 import { useAuth } from '../../../context/AuthContext'
 import { useRequireOnline } from '../../../context/ConnectivityContext'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
+import { toApiUiError } from '../../../lib/apiScreen'
 import { hapticError, hapticSuccess } from '../../../lib/haptics'
 import type { AppColors } from '../../../theme/themes'
 import { fonts } from '../../../theme/typography'
@@ -114,32 +115,22 @@ export default function SponsorshipBoard({
   async function createItem() {
     if (!canManageSponsorships || !isFundActive || !createValid || isCreating || !userId || !requireOnline()) return
     setIsCreating(true)
-    const { data, error } = await supabase
-      .from('fund_sponsorship_items')
-      .insert({
-        fund_id: fundId,
-        title: title.trim(),
-        description: description.trim() || null,
-        target_amount: parsedAmount,
-        created_by: userId,
-      })
-      .select('id, fund_id, title, description, category, target_amount, status, claimed_by_user_id, claimed_at, funded_at, fulfilled_at, linked_expense_id, created_at')
-      .single()
-    setIsCreating(false)
-
-    if (error || !data) {
+    let data
+    try {
+      data = await api.funds.createSponsorship(fundId, { title: title.trim(), description: description.trim() || null, target_amount: String(parsedAmount) })
+    } catch (error) {
+      setIsCreating(false)
       hapticError()
-      Alert.alert('Could not create item', error?.message ?? 'Please try again.')
+      Alert.alert('Could not create item', toApiUiError(error).message)
       return
     }
+    setIsCreating(false)
 
     hapticSuccess()
     onItemsChange([...items, {
       ...data,
-      target_amount: Number(data.target_amount),
-      allocated_amount: 0,
-      outstanding_amount: Number(data.target_amount),
-      sponsor_name: null,
+      target_amount: Number(data.target_amount), allocated_amount: Number(data.allocated_amount),
+      outstanding_amount: Number(data.outstanding_amount),
     } as SponsorshipItem])
     setTitle('')
     setDescription('')
@@ -162,14 +153,16 @@ export default function SponsorshipBoard({
   async function claimItem(item: SponsorshipItem) {
     if (!isFundActive || !userId || workingId || !requireOnline()) return
     setWorkingId(item.id)
-    const { data, error } = await supabase.rpc('claim_sponsorship_item', { p_item_id: item.id })
-    setWorkingId(null)
-
-    if (error || !data) {
+    let data
+    try {
+      data = await api.funds.claimSponsorship(fundId, item.id)
+    } catch (error) {
+      setWorkingId(null)
       hapticError()
-      Alert.alert('Could not claim item', error?.message ?? 'Another member may have claimed it.')
+      Alert.alert('Could not claim item', toApiUiError(error).message)
       return
     }
+    setWorkingId(null)
 
     hapticSuccess()
     onItemsChange(items.map(current => current.id === item.id ? {
@@ -196,13 +189,15 @@ export default function SponsorshipBoard({
   async function releaseItem(item: SponsorshipItem) {
     if (!isFundActive || workingId || !requireOnline()) return
     setWorkingId(item.id)
-    const { error } = await supabase.rpc('release_sponsorship_item', { p_item_id: item.id })
-    setWorkingId(null)
-    if (error) {
+    try {
+      await api.funds.releaseSponsorship(fundId, item.id)
+    } catch (error) {
+      setWorkingId(null)
       hapticError()
-      Alert.alert('Could not release item', error.message)
+      Alert.alert('Could not release item', toApiUiError(error).message)
       return
     }
+    setWorkingId(null)
     onItemsChange(items.map(current => current.id === item.id ? {
       ...current,
       status: 'open',
@@ -228,21 +223,15 @@ export default function SponsorshipBoard({
     if (!canManageSponsorships || !isFundActive) return
     if (workingId || !requireOnline()) return
     setWorkingId(item.id)
-    const { error } = await supabase
-      .from('fund_sponsorship_items')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', item.id)
-      .eq('fund_id', fundId)
-    setWorkingId(null)
-
-    if (error) {
+    try {
+      await api.funds.updateSponsorship(fundId, item.id, { status: 'cancelled' })
+    } catch (error) {
+      setWorkingId(null)
       hapticError()
-      Alert.alert('Could not cancel item', error.message)
+      Alert.alert('Could not cancel item', toApiUiError(error).message)
       return
     }
+    setWorkingId(null)
     onItemsChange(items.map(current => current.id === item.id
       ? { ...current, status: 'cancelled', claimed_by_user_id: null, sponsor_name: null, claimed_at: null }
       : current

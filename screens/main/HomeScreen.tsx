@@ -7,7 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
-import { supabase } from '../../lib/supabase'
+import { createLatestApiRequest, toApiUiError } from '../../lib/apiScreen'
 import {
   HomeItem,
   HomeItemKind,
@@ -18,7 +18,7 @@ import {
   matchesHomeStatus,
   sortHomeItems,
 } from './home/helpers'
-import { loadHomeItems } from './home/loadHomeItems'
+import { loadHomeSummary } from './home/loadHomeItems'
 import HomeItemCard from './home/HomeItemCard'
 import HomeSortMenu from './home/HomeSortMenu'
 import WelcomeOverlay from './home/WelcomeOverlay'
@@ -42,10 +42,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [searchOpen,     setSearchOpen]     = useState(false)
   const [searchQuery,    setSearchQuery]    = useState('')
   const hasLoadedRef = useRef(false)
+  const latestRequestRef = useRef(createLatestApiRequest())
 
   useFocusEffect(
     useCallback(() => {
-      let active = true
+      const signal = latestRequestRef.current.start()
 
       // Token grants and paid actions happen on other screens. Refresh the
       // shared profile state whenever Home regains focus so this header always
@@ -58,36 +59,27 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         setLoadError(null)
 
         try {
-          const items = await loadHomeItems(userId)
-          if (active) {
-            setHomeItems(items)
+          const summary = await loadHomeSummary(signal)
+          if (latestRequestRef.current.isCurrent(signal)) {
+            setHomeItems(summary.items)
+            setUnreadCount(summary.unreadCount)
             hasLoadedRef.current = true
           }
         } catch (err) {
-          if (active) {
+          if (latestRequestRef.current.isCurrent(signal)) {
             if (!hasLoadedRef.current) {
-              setLoadError(err instanceof Error ? err.message : 'Could not load your items.')
+              const error = toApiUiError(err, signal)
+              if (error.kind !== 'cancelled') setLoadError(error.message)
               setHomeItems([])
             }
           }
         } finally {
-          if (active) setIsLoading(false)
+          if (latestRequestRef.current.isCurrent(signal)) setIsLoading(false)
         }
       }
 
-      async function loadUnreadCount() {
-        if (!userId) return
-        const { count, error } = await supabase
-          .from('notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('is_read', false)
-        if (active && !error) setUnreadCount(count ?? 0)
-      }
-
       load()
-      loadUnreadCount()
-      return () => { active = false }
+      return () => latestRequestRef.current.cancel()
     }, [userId])
   )
 

@@ -5,7 +5,8 @@ import {
 } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
+import { runApiRead, toApiUiError } from '../../../lib/apiScreen'
 import { hapticError, hapticSuccess } from '../../../lib/haptics'
 import { FUND_PERMISSION_KEYS, type FundPermission } from '../../../lib/fundPermissions'
 import { makeCommonStyles } from '../recordExpense/common'
@@ -62,12 +63,15 @@ export default function FundSettingsModal({
     if (!visible) return
     setIsLoadingPermissions(true)
     setPermissionLoadError(null)
-    const { data, error } = await supabase.rpc('get_fund_admin_permissions', { p_fund_id: fund.id })
-    if (error) {
+    let data
+    try {
+      data = await runApiRead(call => api.funds.listAdminPermissions(fund.id, call))
+    } catch (error) {
       setIsLoadingPermissions(false)
-      setPermissionLoadError(error.message)
+      const message = toApiUiError(error).message
+      setPermissionLoadError(message)
       setPermissionMember(null)
-      Alert.alert('Could not load admin permissions', error.message)
+      Alert.alert('Could not load admin permissions', message)
       return
     }
     const next: Record<string, FundPermission[]> = {}
@@ -101,15 +105,16 @@ export default function FundSettingsModal({
       goal_amount: parsedGoal,
       contribution_deadline: deadline || null,
       is_private: isPrivate,
-      updated_at: new Date().toISOString(),
     }
-    const { data, error } = await supabase.from('funds').update(changes).eq('id', fund.id).select('id')
-    setIsSaving(false)
-    if (error || !data?.length) {
+    try {
+      await api.funds.update(fund.id, { ...changes, goal_amount: String(parsedGoal) })
+    } catch (error) {
+      setIsSaving(false)
       hapticError()
-      Alert.alert('Could not save settings', error?.message ?? 'Only the fund owner can change these settings.')
+      Alert.alert('Could not save settings', toApiUiError(error).message)
       return
     }
+    setIsSaving(false)
     hapticSuccess()
     onFundSaved(changes)
     Alert.alert('Settings saved', 'The fund details have been updated.')
@@ -161,14 +166,15 @@ export default function FundSettingsModal({
   async function closeFund() {
     if (isSaving) return
     setIsSaving(true)
-    const now = new Date().toISOString()
-    const { data, error } = await supabase.from('funds').update({ status: 'closed', closed_at: now, updated_at: now }).eq('id', fund.id).select('id')
-    setIsSaving(false)
-    if (error || !data?.length) {
+    try {
+      await api.funds.update(fund.id, { status: 'closed' })
+    } catch (error) {
+      setIsSaving(false)
       hapticError()
-      Alert.alert('Could not close fund', error?.message ?? 'Only the fund owner can close this fund.')
+      Alert.alert('Could not close fund', toApiUiError(error).message)
       return
     }
+    setIsSaving(false)
     hapticSuccess()
     onClosed()
   }
@@ -260,6 +266,7 @@ export default function FundSettingsModal({
         </View>
       </KeyboardAvoidingView>
       <AdminPermissionEditorModal
+        fundId={fund.id}
         visible={Boolean(permissionMember)}
         member={permissionMember}
         initialPermissions={permissionMember ? permissionRows[permissionMember.id] ?? [] : []}

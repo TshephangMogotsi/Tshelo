@@ -18,7 +18,8 @@ import type { RouteProp } from '@react-navigation/native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import type { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead } from '../../lib/apiScreen'
 import type { AppColors } from '../../theme/themes'
 import { formatMoney } from './fundDetail/types'
 import { initials } from './richAuntie/reasons'
@@ -52,6 +53,7 @@ export default function MemberDetailsScreen({ navigation, route }: Props) {
     fundTitle,
     currencyCode,
     memberUserId,
+    memberId,
     memberName,
     memberPhone,
     canAward,
@@ -65,46 +67,28 @@ export default function MemberDetailsScreen({ navigation, route }: Props) {
   const [confettiBurstKey, setConfettiBurstKey] = useState(0)
 
   useFocusEffect(useCallback(() => {
-    let active = true
+    const controller = new AbortController()
 
     async function load() {
       setIsLoading(true)
-      const [{ data: contributions }, { data: awardRows }, { data: itemRows }] = await Promise.all([
-        supabase
-          .from('contributions')
-          .select('amount, pledged_amount, status, is_refunded')
-          .eq('fund_id', fundId)
-          .eq('user_id', memberUserId),
-        supabase
-          .from('rich_auntie_awards')
-          .select('id, reason_label, created_at')
-          .eq('fund_id', fundId)
-          .eq('recipient_user_id', memberUserId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('fund_sponsorship_item_progress')
-          .select('title, status')
-          .eq('fund_id', fundId)
-          .eq('claimed_by_user_id', memberUserId)
-          .in('status', ['claimed', 'funded', 'fulfilled']),
-      ])
-      if (!active) return
-
-      setTotalGiven((contributions ?? [])
-        .filter(row => row.status === 'confirmed' && !row.is_refunded)
-        .reduce((sum, row) => sum + Number(row.amount ?? 0), 0))
-      setPledged((contributions ?? [])
-        .filter(row => row.status === 'pledged')
-        .reduce((sum, row) => sum + Number(row.pledged_amount ?? row.amount ?? 0), 0))
-      setAwards((awardRows ?? []) as AwardSummary[])
-      setSponsoredItems((itemRows ?? []).map(row => row.title))
-      setIsLoading(false)
-      if ((awardRows ?? []).length > 0) setConfettiBurstKey(previous => previous + 1)
+      try {
+        const details = await runApiRead(call => api.funds.getMember(fundId, memberId, call), { signal: controller.signal })
+        if (controller.signal.aborted) return
+        setTotalGiven(Number(details.confirmed_total))
+        setPledged(Number(details.pledged_total))
+        setAwards(details.awards as AwardSummary[])
+        setSponsoredItems(details.sponsored_items.map(row => row.title))
+        if (details.awards.length > 0) setConfettiBurstKey(previous => previous + 1)
+      } catch (error) {
+        if (!controller.signal.aborted) Alert.alert('Could not load member details', error instanceof Error ? error.message : 'Please try again.')
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false)
+      }
     }
 
-    load()
-    return () => { active = false }
-  }, [fundId, memberUserId]))
+    void load()
+    return () => controller.abort()
+  }, [fundId, memberId]))
 
   async function sendWhatsApp() {
     const digits = memberPhone.replace(/\D/g, '')

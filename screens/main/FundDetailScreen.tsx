@@ -10,7 +10,9 @@ import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
-import { supabase, fundPreviewUrl } from '../../lib/supabase'
+import { fundPreviewUrl } from '../../lib/fundLinks'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { formatFundMemberCount, fundMemberCount } from '../../lib/fundMembers'
 import { useFundPermissions } from '../../lib/useFundPermissions'
 import {
@@ -90,195 +92,51 @@ export default function FundDetailScreen({
 
   useFocusEffect(
     useCallback(() => {
-      let active = true
+      const controller = new AbortController()
 
       async function loadData() {
         if (!userId) return
         setIsLoading(true)
         setLoadError(null)
-
-        const [{ data: fundData, error: fundError }] = await Promise.all([
-          supabase
-            .from('funds')
-            .select('id, owner_id, title, status, goal_amount, currency_code, fund_code, linked_event_id, contribution_deadline, is_private')
-            .eq('id', fundId)
-            .single(),
-        ])
-
-        if (!active) return
-
-        if (fundError || !fundData) {
-          setLoadError('Could not load fund details.')
-          setIsLoading(false)
-          return
+        try {
+          const workspace = await runApiRead(call => api.funds.workspace(fundId, call), { signal: controller.signal })
+          if (controller.signal.aborted) return
+          setFund({ id: workspace.fund.id, owner_id: workspace.fund.owner_id, title: workspace.fund.title,
+            status: workspace.fund.status, currency_code: workspace.fund.currency_code,
+            goal_amount: Number(workspace.fund.goal_amount ?? 0), total_contributions: Number(workspace.fund.totals.raised),
+            total_expenses: Number(workspace.fund.totals.spent), balance: Number(workspace.fund.totals.balance),
+            member_count: workspace.fund.totals.member_count, fund_code: workspace.fund.fund_code,
+            linked_event_id: workspace.fund.linked_event_id, contribution_deadline: workspace.fund.contribution_deadline,
+            is_private: workspace.fund.is_private })
+          setContributions(workspace.contributions.map(item => ({ ...item, amount: Number(item.amount), pledged_amount: item.pledged_amount === null ? null : Number(item.pledged_amount), allocated_amount: Number(item.allocated_amount), outstanding_amount: item.outstanding_amount === null ? null : Number(item.outstanding_amount) })))
+          setExpenses(workspace.expenses.map(item => ({ ...item, amount: Number(item.amount) })))
+          setSponsorshipItems(workspace.sponsorship_items.filter(item => item.status !== 'cancelled').map(item => ({ ...item, target_amount: Number(item.target_amount), allocated_amount: Number(item.allocated_amount), outstanding_amount: Number(item.outstanding_amount) })))
+          setMembers(workspace.members.filter(item => item.status === 'joined').map(item => ({ id: item.id, user_id: item.user_id, display_name: item.display_name, phone: item.phone ?? '', role: item.role as MemberRole, joined_at: item.joined_at ?? item.requested_at ?? '' })))
+          setPendingRequests(workspace.members.filter(item => item.status === 'pending').map(item => ({ id: item.id, user_id: item.user_id, display_name: item.display_name, phone: item.phone ?? '', requested_at: item.requested_at ?? item.joined_at ?? '' })))
+          setRichAuntieUserIds(new Set(workspace.members.filter(item => item.is_rich_auntie && item.user_id).map(item => item.user_id!)))
+        } catch (error) {
+          if (!controller.signal.aborted) setLoadError(toApiUiError(error, controller.signal).message)
+        } finally {
+          if (!controller.signal.aborted) setIsLoading(false)
         }
-
-        const [
-          { data: contribData },
-          { data: expenseData },
-          { data: memberData },
-          { data: pendingData },
-          { data: profileData },
-          { data: pledgeBalanceData },
-          { data: contributorData },
-          { data: sponsorshipData },
-          { data: richAuntieAwardData },
-        ] = await Promise.all([
-          supabase
-            .from('contributions')
-            .select('id, contributor_id, contributor_name, amount, pledged_amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, created_at, notes')
-            .eq('fund_id', fundId)
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('expenses')
-            .select('id, vendor_name, description, category, amount, created_at, has_open_query, is_sponsored, sponsored_by_user_id, sponsored_by_name')
-            .eq('fund_id', fundId)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('fund_members')
-            .select('id, user_id, role, joined_at')
-            .eq('fund_id', fundId)
-            .eq('status', 'joined')
-            .order('joined_at', { ascending: true }),
-          supabase
-            .from('fund_members')
-            .select('id, invited_at')
-            .eq('fund_id', fundId)
-            .eq('status', 'pending')
-            .order('invited_at', { ascending: true }),
-          supabase.rpc('get_fund_member_profiles', { p_fund_id: fundId }),
-          supabase
-            .from('contributor_pledge_balances')
-            .select('pledge_id, allocated_amount, outstanding_amount, pledge_state')
-            .eq('fund_id', fundId),
-          supabase
-            .from('fund_contributors')
-            .select('id, contributor_type')
-            .eq('fund_id', fundId),
-          supabase
-            .from('fund_sponsorship_item_progress')
-            .select('id, fund_id, title, description, category, target_amount, allocated_amount, outstanding_amount, status, claimed_by_user_id, claimed_at, funded_at, fulfilled_at, linked_expense_id, created_at')
-            .eq('fund_id', fundId)
-            .neq('status', 'cancelled')
-            .order('created_at', { ascending: true }),
-          supabase
-            .from('rich_auntie_awards')
-            .select('recipient_user_id')
-            .eq('fund_id', fundId),
-        ])
-
-        if (!active) return
-
-        const profileByRowId = new Map<string, { user_id: string; name: string; phone: string }>(
-          (profileData ?? []).map((p: any) => [p.member_row_id, { user_id: p.user_id, name: p.name, phone: p.phone }])
-        )
-        const profileByUserId = new Map<string, { name: string; phone: string }>(
-          (profileData ?? []).map((p: any) => [p.user_id, { name: p.name, phone: p.phone }])
-        )
-
-        const totalContributions = (contribData ?? [])
-          .filter(c => c.status === 'confirmed' && !c.is_refunded)
-          .reduce((s, c) => s + Number(c.amount ?? 0), 0)
-        const totalExpenses = (expenseData ?? [])
-          .filter(expense => !expense.is_sponsored)
-          .reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0)
-
-        setFund({
-          id:                  fundData.id,
-          owner_id:            fundData.owner_id,
-          title:               fundData.title,
-          status:              fundData.status,
-          currency_code:       fundData.currency_code,
-          goal_amount:         fundData.goal_amount ?? 0,
-          total_contributions: totalContributions,
-          total_expenses:      totalExpenses,
-          balance:             totalContributions - totalExpenses,
-          member_count:        fundMemberCount(memberData?.length),
-          fund_code:           fundData.fund_code,
-          linked_event_id:     fundData.linked_event_id ?? null,
-          contribution_deadline: fundData.contribution_deadline ?? null,
-          is_private:          fundData.is_private ?? false,
-        })
-
-        const pledgeBalanceById = new Map<string, any>(
-          (pledgeBalanceData ?? []).map((balance: any) => [balance.pledge_id, balance])
-        )
-        const contributorTypeById = new Map<string, 'member' | 'guest'>(
-          (contributorData ?? []).map((contributor: any) => [contributor.id, contributor.contributor_type])
-        )
-
-        setContributions((contribData ?? []).map((contribution: any) => {
-          const balance = pledgeBalanceById.get(contribution.id)
-          return {
-            ...contribution,
-            contributor_type: contributorTypeById.get(contribution.contributor_id) ?? 'guest',
-            allocated_amount: Number(balance?.allocated_amount ?? 0),
-            outstanding_amount: balance ? Number(balance.outstanding_amount ?? 0) : null,
-            pledge_state: balance?.pledge_state ?? null,
-          }
-        }))
-        setExpenses(expenseData ?? [])
-        setSponsorshipItems((sponsorshipData ?? []).map((item: any) => ({
-          ...item,
-          target_amount: Number(item.target_amount ?? 0),
-          allocated_amount: Number(item.allocated_amount ?? 0),
-          outstanding_amount: Number(item.outstanding_amount ?? 0),
-          sponsor_name: item.claimed_by_user_id
-            ? profileByUserId.get(item.claimed_by_user_id)?.name ?? null
-            : null,
-        })))
-        setRichAuntieUserIds(new Set(
-          (richAuntieAwardData ?? []).map(award => award.recipient_user_id),
-        ))
-        setMembers(
-          (memberData ?? []).map(m => {
-            const profile = profileByRowId.get(m.id)
-            return {
-              id:           m.id,
-              user_id:      m.user_id,
-              display_name: profile?.name ?? 'Unknown',
-              phone:        profile?.phone ?? '',
-              role:         m.role as MemberRole,
-              joined_at:    m.joined_at,
-            }
-          })
-        )
-        setPendingRequests(
-          (pendingData ?? []).map((p: any) => {
-            const profile = profileByRowId.get(p.id)
-            return {
-              id:           p.id,
-              user_id:      profile?.user_id ?? null,
-              display_name: profile?.name ?? 'Unknown',
-              phone:        profile?.phone ?? '',
-              requested_at: p.invited_at,
-            }
-          })
-        )
-
-        setIsLoading(false)
       }
 
       loadData()
-      return () => { active = false }
+      return () => controller.abort()
     }, [fundId, userId])
   )
 
   async function handleApprove(memberId: string) {
     if (!canManageMembers || decidingId || !requireActiveFund()) return
     setDecidingId(memberId)
-    const { error } = await supabase
-      .from('fund_members')
-      .update({ status: 'joined', joined_at: new Date().toISOString() })
-      .eq('id', memberId)
-
-    setDecidingId(null)
-
-    if (error) {
-      Alert.alert('Could not approve request', error.message)
+    try {
+      await api.funds.updateMember(fundId, memberId, { status: 'joined' })
+    } catch (error) {
+      setDecidingId(null)
+      Alert.alert('Could not approve request', toApiUiError(error).message)
       return
     }
+    setDecidingId(null)
 
     const request = pendingRequests.find(r => r.id === memberId)
     setPendingRequests(prev => prev.filter(r => r.id !== memberId))
@@ -310,17 +168,14 @@ export default function FundDetailScreen({
   async function handleReject(memberId: string) {
     if (!canManageMembers || decidingId || !requireActiveFund()) return
     setDecidingId(memberId)
-    const { error } = await supabase
-      .from('fund_members')
-      .update({ status: 'declined' })
-      .eq('id', memberId)
-
-    setDecidingId(null)
-
-    if (error) {
-      Alert.alert('Could not reject request', error.message)
+    try {
+      await api.funds.updateMember(fundId, memberId, { status: 'declined' })
+    } catch (error) {
+      setDecidingId(null)
+      Alert.alert('Could not reject request', toApiUiError(error).message)
       return
     }
+    setDecidingId(null)
 
     setPendingRequests(prev => prev.filter(r => r.id !== memberId))
   }
@@ -340,17 +195,14 @@ export default function FundDetailScreen({
   async function handleRemoveMember(memberId: string) {
     if (!canManageMembers || decidingId || !requireActiveFund()) return
     setDecidingId(memberId)
-    const { error } = await supabase
-      .from('fund_members')
-      .update({ status: 'removed' })
-      .eq('id', memberId)
-
-    setDecidingId(null)
-
-    if (error) {
-      Alert.alert('Could not remove member', error.message)
+    try {
+      await api.funds.updateMember(fundId, memberId, { status: 'removed' })
+    } catch (error) {
+      setDecidingId(null)
+      Alert.alert('Could not remove member', toApiUiError(error).message)
       return
     }
+    setDecidingId(null)
 
     setMembers(prev => prev.filter(m => m.id !== memberId))
     setFund(prev => prev ? { ...prev, member_count: fundMemberCount(prev.member_count - 1) } : prev)
@@ -374,13 +226,16 @@ export default function FundDetailScreen({
     if (!fund || fund.owner_id !== userId || member.role === 'owner' || !member.user_id || isFundReadOnly(fund.status)) return
     setPermissionMember(member)
     setIsLoadingMemberPermissions(true)
-    const { data, error } = await supabase.rpc('get_fund_admin_permissions', { p_fund_id: fund.id })
-    setIsLoadingMemberPermissions(false)
-    if (error) {
+    let data
+    try {
+      data = await runApiRead(call => api.funds.listAdminPermissions(fund.id, call))
+    } catch (error) {
+      setIsLoadingMemberPermissions(false)
       setPermissionMember(null)
-      Alert.alert('Could not load admin permissions', error.message)
+      Alert.alert('Could not load admin permissions', toApiUiError(error).message)
       return
     }
+    setIsLoadingMemberPermissions(false)
 
     const next: Record<string, FundPermission[]> = {}
     for (const row of data ?? []) {
@@ -487,13 +342,14 @@ export default function FundDetailScreen({
   async function leaveFund() {
     if (!fund || isLeaving || fund.owner_id === userId) return
     setIsLeaving(true)
-    const { error } = await supabase.rpc('leave_fund', { p_fund_id: fund.id })
-    setIsLeaving(false)
-
-    if (error) {
-      Alert.alert('Could not leave fund', error.message)
+    try {
+      await api.funds.leave(fund.id)
+    } catch (error) {
+      setIsLeaving(false)
+      Alert.alert('Could not leave fund', toApiUiError(error).message)
       return
     }
+    setIsLeaving(false)
 
     navigation.reset({ index: 0, routes: [{ name: 'Tabs' as any }] })
   }
@@ -522,17 +378,14 @@ export default function FundDetailScreen({
   async function deleteFund() {
     if (!fund || isDeleting) return
     setIsDeleting(true)
-    const { error } = await supabase
-      .from('funds')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', fund.id)
-
-    setIsDeleting(false)
-
-    if (error) {
-      Alert.alert('Could not delete fund', error.message)
+    try {
+      await api.funds.remove(fund.id)
+    } catch (error) {
+      setIsDeleting(false)
+      Alert.alert('Could not delete fund', toApiUiError(error).message)
       return
     }
+    setIsDeleting(false)
 
     navigation.reset({
       index: 0,
@@ -903,6 +756,7 @@ export default function FundDetailScreen({
       />
 
       <AdminPermissionEditorModal
+        fundId={fundId}
         visible={Boolean(permissionMember)}
         member={permissionMember}
         initialPermissions={permissionMember ? memberPermissionRows[permissionMember.id] ?? [] : []}

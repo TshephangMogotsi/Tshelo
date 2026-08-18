@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
-import { supabase } from '../../../lib/supabase'
+import { api } from '../../../lib/api'
+import { runApiRead } from '../../../lib/apiScreen'
 import { makeCommonStyles } from '../recordExpense/common'
 import { CATEGORIES } from '../recordExpense/categories'
 import { formatMoney } from './types'
@@ -77,30 +78,24 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
 
   useEffect(() => {
     if (!visible) return
-    let active = true
+    const controller = new AbortController()
 
     async function loadLog() {
       setIsLoading(true)
       setLoadError(null)
 
-      const { data, error } = await supabase
-        .from('audit_log')
-        .select('id, entity_id, user_id, action, entity_type, old_values, new_values, created_at')
-        .eq('fund_id', fundId)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (!active) return
-      if (error) {
-        setLoadError(error.message)
-      } else {
-        setEntries((data ?? []) as AuditEntry[])
+      try {
+        const page = await runApiRead(call => api.funds.activity(fundId, { limit: 50 }, call), { signal: controller.signal })
+        if (controller.signal.aborted) return
+        setEntries(page.items as AuditEntry[])
+      } catch (error) {
+        if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : 'Could not load fund activity.')
       }
-      setIsLoading(false)
+      if (!controller.signal.aborted) setIsLoading(false)
     }
 
-    loadLog()
-    return () => { active = false }
+    void loadLog()
+    return () => controller.abort()
   }, [visible, fundId])
 
   function formatValue(field: string, value: unknown): string {
@@ -230,6 +225,7 @@ export default function ActivityLogModal({ visible, fundId, currencyCode, member
           )}
 
           <ActivityDetailsModal
+            fundId={fundId}
             entry={selectedEntry}
             actorName={(selectedEntry?.user_id && memberNames.get(selectedEntry.user_id)) ?? 'A member'}
             currencyCode={currencyCode}
