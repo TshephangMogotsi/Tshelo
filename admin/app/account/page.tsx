@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { ArrowRight, CalendarDays, Coins, HandCoins, ListChecks, UserRound } from 'lucide-react'
 import { StatusPill } from '@/components/status-pill'
@@ -58,7 +59,8 @@ export default async function AccountPage() {
       <section className="member-card">
         <header><div className="member-section-title"><span><ListChecks size={18} /></span><h2>Quick actions</h2></div></header>
         <div className="member-card-body member-actions">
-          <Link className="primary" href="/account/funds">View my funds</Link>
+          <Link className="primary" href={'/account/funds/new' as Route}>Create a fund</Link>
+          <Link href="/account/funds">Manage my funds</Link>
           <Link href="/account/contributions">My contributions</Link>
           <a href="#events">My events</a>
           <a href="#profile">Account details</a>
@@ -91,14 +93,14 @@ export default async function AccountPage() {
             const fund = membership.fund
             if (!fund) return null
             return (
-              <article className="member-fund" key={membership.id}>
+              <Link className="member-fund" href={`/account/funds/${fund.id}` as Route} key={membership.id}>
                 <div className="member-fund-head">
                   <div><h3>{fund.title}</h3><p>{fund.fund_code} · {formatDate(fund.created_at)}</p></div>
                   <span>{titleCase(membership.role)}</span>
                 </div>
                 <div className="member-fund-goal"><p>Fund goal</p><strong>{formatMoney(fund.goal_amount, fund.currency_code)}</strong></div>
                 <div className="member-fund-foot"><StatusPill value={fund.status} /><span>{titleCase(membership.status)}</span></div>
-              </article>
+              </Link>
             )
           })}
           {!memberships.length && <div className="member-empty">No funds are linked to this account yet.</div>}
@@ -123,7 +125,7 @@ export default async function AccountPage() {
           <div><span>Member since</span><strong>{formatDate(user.createdAt)}</strong></div>
           <div><span>Profile</span><strong>{user.profileCompleted ? 'Complete' : 'Incomplete'}</strong></div>
         </div>
-        <div className="member-web-note">This web dashboard is an overview. Use the Tshelo mobile app to create funds, record contributions, manage events and update account details.</div>
+        <div className="member-web-note">You can now create and manage funds on the website. Contribution recording, event management, and account updates remain in the Tshelo mobile app for now.</div>
       </section>
     </>
   )

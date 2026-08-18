@@ -59,4 +59,29 @@ describe('fund and membership API slice', () => {
     routes.forEach(route => expect(fs.existsSync(path.join(root, route))).toBe(true))
     expect(read('screens/main/home/loadHomeItems.ts')).toContain('api.home.summary')
   })
+
+  it('keeps the website fund flow behind the typed API boundary', () => {
+    const websiteFiles = [
+      'admin/components/account-funds/fund-list.tsx',
+      'admin/components/account-funds/create-fund-form.tsx',
+      'admin/components/account-funds/join-fund-form.tsx',
+      'admin/components/account-funds/fund-workspace.tsx',
+    ]
+
+    for (const file of websiteFiles) {
+      const source = read(file)
+      expect({ file, importsBrowserApi: source.includes("from '@/lib/api-client'") }).toEqual({
+        file,
+        importsBrowserApi: true,
+      })
+      expect({ file, importsSupabase: /from\s+['"][^'"]*supabase['"]/.test(source) }).toEqual({
+        file,
+        importsSupabase: false,
+      })
+      expect({ file, callsSupabaseData: /\bsupabase\s*\.\s*(?:from|rpc|functions|storage)\b/.test(source) }).toEqual({
+        file,
+        callsSupabaseData: false,
+      })
+    }
+  })
 })
