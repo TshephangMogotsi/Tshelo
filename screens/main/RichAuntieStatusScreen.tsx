@@ -16,11 +16,12 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import type { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead } from '../../lib/apiScreen'
 import type { AppColors } from '../../theme/themes'
 import { formatMoney } from './fundDetail/types'
 import { initials } from './richAuntie/reasons'
-import { richAuntieHeroTitle, summarizeRichAuntieStatus } from './richAuntie/status'
+import { richAuntieHeroTitle } from './richAuntie/status'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'RichAuntieStatus'>
@@ -36,83 +37,56 @@ type Award = {
 
 export default function RichAuntieStatusScreen({ navigation }: Props) {
   const { colors } = useTheme()
-  const { userId, userName } = useAuth()
+  const { userName } = useAuth()
   const styles = makeStyles(colors)
   const [cashGiven, setCashGiven] = useState(0)
   const [fundCount, setFundCount] = useState(0)
   const [awards, setAwards] = useState<Award[]>([])
+  const [awardCount, setAwardCount] = useState(0)
   const [isConsistentContributor, setIsConsistentContributor] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
 
   useFocusEffect(useCallback(() => {
     let active = true
+    const controller = new AbortController()
     async function load() {
-      if (!userId) {
-        setIsLoading(false)
-        setLoadError(true)
-        return
-      }
       setIsLoading(true)
       setLoadError(false)
-      const [
-        { data: contributions, error: contributionsError },
-        { data: awardRows, error: awardsError },
-      ] = await Promise.all([
-        supabase
-          .from('contributions')
-          .select('fund_id, amount, status, is_refunded')
-          .eq('user_id', userId),
-        supabase
-          .from('rich_auntie_awards')
-          .select('id, fund_id, reason_label, created_at')
-          .eq('recipient_user_id', userId)
-          .order('created_at', { ascending: false }),
-      ])
-      if (!active) return
-      if (contributionsError || awardsError) {
-        setLoadError(true)
-        setIsLoading(false)
-        return
+      try {
+        const status = await runApiRead(
+          call => api.richAuntie.status(call),
+          { signal: controller.signal },
+        )
+        if (!active) return
+        setCashGiven(Number(status.cash_given))
+        setFundCount(status.fund_count)
+        setIsConsistentContributor(status.is_consistent_contributor)
+        setAwardCount(status.award_count)
+        setAwards(status.awards.map(award => ({
+          id: award.id,
+          fund_id: award.fund_id,
+          reason_label: award.reason_label,
+          created_at: award.created_at,
+          fundTitle: award.fund_title,
+        })))
+      } catch {
+        if (active) setLoadError(true)
+      } finally {
+        if (active) setIsLoading(false)
       }
-
-      const summary = summarizeRichAuntieStatus(contributions ?? [], awardRows ?? [])
-      const confirmed = (contributions ?? []).filter(row => row.status === 'confirmed' && !row.is_refunded)
-      const fundIds = [...new Set([
-        ...confirmed.map(row => row.fund_id),
-        ...(awardRows ?? []).map(row => row.fund_id),
-      ])]
-      const { data: funds, error: fundsError } = fundIds.length
-        ? await supabase.from('funds').select('id, title').in('id', fundIds)
-        : { data: [] as { id: string; title: string }[], error: null }
-      if (!active) return
-      if (fundsError) {
-        setLoadError(true)
-        setIsLoading(false)
-        return
-      }
-
-      const fundTitles = new Map((funds ?? []).map(fund => [fund.id, fund.title]))
-      setCashGiven(summary.cashGiven)
-      setFundCount(summary.fundCount)
-      setIsConsistentContributor(summary.isConsistentContributor)
-      setAwards((awardRows ?? []).map(row => ({
-        ...row,
-        fundTitle: fundTitles.get(row.fund_id) ?? 'Fund',
-      })))
-      setIsLoading(false)
     }
     load()
-    return () => { active = false }
-  }, [userId]))
+    return () => { active = false; controller.abort() }
+  }, []))
 
   async function shareStatus() {
     await Share.share({
-      message: `♛ I’ve been recognised as a Rich Auntie on Tshelo — ${awards.length} award${awards.length === 1 ? '' : 's'} across ${fundCount} fund${fundCount === 1 ? '' : 's'}.`,
+      message: `♛ I’ve been recognised as a Rich Auntie on Tshelo — ${awardCount} award${awardCount === 1 ? '' : 's'} across ${fundCount} fund${fundCount === 1 ? '' : 's'}.`,
     })
   }
 
-  const isRichAuntie = awards.length > 0
+  const isRichAuntie = awardCount > 0
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -134,7 +108,7 @@ export default function RichAuntieStatusScreen({ navigation }: Props) {
             <View style={styles.badge}><Text style={styles.badgeText}>♛</Text></View>
           )}
         </View>
-        <Text style={styles.heroTitle}>{richAuntieHeroTitle(isLoading, awards.length)}</Text>
+        <Text style={styles.heroTitle}>{richAuntieHeroTitle(isLoading, awardCount)}</Text>
         {!isLoading && !isRichAuntie && !loadError && (
           <Text style={styles.heroSubtitle}>Awards from your fund organisers will appear here.</Text>
         )}
@@ -162,7 +136,7 @@ export default function RichAuntieStatusScreen({ navigation }: Props) {
               </View>
               <View style={styles.divider} />
               <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: '#F4A300' }]}>{awards.length}</Text>
+                <Text style={[styles.statValue, { color: '#F4A300' }]}>{awardCount}</Text>
                 <Text style={styles.statLabel}>Awards</Text>
               </View>
             </View>

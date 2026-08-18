@@ -12,8 +12,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RouteProp } from '@react-navigation/native'
 import type { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
-import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead } from '../../lib/apiScreen'
 import { initials } from './richAuntie/reasons'
 
 type Props = {
@@ -31,44 +31,33 @@ type Celebration = {
 
 export default function RichAuntieCelebrationScreen({ navigation, route }: Props) {
   const { colors } = useTheme()
-  const { userId } = useAuth()
   const [details, setDetails] = useState<Celebration | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     async function load() {
-      const { data: award, error } = await supabase
-        .from('rich_auntie_awards')
-        .select('fund_id, recipient_user_id, awarded_by, reason_label')
-        .eq('id', route.params.awardId)
-        .single()
-
-      if (!active) return
-      if (error || !award) {
-        setLoadFailed(true)
-        return
+      try {
+        const celebration = await runApiRead(
+          call => api.richAuntie.celebration(route.params.awardId, call),
+          { signal: controller.signal },
+        )
+        if (!active) return
+        setDetails({
+          recipientName: celebration.award.recipient_name,
+          fundTitle: celebration.award.fund_title,
+          reason: celebration.award.reason_label,
+          organiserName: celebration.award.awarded_by_name,
+          isRecipient: celebration.is_recipient,
+        })
+      } catch {
+        if (active) setLoadFailed(true)
       }
-
-      const [{ data: fund }, { data: profiles }] = await Promise.all([
-        supabase.from('funds').select('title').eq('id', award.fund_id).single(),
-        supabase.rpc('get_fund_member_profiles', { p_fund_id: award.fund_id }),
-      ])
-      if (!active) return
-
-      const recipient = (profiles ?? []).find((profile: any) => profile.user_id === award.recipient_user_id)
-      const organiser = (profiles ?? []).find((profile: any) => profile.user_id === award.awarded_by)
-      setDetails({
-        recipientName: recipient?.name ?? 'A fund member',
-        fundTitle: fund?.title ?? 'the fund',
-        reason: award.reason_label,
-        organiserName: organiser?.name ?? 'The organiser',
-        isRecipient: award.recipient_user_id === userId,
-      })
     }
     load()
-    return () => { active = false }
-  }, [route.params.awardId, userId])
+    return () => { active = false; controller.abort() }
+  }, [route.params.awardId])
 
   function done() {
     if (details?.isRecipient || route.params.recipientView) {

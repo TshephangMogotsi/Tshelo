@@ -21,7 +21,8 @@ import type { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead } from '../../lib/apiScreen'
 import { hapticError, hapticSuccess } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { initials, RICH_AUNTIE_REASONS, type RichAuntieReasonCode } from './richAuntie/reasons'
@@ -64,24 +65,19 @@ export default function AwardRichAuntieScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     let active = true
-    Promise.all([
-      supabase
-        .from('fund_sponsorship_item_progress')
-        .select('id, title')
-        .eq('fund_id', fundId)
-        .eq('claimed_by_user_id', memberUserId)
-        .in('status', ['funded', 'fulfilled']),
-      supabase
-        .from('rich_auntie_awards')
-        .select('sponsorship_item_id')
-        .eq('fund_id', fundId)
-        .eq('recipient_user_id', memberUserId),
-    ]).then(([itemsResult, awardsResult]) => {
-      if (!active) return
-      const awardedIds = new Set((awardsResult.data ?? []).map(row => row.sponsorship_item_id).filter(Boolean))
-      setEligibleItems((itemsResult.data ?? []).filter(item => !awardedIds.has(item.id)))
-    })
-    return () => { active = false }
+    const controller = new AbortController()
+    runApiRead(
+      call => api.richAuntie.eligibility(fundId, memberUserId, call),
+      { signal: controller.signal },
+    )
+      .then(result => {
+        if (!active) return
+        setEligibleItems(result.sponsorship_progress
+          .filter(item => item.eligible)
+          .map(item => ({ id: item.id, title: item.title })))
+      })
+      .catch(() => { if (active) setEligibleItems([]) })
+    return () => { active = false; controller.abort() }
   }, [fundId, memberUserId])
 
   const selectedPreset = RICH_AUNTIE_REASONS.find(reason => reason.code === reasonCode)
@@ -89,30 +85,25 @@ export default function AwardRichAuntieScreen({ navigation, route }: Props) {
   const canSave = Boolean(reasonCode && reasonLabel.length >= 2 && userId)
 
   async function award() {
-    if (!canAwardRecognition || !canSave || isSaving || !userId || !requireOnline()) return
+    if (!canAwardRecognition || !canSave || isSaving || !userId || !reasonCode || !requireOnline()) return
     setIsSaving(true)
-    const { data, error } = await supabase
-      .from('rich_auntie_awards')
-      .insert({
+    try {
+      const award = await api.richAuntie.createAward({
         fund_id: fundId,
         recipient_user_id: memberUserId,
         sponsorship_item_id: selectedItemId,
         reason_code: reasonCode,
         reason_label: reasonLabel,
-        awarded_by: userId,
         notify_member: notifyMember,
       })
-      .select('id')
-      .single()
-    setIsSaving(false)
-
-    if (error || !data) {
+      hapticSuccess()
+      navigation.replace('RichAuntieCelebration', { awardId: award.id })
+    } catch (error) {
       hapticError()
-      Alert.alert('Could not award Rich Auntie', error?.message ?? 'Please try again.')
-      return
+      Alert.alert('Could not award Rich Auntie', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setIsSaving(false)
     }
-    hapticSuccess()
-    navigation.replace('RichAuntieCelebration', { awardId: data.id })
   }
 
   return (
