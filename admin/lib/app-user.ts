@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { redirect } from 'next/navigation'
+import type { TrustLevel } from '@shared/contracts/users'
 import { createClient } from './supabase-server'
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
@@ -9,7 +10,7 @@ export type AppUser = {
   name: string
   phone: string
   trustScore: number
-  trustLevel: string
+  trustLevel: TrustLevel
   tokenBalance: number
   profileCompleted: boolean
   createdAt: string
@@ -44,7 +45,7 @@ export async function requireAppUser(client?: ServerClient, knownUserId?: string
     name: profile.name || 'Tshelo member',
     phone: profile.phone || '',
     trustScore: profile.trust_score ?? 0,
-    trustLevel: profile.trust_level ?? 'new',
+    trustLevel: (profile.trust_level ?? 'new') as TrustLevel,
     tokenBalance: profile.token_balance ?? 0,
     profileCompleted: profile.profile_completed ?? false,
     createdAt: profile.created_at,

@@ -40,6 +40,7 @@ function requireHttps(name) {
 
 requireHttps('EXPO_PUBLIC_SUPABASE_URL')
 requireValue('EXPO_PUBLIC_SUPABASE_ANON_KEY')
+requireHttps('EXPO_PUBLIC_API_BASE_URL')
 requireHttps('EXPO_PUBLIC_TERMS_OF_SERVICE_URL')
 requireHttps('EXPO_PUBLIC_PRIVACY_POLICY_URL')
 

@@ -28,6 +28,7 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: https://bundle-check.invalid
           EXPO_PUBLIC_SUPABASE_ANON_KEY: bundle-check-public-key
+          EXPO_PUBLIC_API_BASE_URL: https://api-bundle-check.invalid
         run: npm run bundle:size
       - name: Reject high-severity dependency advisories
         run: npm audit --audit-level=high
@@ -55,6 +56,17 @@ jobs:
           --dbname postgres
           --set ON_ERROR_STOP=1
           --file supabase/tests/fund_admin_permission_matrix.sql
+      - name: Verify API v1 database boundaries
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql
+          --host 127.0.0.1
+          --port 54322
+          --username postgres
+          --dbname postgres
+          --set ON_ERROR_STOP=1
+          --file supabase/tests/api_v1_boundaries.sql
       - name: Stop disposable database
         if: always()
         run: supabase stop --no-backup

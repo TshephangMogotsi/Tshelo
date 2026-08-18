@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation'
+import type { PlatformAdminRole } from '@shared/contracts/admin'
 import { createClient } from './supabase-server'
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>
 
 export type PlatformAdmin = {
   userId: string
-  role: 'support' | 'operations' | 'finance' | 'super_admin'
+  role: PlatformAdminRole
   name: string
   phone: string
 }

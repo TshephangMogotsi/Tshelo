@@ -9,7 +9,9 @@
     "web": "expo start --web",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test -- --runInBand",
+    "test:api-verifier": "node --test scripts/__tests__/verify-api.test.mjs",
+    "verify:api": "node scripts/verify-api.mjs",
+    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-verifier",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "postinstall": "patch-package"

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, CalendarDays, Coins, HandCoins, ListChecks, UserRound } from 'lucide-react'
 import { StatusPill } from '@/components/status-pill'
 import { getAppUserContext } from '@/lib/app-user'
+import { getAccountOverviewData } from '@/lib/data/account'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -12,88 +13,28 @@ export const metadata: Metadata = {
   description: 'Your secure Tshelo account overview.',
 }
 
-type FundSummary = {
-  id: string
-  title: string
-  fund_code: string
-  status: string
-  goal_amount: number | string | null
-  currency_code: string
-  created_at: string
-}
-
-type MembershipRow = {
-  id: string
-  role: string
-  status: string
-  funds: FundSummary | FundSummary[] | null
-}
-
-type ContributionRow = {
-  id: string
-  amount: number | string
-  currency_code: string
-  status: string
-  created_at: string
-  funds: { title: string } | { title: string }[] | null
-}
-
-function membershipFund(row: MembershipRow) {
-  return Array.isArray(row.funds) ? row.funds[0] : row.funds
-}
-
-function contributionFund(row: ContributionRow) {
-  return Array.isArray(row.funds) ? row.funds[0] : row.funds
-}
-
 export default async function AccountPage() {
   const { supabase, userId, userPromise } = await getAppUserContext()
-
-  const [user, ownedFundsResult, membershipCountResult, membershipsResult, contributionsResult, eventsResult] = await Promise.all([
-    userPromise,
-    supabase
-      .from('funds')
-      .select('*', { count: 'exact', head: true })
-      .eq('owner_id', userId)
-      .is('deleted_at', null),
-    supabase
-      .from('fund_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'joined'),
-    supabase
-      .from('fund_members')
-      .select('id, role, status, funds(id, title, fund_code, status, goal_amount, currency_code, created_at)')
-      .eq('user_id', userId)
-      .in('status', ['joined', 'pending'])
-      .order('created_at', { ascending: false })
-      .limit(6),
-    supabase
-      .from('contributions')
-      .select('id, amount, currency_code, status, created_at, funds(title)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('events')
-      .select('*', { count: 'exact', head: true })
-      .eq('creator_id', userId)
-      .is('deleted_at', null),
-  ])
-
-  const memberships = (membershipsResult.data ?? []) as MembershipRow[]
-  const contributions = (contributionsResult.data ?? []) as ContributionRow[]
+  const {
+    user,
+    ownedFundCount,
+    joinedFundCount,
+    memberships,
+    contributions,
+    eventCount,
+  } = await getAccountOverviewData(supabase, userId, userPromise)
   const recentContributions = contributions.slice(0, 5)
   const lifetimeContributed = contributions
     .filter((contribution) => contribution.status === 'confirmed' && contribution.currency_code === 'BWP')
     .reduce((total, contribution) => total + Number(contribution.amount || 0), 0)
-  const contributedFundCount = new Set(contributions.map((contribution) => contributionFund(contribution)?.title).filter(Boolean)).size
+  const contributedFundCount = new Set(contributions.map((contribution) => contribution.fund?.title).filter(Boolean)).size
   const firstName = user.name.split(' ')[0]
   const stats = [
     { label: 'Token balance', value: user.tokenBalance.toLocaleString('en-BW'), hint: 'Never expires', accent: true },
     { label: 'Lifetime contributed', value: formatMoney(lifetimeContributed, 'BWP'), hint: `Across ${contributedFundCount} fund${contributedFundCount === 1 ? '' : 's'}` },
-    { label: 'Funds organised', value: (ownedFundsResult.count ?? 0).toLocaleString('en-BW'), hint: 'Created by you' },
-    { label: 'Funds joined', value: (membershipCountResult.count ?? 0).toLocaleString('en-BW'), hint: 'Current memberships' },
-    { label: 'Events organised', value: (eventsResult.count ?? 0).toLocaleString('en-BW'), hint: 'Created by you' },
+    { label: 'Funds organised', value: ownedFundCount.toLocaleString('en-BW'), hint: 'Created by you' },
+    { label: 'Funds joined', value: joinedFundCount.toLocaleString('en-BW'), hint: 'Current memberships' },
+    { label: 'Events organised', value: eventCount.toLocaleString('en-BW'), hint: 'Created by you' },
   ]
 
   return (
@@ -134,7 +75,7 @@ export default async function AccountPage() {
             {recentContributions.map((contribution) => (
               <li key={contribution.id}>
                 <span className="member-feed-icon"><Coins size={17} /></span>
-                <div><strong>You contributed {formatMoney(contribution.amount, contribution.currency_code)}</strong><p>{contributionFund(contribution)?.title ?? 'Tshelo fund'} · {titleCase(contribution.status)}</p></div>
+                <div><strong>You contributed {formatMoney(contribution.amount, contribution.currency_code)}</strong><p>{contribution.fund?.title ?? 'Tshelo fund'} · {titleCase(contribution.status)}</p></div>
                 <time>{formatDate(contribution.created_at)}</time>
               </li>
             ))}
@@ -147,7 +88,7 @@ export default async function AccountPage() {
         <header><div className="member-section-title"><span><HandCoins size={18} /></span><h2>My funds</h2></div></header>
         <div className="member-card-body member-fund-grid">
           {memberships.map((membership) => {
-            const fund = membershipFund(membership)
+            const fund = membership.fund
             if (!fund) return null
             return (
               <article className="member-fund" key={membership.id}>
@@ -167,7 +108,7 @@ export default async function AccountPage() {
       <section className="member-card" id="events">
         <header><div className="member-section-title"><span><CalendarDays size={18} /></span><h2>My events</h2></div></header>
         <div className="member-card-body member-event-summary">
-          <strong>{eventsResult.count ?? 0}</strong>
+          <strong>{eventCount}</strong>
           <div><h3>Events organised</h3><p>Event details and guest management remain available in the Tshelo mobile app.</p></div>
         </div>
       </section>

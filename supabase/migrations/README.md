@@ -61,3 +61,19 @@ The final migration keeps `admin` as a relationship label and grant
 qualification, but removes it as a standalone operational authorization path.
 See `docs/granular-admin-rollout.md` for smoke tests, audit queries, and rollback
 posture.
+
+## API v1 database rollout (2026-08-17)
+
+Apply these migrations in order before deploying API v1 mutation and read
+handlers:
+
+- `20260817140000_api_source_of_truth_rpcs.sql` adds the transactional event,
+  linked-fund, and audited platform-admin RPC boundaries. It also adds support
+  ticket resolution metadata.
+- `20260817160000_api_read_rls_and_indexes.sql` extends active platform-admin
+  read access to the relationship rows required by typed API detail/filter
+  queries, and adds deterministic list-pagination indexes.
+
+Both migrations preserve caller identity through `auth.uid()`. The read
+migration grants no write privileges, and the mutation RPCs derive the actor
+server-side rather than accepting an actor ID from clients.

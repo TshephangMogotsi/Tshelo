@@ -16,7 +16,10 @@ routed to the admin dashboard; regular users are routed to the read-only
    project's key migration.
 4. From this directory, run `npm install` and `npm run dev`.
 
-The initial release is read-only. It does not need a Supabase secret key.
+The console does not need a Supabase secret key for its current reads or
+privileged mutations. Requests use the caller's JWT so Row Level Security and
+`auth.uid()` remain available; narrow database RPCs authorize and audit the
+platform-admin mutations atomically.
 
 ## Enable the database model
 
@@ -55,6 +58,8 @@ Create a Vercel project from the existing `Tshelo` repository and set:
 - Framework Preset: Next.js
 - Environment variables: `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+Interactive browser components use the same-origin API.
 
 Add the deployed URL to the Supabase Auth redirect allowlist. No GitHub
 organization or second repository is required.

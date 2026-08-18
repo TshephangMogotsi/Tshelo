@@ -28,6 +28,7 @@ External release actions and the product/legal decisions listed below must be co
 
 - Obtain client approval or amendments for [Tshelo_Trust_Points_Client_Review_Draft.docx](../output/Tshelo_Trust_Points_Client_Review_Draft.docx).
 - Confirm the token pack prices and paid-feature costs are final.
+- Provide the production `EXPO_PUBLIC_API_BASE_URL` before migrating mobile screens to API v1.
 - Provide `EXPO_PUBLIC_TOKEN_PORTAL_URL`, or explicitly ship token checkout as unavailable. The current app clearly says checkout is coming soon and takes no payment.
 
 ### Legal and store policy

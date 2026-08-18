@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { StatusPill } from '@/components/status-pill'
 import { getAppUserContext } from '@/lib/app-user'
+import { getContributionHistory } from '@/lib/data/account'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -15,30 +16,6 @@ type SearchParams = {
   fund?: string
   from?: string
   to?: string
-}
-
-type FundRef = {
-  id: string
-  title: string
-}
-
-type MembershipRow = {
-  fund_id: string
-  funds: FundRef | FundRef[] | null
-}
-
-type ContributionRow = {
-  id: string
-  amount: number | string
-  currency_code: string
-  payment_method: string | null
-  status: string
-  created_at: string
-  funds: FundRef | FundRef[] | null
-}
-
-function relatedFund(value: FundRef | FundRef[] | null) {
-  return Array.isArray(value) ? value[0] : value
 }
 
 function validDate(value: string | undefined, fallback: string) {
@@ -58,37 +35,10 @@ export default async function ContributionsPage({
   const from = validDate(query.from, defaultFrom)
   const to = validDate(query.to, today)
   const selectedFund = /^[0-9a-f-]{36}$/i.test(query.fund ?? '') ? query.fund ?? '' : ''
-
-  let contributionsQuery = supabase
-    .from('contributions')
-    .select('id, amount, currency_code, payment_method, status, created_at, funds(id, title)')
-    .eq('user_id', userId)
-    .gte('created_at', `${from}T00:00:00.000Z`)
-    .lte('created_at', `${to}T23:59:59.999Z`)
-    .order('created_at', { ascending: false })
-
-  if (selectedFund) contributionsQuery = contributionsQuery.eq('fund_id', selectedFund)
-
-  const [membershipsResult, contributionsResult] = await Promise.all([
-    supabase
-      .from('fund_members')
-      .select('fund_id, funds(id, title)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    contributionsQuery,
+  const [{ funds, contributions, hasError }] = await Promise.all([
+    getContributionHistory(supabase, userId, { fundId: selectedFund || undefined, from, to }),
     userPromise,
   ])
-
-  const memberships = (membershipsResult.data ?? []) as MembershipRow[]
-  const contributions = (contributionsResult.data ?? []) as ContributionRow[]
-  const funds = Array.from(
-    new Map(
-      memberships
-        .map((membership) => relatedFund(membership.funds))
-        .filter((fund): fund is FundRef => Boolean(fund))
-        .map((fund) => [fund.id, fund]),
-    ).values(),
-  ).sort((a, b) => a.title.localeCompare(b.title))
 
   return (
     <>
@@ -133,7 +83,7 @@ export default async function ContributionsPage({
               <tbody>
                 {contributions.map((contribution) => (
                   <tr key={contribution.id}>
-                    <td><strong>{relatedFund(contribution.funds)?.title ?? 'Tshelo fund'}</strong></td>
+                    <td><strong>{contribution.fund?.title ?? 'Tshelo fund'}</strong></td>
                     <td>{formatDate(contribution.created_at)}</td>
                     <td>{formatMoney(contribution.amount, contribution.currency_code)}</td>
                     <td>{contribution.payment_method ? titleCase(contribution.payment_method) : 'Not recorded'}</td>
@@ -147,7 +97,7 @@ export default async function ContributionsPage({
             </table>
           </div>
 
-          {contributionsResult.error && <p className="member-contribution-error">Your contributions could not be loaded. Please try again.</p>}
+          {hasError && <p className="member-contribution-error">Your contributions could not be loaded. Please try again.</p>}
           <div className="member-year-note">
             <strong>Your year end summary is generated every January.</strong>{' '}
             It totals every contribution you made in the previous year across all funds, as one PDF you can keep for your own records.
