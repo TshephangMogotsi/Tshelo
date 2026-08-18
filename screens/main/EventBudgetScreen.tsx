@@ -8,11 +8,9 @@ import { RouteProp, useFocusEffect } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { isFundReadOnly } from './fundDetail/finance'
-import { useAuth } from '../../context/AuthContext'
-import { loadMyFundPermissions } from '../../lib/useFundPermissions'
-import type { FundPermission } from '../../lib/fundPermissions'
 import LoadingOverlay from '../../components/LoadingOverlay'
 
 type Props = {
@@ -24,52 +22,39 @@ const PRESETS = ['5,000', '10,000', '15,000', '25,000']
 
 export default function EventBudgetScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
-  const { userId } = useAuth()
   const styles = makeStyles(colors)
   const [budget, setBudget] = useState('0')
   const [currency, setCurrency] = useState('BWP')
   const [isSaving, setIsSaving] = useState(false)
-  const [linkedFundId, setLinkedFundId] = useState<string | null>(null)
+  const [hasLinkedFund, setHasLinkedFund] = useState(false)
+  const [linkedFundReadOnly, setLinkedFundReadOnly] = useState(false)
   const [canManageBudget, setCanManageBudget] = useState<boolean | null>(null)
   const permissionAlerted = useRef(false)
 
   useFocusEffect(useCallback(() => {
     let active = true
+    const controller = new AbortController()
     permissionAlerted.current = false
     setCanManageBudget(null)
-    Promise.all([
-      supabase.from('events').select('creator_id, currency_code, linked_fund_id').eq('id', route.params.eventId).single(),
-      supabase.from('event_budgets').select('total_budget, currency_code').eq('event_id', route.params.eventId).maybeSingle(),
-      userId
-        ? supabase.from('event_organisers').select('id').eq('event_id', route.params.eventId).eq('user_id', userId).eq('status', 'active').maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]).then(async ([eventResult, budgetResult, organiserResult]) => {
-      if (!active) return
-      if (eventResult.error || !eventResult.data) {
-        setCanManageBudget(false)
-        Alert.alert(
-          'Budget unavailable',
-          eventResult.error?.message ?? 'This event could not be loaded.',
-          [{ text: 'Go back', onPress: () => navigation.goBack() }],
-        )
-        return
-      }
-      if (eventResult.data && !eventResult.data.linked_fund_id) {
-        setCanManageBudget(false)
-        Alert.alert(
-          'Budget unavailable',
-          'Event-only records track invitations and RSVPs. Create an Event + Fund when you need financial tracking.',
-          [{ text: 'Back', onPress: () => navigation.goBack() }],
-        )
-        return
-      }
-      if (eventResult.data?.linked_fund_id) {
-        const permissions = await loadMyFundPermissions(eventResult.data.linked_fund_id)
-          .catch(() => new Set<FundPermission>())
-        if (!active) return
-        const allowed = eventResult.data.creator_id === userId
-          || Boolean(organiserResult.data)
-          || permissions.has('manage_event_budget')
+    setHasLinkedFund(false)
+    setLinkedFundReadOnly(false)
+    runApiRead(call => api.events.workspace(route.params.eventId, call), { signal: controller.signal })
+      .then(workspace => {
+        if (!active || controller.signal.aborted) return
+        const linked = Boolean(workspace.event.linked_fund_id)
+        setHasLinkedFund(linked)
+        if (!linked) {
+          setCanManageBudget(false)
+          Alert.alert(
+            'Budget unavailable',
+            'Event-only records track invitations and RSVPs. Create an Event + Fund when you need financial tracking.',
+            [{ text: 'Back', onPress: () => navigation.goBack() }],
+          )
+          return
+        }
+        const allowed = workspace.capabilities.is_creator
+          || workspace.capabilities.is_organiser
+          || workspace.capabilities.linked_fund_permissions.includes('manage_event_budget')
         setCanManageBudget(allowed)
         if (!allowed && !permissionAlerted.current) {
           permissionAlerted.current = true
@@ -79,27 +64,29 @@ export default function EventBudgetScreen({ navigation, route }: Props) {
             [{ text: 'Go back', onPress: () => navigation.goBack() }],
           )
         }
-        void supabase
-          .from('funds')
-          .select('status')
-          .eq('id', eventResult.data.linked_fund_id)
-          .single()
-          .then(({ data }) => {
-            if (!active || !data || !isFundReadOnly(data.status)) return
-            Alert.alert(
-              'Fund is closed',
-              'The event budget is read-only because its linked fund is closed.',
-              [{ text: 'Back', onPress: () => navigation.goBack() }],
-            )
-          })
-      }
-      const code = budgetResult.data?.currency_code ?? eventResult.data?.currency_code ?? 'BWP'
-      setCurrency(code)
-      setLinkedFundId(eventResult.data?.linked_fund_id ?? null)
-      if (budgetResult.data) setBudget(Number(budgetResult.data.total_budget).toLocaleString('en-BW'))
-    })
-    return () => { active = false }
-  }, [navigation, route.params.eventId, userId]))
+        const readOnly = Boolean(workspace.linked_fund && isFundReadOnly(workspace.linked_fund.fund.status))
+        setLinkedFundReadOnly(readOnly)
+        if (readOnly) {
+          Alert.alert(
+            'Fund is closed',
+            'The event budget is read-only because its linked fund is closed.',
+            [{ text: 'Back', onPress: () => navigation.goBack() }],
+          )
+        }
+        const code = workspace.budget?.currency_code ?? workspace.event.currency_code ?? 'BWP'
+        setCurrency(code)
+        setBudget(workspace.budget
+          ? Number(workspace.budget.total_budget).toLocaleString('en-BW')
+          : '0')
+      }).catch(error => {
+        if (!active || controller.signal.aborted) return
+        setCanManageBudget(false)
+        Alert.alert('Budget unavailable', toApiUiError(error, controller.signal).message, [
+          { text: 'Go back', onPress: () => navigation.goBack() },
+        ])
+      })
+    return () => { active = false; controller.abort() }
+  }, [navigation, route.params.eventId]))
 
   function handleBudgetChange(text: string) {
     const cleaned = text.replace(/[^0-9,]/g, '')
@@ -113,21 +100,22 @@ export default function EventBudgetScreen({ navigation, route }: Props) {
       Alert.alert('Enter a budget', 'The budget must be greater than zero.')
       return
     }
-    if (linkedFundId) {
-      const { data: linkedFund } = await supabase.from('funds').select('status').eq('id', linkedFundId).single()
-      if (!linkedFund || isFundReadOnly(linkedFund.status)) {
-        Alert.alert('Fund is closed', 'The event budget cannot be changed after its linked fund is closed.')
-        return
-      }
+    if (linkedFundReadOnly) {
+      Alert.alert('Fund is closed', 'The event budget cannot be changed after its linked fund is closed.')
+      return
     }
     setIsSaving(true)
-    const { error } = await supabase.from('event_budgets').upsert({
-      event_id: route.params.eventId,
-      total_budget: amount,
-      currency_code: currency,
-    }, { onConflict: 'event_id' })
-    setIsSaving(false)
-    Alert.alert(error ? 'Could not save budget' : 'Budget saved', error?.message ?? 'Your event budget is up to date.')
+    try {
+      await api.events.updateBudget(route.params.eventId, {
+        total_budget: String(amount),
+        currency_code: currency,
+      })
+      Alert.alert('Budget saved', 'Your event budget is up to date.')
+    } catch (error) {
+      Alert.alert('Could not save budget', toApiUiError(error).message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -183,19 +171,19 @@ export default function EventBudgetScreen({ navigation, route }: Props) {
             <Ionicons name="wallet-outline" size={22} color={colors.primary} />
           </View>
           <View style={styles.linkFundCopy}>
-            <Text style={styles.linkFundEyebrow}>{linkedFundId ? 'LINKED FUND' : 'CONTRIBUTIONS'}</Text>
-            <Text style={styles.linkFundTitle}>{linkedFundId ? 'Contribution fund' : 'Fund this event'}</Text>
-            <Text style={styles.linkFundText}>{linkedFundId ? 'Track contributions and spending' : 'Create Event + Fund to collect contributions'}</Text>
+            <Text style={styles.linkFundEyebrow}>{hasLinkedFund ? 'LINKED FUND' : 'CONTRIBUTIONS'}</Text>
+            <Text style={styles.linkFundTitle}>{hasLinkedFund ? 'Contribution fund' : 'Fund this event'}</Text>
+            <Text style={styles.linkFundText}>{hasLinkedFund ? 'Track contributions and spending' : 'Create Event + Fund to collect contributions'}</Text>
           </View>
           <TouchableOpacity
             style={styles.linkFundButton}
             activeOpacity={0.86}
             onPress={() => {
-              if (linkedFundId) navigation.navigate('EventDetail', { eventId: route.params.eventId, workspace: 'fund' })
+              if (hasLinkedFund) navigation.navigate('EventDetail', { eventId: route.params.eventId, workspace: 'fund' })
               else Alert.alert('No linked fund', 'Create an Event + Fund from the creation menu to track contributions with a budget.')
             }}
           >
-            <Ionicons name={linkedFundId ? 'chevron-forward' : 'information-circle-outline'} size={20} color={colors.primary} />
+            <Ionicons name={hasLinkedFund ? 'chevron-forward' : 'information-circle-outline'} size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
 

@@ -21,7 +21,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
 import { hapticError, hapticSuccess } from '../../lib/haptics'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 
@@ -111,14 +112,15 @@ export default function JoinEventScreen({ navigation, route }: Props) {
     setPhase('searching')
     setError(null)
 
-    const { data: rows, error: rpcError } = await supabase.rpc('find_event_by_code', {
-      p_code: cleanedCode,
-    })
-    const row = rows?.[0] ?? null
-
-    if (rpcError || !row) {
+    let row
+    try {
+      row = await runApiRead(call => api.events.previewInvite(cleanedCode, call))
+    } catch (findError) {
       hapticError()
-      setError('No event was found with that code. Check the code with the organiser and try again.')
+      const uiError = toApiUiError(findError)
+      setError(uiError.kind === 'not_found'
+        ? 'No event was found with that code. Check the code with the organiser and try again.'
+        : uiError.message)
       setPhase('input')
       return
     }
@@ -155,20 +157,15 @@ export default function JoinEventScreen({ navigation, route }: Props) {
 
     setPhase('joining')
     setError(null)
-    const { data: rows, error: rpcError } = await supabase.rpc('join_event_by_code', {
-      p_code: cleanedCode,
-    })
-    const joined = rows?.[0] ?? null
-
-    if (rpcError || !joined?.event_id) {
+    try {
+      const joined = await api.events.join(cleanedCode)
+      hapticSuccess()
+      navigation.replace('EventDetail', { eventId: joined.event_id })
+    } catch (joinError) {
       hapticError()
-      setError(rpcError?.message || 'Could not join this event. Please try again.')
+      setError(toApiUiError(joinError).message)
       setPhase('preview')
-      return
     }
-
-    hapticSuccess()
-    navigation.replace('EventDetail', { eventId: joined.event_id })
   }
 
   return (

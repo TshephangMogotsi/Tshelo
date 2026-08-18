@@ -11,10 +11,17 @@ import type {
   CreateReceiptUploadSessionRequest,
   CreateSponsorshipAllocationRequest,
   CreateEventRequest,
+  CreateEventAnnouncementRequest,
+  CreateEventFundRequest,
+  CreatedEventFund,
   CreateFundRequest,
   Event,
   EventGuest,
+  EventAnnouncement,
+  EventBudget,
+  EventInvitePreview,
   EventSummary,
+  EventWorkspace,
   EvaluateRewardsResult,
   Expense,
   FundContributor,
@@ -36,6 +43,8 @@ import type {
   HomeSummary,
   JoinFundRequest,
   JoinFundResult,
+  JoinedEvent,
+  LeftEvent,
   LeaveFundResult,
   ListFundActivityRequest,
   ListAdminAuditRequest,
@@ -77,6 +86,10 @@ import type {
   UpdateFundSponsorshipRequest,
   UpdateContributionRequest,
   UpdateExpenseRequest,
+  UpdateEventBudgetRequest,
+  UpdateEventRequest,
+  CompleteEventRequest,
+  InviteEventOrganiserRequest,
   CreateFundSponsorshipRequest,
   ConfigureFundAdminRequest,
   UpsertPlatformAdminRequest,
@@ -404,6 +417,42 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       },
       create(input: CreateEventRequest, call?: ApiCallOptions) {
         return request<Event>('/api/v1/events', { ...call, method: 'POST', body: input })
+      },
+      createFund(input: CreateEventFundRequest, call?: ApiCallOptions) {
+        return request<CreatedEventFund>('/api/v1/events/event-funds', { ...call, method: 'POST', body: input })
+      },
+      update(eventId: string, input: UpdateEventRequest, call?: ApiCallOptions) {
+        return request<Event>(`/api/v1/events/${encodeURIComponent(eventId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      remove(eventId: string, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/events/${encodeURIComponent(eventId)}`, { ...call, method: 'DELETE' })
+      },
+      workspace(eventId: string, call?: ApiCallOptions) {
+        return request<EventWorkspace>(`/api/v1/events/${encodeURIComponent(eventId)}/workspace`, call)
+      },
+      previewInvite(code: string, call?: ApiCallOptions) {
+        return request<EventInvitePreview>(`/api/v1/events/invite-preview${toQueryString({ code })}`, call)
+      },
+      join(code: string, call?: ApiCallOptions) {
+        return request<JoinedEvent>('/api/v1/events/join', { ...call, method: 'POST', body: { code } })
+      },
+      leave(eventId: string, call?: ApiCallOptions) {
+        return request<LeftEvent>(`/api/v1/events/${encodeURIComponent(eventId)}/leave`, { ...call, method: 'POST' })
+      },
+      complete(eventId: string, input: CompleteEventRequest, call?: ApiCallOptions) {
+        return request<Event>(`/api/v1/events/${encodeURIComponent(eventId)}/complete`, { ...call, method: 'POST', body: input })
+      },
+      budget(eventId: string, call?: ApiCallOptions) {
+        return request<EventBudget | null>(`/api/v1/events/${encodeURIComponent(eventId)}/budget`, call)
+      },
+      updateBudget(eventId: string, input: UpdateEventBudgetRequest, call?: ApiCallOptions) {
+        return request<EventBudget>(`/api/v1/events/${encodeURIComponent(eventId)}/budget`, { ...call, method: 'PUT', body: input })
+      },
+      createAnnouncement(eventId: string, input: CreateEventAnnouncementRequest, call?: ApiCallOptions) {
+        return request<EventAnnouncement>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements`, { ...call, method: 'POST', body: input })
+      },
+      inviteOrganiser(eventId: string, input: InviteEventOrganiserRequest, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/events/${encodeURIComponent(eventId)}/organiser-invites`, { ...call, method: 'POST', body: input })
       },
       syncOrganiserInvites(call?: ApiCallOptions) {
         return request<SyncOrganiserInvitesResult>('/api/v1/events/organiser-invites/sync', {

@@ -4,11 +4,13 @@ import * as Contacts from 'expo-contacts'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp, useFocusEffect } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
+import type { ConnectionSummary } from '@shared/contracts/users'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { useHardwareBack } from '../../lib/useHardwareBack'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { normalizeMapsUrl } from '../../lib/maps'
 import { TOKEN_FEATURE_PRICES } from '../../lib/tokenPricing'
 import { HomeItem } from './home/helpers'
@@ -41,15 +43,6 @@ import { useFundPermissions } from '../../lib/useFundPermissions'
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'CreateFund'>
   route:      RouteProp<MainStackParamList, 'CreateFund'>
-}
-
-function readableError(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message.trim()) return error.message
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = String((error as { message?: unknown }).message ?? '').trim()
-    if (message) return message
-  }
-  return fallback
 }
 
 export default function CreateFundScreen({ navigation }: Props) {
@@ -118,12 +111,14 @@ export default function CreateFundScreen({ navigation }: Props) {
 
     setIsSearchingConnections(true)
     const timeout = setTimeout(async () => {
-      const { data, error } = await supabase.rpc('search_my_connections', { p_query: query })
+      let data: ConnectionSummary[]
+      try {
+        data = await runApiRead(call => api.users.searchConnections({ q: query }, call))
+      } catch {
+        data = []
+      }
       if (!active) return
-      if (error) {
-        setConnectionResults([])
-      } else {
-        setConnectionResults((data ?? []).map((person: any) => ({
+      setConnectionResults(data.map(person => ({
           id: `connection:${person.user_id}`,
           userId: person.user_id,
           name: person.name,
@@ -132,7 +127,6 @@ export default function CreateFundScreen({ navigation }: Props) {
         })).filter((person: PickedOrganiser) => !pickedOrganisers.some(picked =>
           picked.userId === person.userId || normalizePhone(picked.phone) === normalizePhone(person.phone)
         )))
-      }
       setIsSearchingConnections(false)
     }, 300)
 
@@ -144,6 +138,19 @@ export default function CreateFundScreen({ navigation }: Props) {
 
   function normalizePhone(value?: string) {
     return (value ?? '').replace(/\D/g, '').slice(-8)
+  }
+
+  function toE164Phone(value?: string) {
+    const digits = (value ?? '').replace(/\D/g, '')
+    if (digits.startsWith('267') && digits.length === 11) return `+${digits}`
+    if (digits.length === 8) return `+267${digits}`
+    return digits.length >= 7 ? `+${digits}` : ''
+  }
+
+  function organiserInputs() {
+    return pickedOrganisers
+      .map(person => ({ name: person.name.trim(), phone: toE164Phone(person.phone) }))
+      .filter(person => person.name.length > 0 && person.phone.length > 0)
   }
 
   function handleQuickAction(id: QuickActionId) {
@@ -264,25 +271,15 @@ export default function CreateFundScreen({ navigation }: Props) {
     setOrganiserSearch('')
   }
 
-  type CreatedEvent = { id: string; share_code: string | null }
   type CreatedFund  = { id: string; fund_code: string | null }
-  type CreatedEventFundResult = {
-    event_id: string
-    fund_id: string
-    fund_code: string | null
-    event_share_code: string | null
-    remaining_tokens: number
-  }
 
   // Inserts the event + pending organiser invites. Alerts and returns
   // null on failure; a missing organiser row is non-fatal.
   async function insertEventWithOrganisers(): Promise<CreatedEvent | null> {
     if (!eventDate || !eventTime) return null
 
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .insert({
-        creator_id: userId,
+    try {
+      const event = await api.events.create({
         name: eventName.trim(),
         event_type: isOtherEvent ? customEventType.trim() : eventType.id,
         event_emoji: selectedEventEmoji,
@@ -291,40 +288,14 @@ export default function CreateFundScreen({ navigation }: Props) {
         venue_name: eventVenue.trim(),
         venue_address: normalizeMapsUrl(eventVenueMapLink) ?? normalizeMapsUrl(eventVenue),
         currency_code: currency,
+        organisers: organiserInputs(),
       })
-      .select('id, share_code')
-      .single()
-
-    if (eventError || !event) {
+      return { id: event.id, share_code: event.share_code }
+    } catch (error) {
       hapticError()
-      Alert.alert('Could not create event', eventError?.message ?? 'Please try again.')
+      Alert.alert('Could not create event', toApiUiError(error).message)
       return null
     }
-
-    const organiserRows = pickedOrganisers
-      .filter(person => person.name.trim().length > 0 || person.phone?.trim())
-      .map(person => ({
-        event_id: event.id,
-        invited_name: person.name.trim() || null,
-        invited_phone: person.phone?.trim() || null,
-        invited_by: userId,
-        status: 'pending',
-      }))
-
-    if (organiserRows.length > 0) {
-      const { error: organisersError } = await supabase
-        .from('event_organisers')
-        .insert(organiserRows)
-
-      if (organisersError) {
-        Alert.alert(
-          'Event created',
-          'Your event was created, but the organisers could not be added. You can add them later.'
-        )
-      }
-    }
-
-    return event
   }
 
   // Inserts the fund and links the event when given. The database creates the
@@ -336,55 +307,23 @@ export default function CreateFundScreen({ navigation }: Props) {
     deadline: string | null
     linkedEvent: CreatedEvent | null
   }): Promise<CreatedFund | null> {
-    const { data: fund, error: fundError } = await supabase
-      .from('funds')
-      .insert({
-        owner_id:              userId,
+    try {
+      const fund = await api.funds.create({
         title:                 opts.title,
         fund_type:             opts.linkedEvent ? 'eventFund' : 'fund',
         fund_emoji:            selectedEmoji.emoji,
-        goal_amount:           opts.goalAmount,
+        goal_amount:           opts.goalAmount === null ? null : String(opts.goalAmount),
         contribution_deadline: opts.deadline,
         currency_code:         currency,
-        status:                'active',
         is_private:            isPrivate,
-        ...(opts.linkedEvent ? { linked_event_id: opts.linkedEvent.id } : {}),
+        linked_event_id:       opts.linkedEvent?.id ?? null,
       })
-      .select('id, fund_code')
-      .single()
-
-    if (fundError || !fund) {
+      return { id: fund.id, fund_code: fund.fund_code }
+    } catch (error) {
       hapticError()
-      Alert.alert('Could not create fund', fundError?.message ?? 'Please try again.')
+      Alert.alert('Could not create fund', toApiUiError(error).message)
       return null
     }
-
-    if (opts.linkedEvent) {
-      const [eventLinkResult, linkRowResult] = await Promise.all([
-        supabase
-          .from('events')
-          .update({ linked_fund_id: fund.id })
-          .eq('id', opts.linkedEvent.id),
-        supabase
-          .from('event_fund_links')
-          .insert({
-            event_id:   opts.linkedEvent.id,
-            fund_id:    fund.id,
-            linked_by:  userId,
-            link_type:  'eventFund',
-            is_active:  true,
-          }),
-      ])
-
-      if (eventLinkResult.error || linkRowResult.error) {
-        Alert.alert(
-          'Event and fund created',
-          'The items were created, but part of their link could not be saved. They will still appear in your items.'
-        )
-      }
-    }
-
-    return fund
   }
 
   async function handleCreateEvent() {
@@ -479,30 +418,30 @@ export default function CreateFundScreen({ navigation }: Props) {
     try {
       const budgetAmount = parseAmount(eventBudget)
       const fundTitle = name.trim() || `${eventName.trim()} Fund`
-      const { data, error } = await supabase.rpc('create_event_fund', {
-        p_event_name: eventName.trim(),
-        p_event_type: isOtherEvent ? customEventType.trim() : eventType.id,
-        p_event_emoji: selectedEventEmoji,
-        p_event_date: formatDateISO(eventDate),
-        p_event_time: formatTimeISO(eventTime),
-        p_event_venue: eventVenue.trim(),
-        p_fund_title: fundTitle,
-        p_currency_code: currency,
-        p_budget: budgetAmount,
-        p_goal_percentage: fundGoalPercent,
-        p_is_private: isPrivate,
-        p_organisers: pickedOrganisers.map(person => ({
-          name: person.name.trim(),
-          phone: person.phone?.trim() ?? '',
-        })),
-      }).single()
-
-      if (error || !data) {
-        if (error?.message.includes('INSUFFICIENT_TOKENS')) {
+      let created
+      try {
+        created = await api.events.createFund({
+          event_name: eventName.trim(),
+          event_type: isOtherEvent ? customEventType.trim() : eventType.id,
+          event_emoji: selectedEventEmoji,
+          event_date: formatDateISO(eventDate),
+          event_time: formatTimeISO(eventTime),
+          event_venue: eventVenue.trim(),
+          venue_address: normalizeMapsUrl(eventVenueMapLink) ?? normalizeMapsUrl(eventVenue),
+          fund_title: fundTitle,
+          currency_code: currency,
+          budget: String(budgetAmount),
+          goal_percentage: fundGoalPercent,
+          is_private: isPrivate,
+          organisers: organiserInputs(),
+        })
+      } catch (error) {
+        const uiError = toApiUiError(error)
+        if (uiError.kind === 'validation' && uiError.message.toLowerCase().includes('tokens')) {
           await refreshProfile()
           Alert.alert(
             'Not enough tokens',
-            error.message.replace('INSUFFICIENT_TOKENS: ', ''),
+            uiError.message,
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Go to Tokens', onPress: () => navigation.navigate('TokenPurchase') },
@@ -510,23 +449,10 @@ export default function CreateFundScreen({ navigation }: Props) {
           )
           return
         }
-        throw error ?? new Error('The Event + Fund could not be created.')
+        throw error
       }
-
-      const created = data as CreatedEventFundResult
-      const venueMapLink = normalizeMapsUrl(eventVenueMapLink) ?? normalizeMapsUrl(eventVenue)
-      if (venueMapLink) {
-        const { error: venueLinkError } = await supabase
-          .from('events')
-          .update({ venue_address: venueMapLink })
-          .eq('id', created.event_id)
-
-        if (venueLinkError) {
-          Alert.alert(
-            'Event + Fund created',
-            'Your event was created, but its Maps link could not be saved. You can still find the venue by name.',
-          )
-        }
+      if (!created.venue_address_saved) {
+        Alert.alert('Event + Fund created', 'Your event was created, but its Maps link could not be saved. You can still find the venue by name.')
       }
       await refreshProfile()
       hapticSuccess()
@@ -542,7 +468,7 @@ export default function CreateFundScreen({ navigation }: Props) {
         fundId:     created.fund_id,
       })
     } catch (error) {
-      Alert.alert('Could not create event fund', readableError(error, 'Please try again.'))
+      Alert.alert('Could not create event fund', toApiUiError(error).message)
     } finally {
       setIsCreatingFund(false)
     }

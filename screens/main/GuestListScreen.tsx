@@ -8,10 +8,8 @@ import { RouteProp, useFocusEffect } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
-import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../context/AuthContext'
-import { loadMyFundPermissions } from '../../lib/useFundPermissions'
-import type { FundPermission } from '../../lib/fundPermissions'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import LoadingOverlay from '../../components/LoadingOverlay'
 
 type Props = {
@@ -34,7 +32,6 @@ type Guest = {
 
 export default function GuestListScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
-  const { userId } = useAuth()
   const styles = makeStyles(colors)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
@@ -44,49 +41,33 @@ export default function GuestListScreen({ navigation, route }: Props) {
 
   useFocusEffect(useCallback(() => {
     let active = true
+    const controller = new AbortController()
     permissionAlerted.current = false
     setCanManageGuests(null)
+    setGuests([])
 
     async function load() {
-      const [eventResult, organiserResult] = await Promise.all([
-        supabase
-          .from('events')
-          .select('creator_id, linked_fund_id')
-          .eq('id', route.params.eventId)
-          .single(),
-        userId
-          ? supabase
-            .from('event_organisers')
-            .select('id')
-            .eq('event_id', route.params.eventId)
-            .eq('user_id', userId)
-            .eq('status', 'active')
-            .maybeSingle()
-          : Promise.resolve({ data: null }),
-      ])
-      if (!active) return
-      if (eventResult.error || !eventResult.data) {
+      let workspace
+      try {
+        workspace = await runApiRead(
+          call => api.events.workspace(route.params.eventId, call),
+          { signal: controller.signal },
+        )
+      } catch (error) {
+        if (!active || controller.signal.aborted) return
         setCanManageGuests(false)
         Alert.alert(
           'Guest list unavailable',
-          eventResult.error?.message ?? 'This event could not be loaded.',
+          toApiUiError(error, controller.signal).message,
           [{ text: 'Go back', onPress: () => navigation.goBack() }],
         )
         return
       }
-
-      const permissions = eventResult.data?.linked_fund_id
-        ? await loadMyFundPermissions(eventResult.data.linked_fund_id)
-          .catch(() => new Set<FundPermission>())
-        : new Set<FundPermission>()
       if (!active) return
 
-      const allowed = Boolean(
-        eventResult.data
-        && (eventResult.data.creator_id === userId
-          || organiserResult.data
-          || permissions.has('manage_event_guests')),
-      )
+      const allowed = workspace.capabilities.is_creator
+        || workspace.capabilities.is_organiser
+        || workspace.capabilities.linked_fund_permissions.includes('manage_event_guests')
       setCanManageGuests(allowed)
       if (!allowed) {
         if (!permissionAlerted.current) {
@@ -100,18 +81,11 @@ export default function GuestListScreen({ navigation, route }: Props) {
         return
       }
 
-      const { data } = await supabase
-        .from('event_guests')
-        .select('id, guest_name, guest_phone, rsvp_status, plus_ones')
-        .eq('event_id', route.params.eventId)
-        .order('invited_at', { ascending: false })
-      if (!active) return
-
-      setGuests((data ?? []).map(row => {
+      setGuests(workspace.guests.map(row => {
         const name: string = String(row.guest_name?.trim() || row.guest_phone?.trim() || 'Guest')
-        const status: GuestStatus = row.rsvp_status === 'yes' || row.rsvp_status === 'confirmed'
+        const status: GuestStatus = row.rsvp_status === 'yes'
           ? 'yes'
-          : row.rsvp_status === 'no' || row.rsvp_status === 'declined'
+          : row.rsvp_status === 'no'
             ? 'no'
             : 'pending'
         const plusOnes = Math.max(0, Number(row.plus_ones ?? 0))
@@ -128,8 +102,8 @@ export default function GuestListScreen({ navigation, route }: Props) {
     }
 
     void load()
-    return () => { active = false }
-  }, [navigation, route.params.eventId, userId]))
+    return () => { active = false; controller.abort() }
+  }, [navigation, route.params.eventId]))
 
   const visibleGuests = guests.filter(guest => {
     const matchesFilter = filter === 'all' || guest.status === filter

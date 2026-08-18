@@ -19,6 +19,17 @@ Authenticated calls require `Authorization: Bearer <supabase-access-token>`. The
 | `GET` | `/api/v1/events` | `ListEventsRequest` query | `Paginated<EventSummary>` | Caller-scoped `events` query; RLS decides visibility. |
 | `GET` | `/api/v1/events/:eventId` | UUID path parameter | `{ event: Event; guests: EventGuest[] }` | Caller-scoped `events` and `event_guests` queries; RLS decides visibility. |
 | `POST` | `/api/v1/events` | `CreateEventRequest` | `Event` | `create_standalone_event(...)` |
+| `PATCH` | `/api/v1/events/:eventId` | `UpdateEventRequest` | `Event` | Caller-scoped event update; RLS decides authorization. |
+| `DELETE` | `/api/v1/events/:eventId` | UUID path parameter | `{}` | `delete_event_only(...)` |
+| `GET` | `/api/v1/events/:eventId/workspace` | UUID path parameter | `EventWorkspace` | Caller-scoped event, guest, budget, announcement, organiser, permission, and optional fund-workspace reads. |
+| `POST` | `/api/v1/events/:eventId/leave` | UUID path parameter | `LeftEvent` | `leave_event(...)` |
+| `POST` | `/api/v1/events/:eventId/complete` | `CompleteEventRequest` | `Event` | Caller-scoped standalone-event completion; RLS decides authorization. |
+| `GET/PUT` | `/api/v1/events/:eventId/budget` | UUID path parameter / `UpdateEventBudgetRequest` | `EventBudget \| null` / `EventBudget` | Caller-scoped budget read/upsert; RLS decides authorization. |
+| `POST` | `/api/v1/events/:eventId/announcements` | `CreateEventAnnouncementRequest` | `EventAnnouncement` | Caller-scoped announcement insert; RLS decides authorization. |
+| `POST` | `/api/v1/events/:eventId/organiser-invites` | `InviteEventOrganiserRequest` | `{}` | `invite_event_fund_organiser(...)` |
+| `GET` | `/api/v1/events/invite-preview` | `code` query | `EventInvitePreview` | `find_event_by_code(...)` |
+| `POST` | `/api/v1/events/join` | `JoinEventRequest` | `JoinedEvent` | `join_event_by_code(...)` |
+| `POST` | `/api/v1/events/event-funds` | `CreateEventFundRequest` | `CreatedEventFund` | `create_event_fund(...)`, followed by a caller-scoped venue-address update when supplied. |
 | `GET` | `/api/v1/funds` | `ListFundsRequest` query | `Paginated<FundSummary>` | Caller-scoped `funds` query; RLS decides visibility. |
 | `GET` | `/api/v1/funds/:fundId` | UUID path parameter | `FundDetail` | Caller-scoped fund, membership, contribution, expense, and member queries; RLS decides visibility. |
 | `POST` | `/api/v1/funds` | `CreateFundRequest` | `Fund` | A linked `eventFund` uses `create_fund_for_existing_event(...)`; an unlinked standalone fund is one caller-scoped RLS insert. |

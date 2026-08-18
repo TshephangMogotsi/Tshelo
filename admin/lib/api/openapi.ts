@@ -408,6 +408,91 @@ export const tsheloOpenApiDocument = {
           ...standardErrors,
         },
       },
+      patch: {
+        tags: ['Events'], operationId: 'updateEvent', summary: 'Update an event',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', minProperties: 1 }),
+        responses: { '200': response('Event updated.', success({ $ref: '#/components/schemas/Event' })), ...standardErrors },
+      },
+      delete: {
+        tags: ['Events'], operationId: 'deleteEvent', summary: 'Delete a standalone event',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('Event deleted.', success({ type: 'object', maxProperties: 0 })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/workspace': {
+      get: {
+        tags: ['Events'], operationId: 'getEventWorkspace', summary: 'Get the event screen workspace',
+        description: 'Returns event, guest, budget, announcement, capability, and optional linked-fund data in one typed response.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('Event workspace returned.', success({ $ref: '#/components/schemas/EventWorkspace' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/leave': {
+      post: {
+        tags: ['Events'], operationId: 'leaveEvent', summary: 'Leave an event',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('Event left.', success({ type: 'object' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/complete': {
+      post: {
+        tags: ['Events'], operationId: 'completeEvent', summary: 'Complete a standalone event',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['estimated_spend_amount'], properties: { estimated_spend_amount: { type: ['string', 'null'], pattern: '^\\d+(\\.\\d{1,2})?$' } } }),
+        responses: { '200': response('Event completed.', success({ $ref: '#/components/schemas/Event' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/budget': {
+      get: {
+        tags: ['Events'], operationId: 'getEventBudget', summary: 'Get an event budget',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('Event budget returned.', success({ oneOf: [{ $ref: '#/components/schemas/EventBudget' }, { type: 'null' }] })), ...standardErrors },
+      },
+      put: {
+        tags: ['Events'], operationId: 'updateEventBudget', summary: 'Create or update an event budget',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['total_budget', 'currency_code'], properties: { total_budget: { type: 'string' }, currency_code: { type: 'string', pattern: '^[A-Z]{3}$' } } }),
+        responses: { '200': response('Event budget updated.', success({ $ref: '#/components/schemas/EventBudget' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/announcements': {
+      post: {
+        tags: ['Events'], operationId: 'createEventAnnouncement', summary: 'Publish an event announcement',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['title', 'body'], properties: { title: { type: 'string' }, body: { type: 'string' } } }),
+        responses: { '201': response('Announcement published.', success({ $ref: '#/components/schemas/EventAnnouncement' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/organiser-invites': {
+      post: {
+        tags: ['Events'], operationId: 'inviteEventOrganiser', summary: 'Invite an Event + Fund organiser',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['name', 'phone'], properties: { name: { type: 'string' }, phone: { type: 'string', example: '+26771000000' } } }),
+        responses: { '201': response('Organiser invited.', success({ type: 'object', maxProperties: 0 })), ...standardErrors },
+      },
+    },
+    '/events/invite-preview': {
+      get: {
+        tags: ['Events'], operationId: 'previewEventInvite', summary: 'Preview an event invite code',
+        parameters: [{ name: 'code', in: 'query', required: true, schema: { type: 'string', minLength: 8, maxLength: 32 } }],
+        responses: { '200': response('Event invite returned.', success({ $ref: '#/components/schemas/EventInvitePreview' })), ...standardErrors },
+      },
+    },
+    '/events/join': {
+      post: {
+        tags: ['Events'], operationId: 'joinEvent', summary: 'Join an event by invite code',
+        requestBody: jsonBody({ type: 'object', required: ['code'], properties: { code: { type: 'string', minLength: 8, maxLength: 32 } } }),
+        responses: { '200': response('Event joined.', success({ type: 'object' })), ...standardErrors },
+      },
+    },
+    '/events/event-funds': {
+      post: {
+        tags: ['Events'], operationId: 'createEventFund', summary: 'Create an Event + Fund workspace',
+        description: 'Uses the atomic create_event_fund database function for event, fund, budget, membership, organiser invitations, and token accounting.',
+        requestBody: jsonBody({ type: 'object', required: ['event_name', 'event_type', 'event_date', 'event_time', 'event_venue', 'fund_title', 'currency_code', 'budget', 'goal_percentage'] }),
+        responses: { '201': response('Event + Fund created.', success({ type: 'object' })), ...standardErrors },
+      },
     },
     '/events/organiser-invites/sync': {
       post: {
@@ -912,6 +997,46 @@ export const tsheloOpenApiDocument = {
           user_id: { type: ['string', 'null'], format: 'uuid' }, guest_name: { type: ['string', 'null'] },
           guest_phone: { type: ['string', 'null'] }, rsvp_status: { type: 'string', enum: ['pending', 'yes', 'no', 'maybe'] },
           plus_ones: { type: 'integer' }, created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      EventBudget: {
+        type: 'object', required: ['event_id', 'total_budget', 'currency_code'],
+        properties: {
+          event_id: { type: 'string', format: 'uuid' }, total_budget: { type: 'string', example: '25000.00' },
+          currency_code: { type: 'string', pattern: '^[A-Z]{3}$' },
+        },
+      },
+      EventAnnouncement: {
+        type: 'object', required: ['id', 'event_id', 'author_id', 'author_name', 'title', 'body', 'created_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' }, event_id: { type: 'string', format: 'uuid' }, author_id: { type: 'string', format: 'uuid' },
+          author_name: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      EventInvitePreview: {
+        type: 'object',
+        required: ['id', 'name', 'event_type', 'event_date', 'status', 'organiser_name', 'has_linked_fund', 'already_joined'],
+        properties: {
+          id: { type: 'string', format: 'uuid' }, name: { type: 'string' }, event_type: { type: 'string' }, event_emoji: { type: ['string', 'null'] },
+          event_date: { type: 'string', format: 'date' }, event_time: { type: ['string', 'null'], format: 'time' }, venue_name: { type: ['string', 'null'] },
+          status: { type: 'string', enum: ['active', 'completed', 'cancelled'] }, organiser_name: { type: 'string' }, has_linked_fund: { type: 'boolean' }, already_joined: { type: 'boolean' },
+        },
+      },
+      EventWorkspace: {
+        type: 'object', required: ['event', 'guests', 'budget', 'announcements', 'capabilities', 'linked_fund'],
+        properties: {
+          event: { $ref: '#/components/schemas/Event' },
+          guests: { type: 'array', items: { $ref: '#/components/schemas/EventGuest' } },
+          budget: { oneOf: [{ $ref: '#/components/schemas/EventBudget' }, { type: 'null' }] },
+          announcements: { type: 'array', items: { $ref: '#/components/schemas/EventAnnouncement' } },
+          capabilities: {
+            type: 'object', required: ['is_creator', 'is_organiser', 'can_leave_event', 'linked_fund_permissions'],
+            properties: {
+              is_creator: { type: 'boolean' }, is_organiser: { type: 'boolean' }, can_leave_event: { type: 'boolean' },
+              linked_fund_permissions: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          linked_fund: { type: ['object', 'null'] },
         },
       },
       CreateEventRequest: {

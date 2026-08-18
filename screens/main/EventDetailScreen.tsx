@@ -27,14 +27,14 @@ import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { mapsSearchUrl, normalizeMapsUrl } from '../../lib/maps'
 import LoadingOverlay from '../../components/LoadingOverlay'
 import type { Contribution, Expense } from './fundDetail/types'
 import { isFundReadOnly } from './fundDetail/finance'
 import { buildCalendarEventDetails } from './eventDetail/calendar'
 import { parseEstimatedSpend, summarizeEventGuests } from './eventDetail/eventOnly'
-import { loadMyFundPermissions } from '../../lib/useFundPermissions'
 import type { FundPermission } from '../../lib/fundPermissions'
 import { linkedEventCapabilities } from '../../lib/fundPermissionPolicy'
 import FundDetailScreen from './FundDetailScreen'
@@ -108,34 +108,6 @@ const EVENT_HEADER_PURPLE = '#E8DDFF'
 const INK = '#0D0D0D'
 const MUTED = '#A1A1AA'
 const BORDER = '#E4E4E7'
-const EVENT_FIELDS = 'creator_id, name, description, event_date, event_time, event_end_date, event_end_time, venue_name, venue_address, share_code, linked_fund_id, currency_code, status, completed_at'
-const EVENT_OUTCOME_FIELDS = `${EVENT_FIELDS}, estimated_spend_amount`
-
-async function loadEventRow(eventId: string) {
-  const result = await supabase
-    .from('events')
-    .select(EVENT_OUTCOME_FIELDS)
-    .eq('id', eventId)
-    .single()
-
-  const missingOutcomeColumn = result.error?.code === '42703'
-    || result.error?.message?.includes('estimated_spend_amount')
-  if (!missingOutcomeColumn) return result
-
-  const fallback = await supabase
-    .from('events')
-    .select(EVENT_FIELDS)
-    .eq('id', eventId)
-    .single()
-
-  return {
-    ...fallback,
-    data: fallback.data
-      ? { ...fallback.data, estimated_spend_amount: null }
-      : null,
-  }
-}
-
 function displayEventDate(value?: string | null) {
   if (!value) return 'Date to be confirmed'
   const [year, month, day] = value.split('-').map(Number)
@@ -162,6 +134,16 @@ function announcementDate(value: string) {
   const sameDay = date.toDateString() === today.toDateString()
   if (sameDay) return date.toLocaleTimeString('en-BW', { hour: '2-digit', minute: '2-digit' })
   return date.toLocaleDateString('en-BW', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function normalizeOrganiserPhone(value: string) {
+  const trimmed = value.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  if (!digits) return ''
+  if (trimmed.startsWith('+')) return `+${digits}`
+  if (digits.startsWith('00')) return `+${digits.slice(2)}`
+  if (digits.length === 8) return `+267${digits}`
+  return `+${digits}`
 }
 
 export default function EventDetailScreen({ navigation, route }: Props) {
@@ -204,123 +186,83 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
   useFocusEffect(useCallback(() => {
     let active = true
+    const controller = new AbortController()
 
     async function loadEvent() {
       setIsLoading(true)
       setIsEventAdmin(false)
       setLinkedFundPermissions(new Set())
-      const organiserResultPromise = userId
-        ? supabase
-          .from('event_organisers')
-          .select('id')
-          .eq('event_id', eventId)
-          .eq('user_id', userId)
-          .eq('status', 'active')
-          .maybeSingle()
-        : Promise.resolve({ data: null, error: null })
-      const [eventResult, guestsResult, budgetResult, announcementsResult, organiserResult] = await Promise.all([
-        loadEventRow(eventId),
-        supabase
-          .from('event_guests')
-          .select('id, user_id, guest_name, guest_phone, rsvp_status, plus_ones')
-          .eq('event_id', eventId)
-          .order('invited_at', { ascending: false }),
-        supabase.from('event_budgets').select('total_budget, currency_code').eq('event_id', eventId).maybeSingle(),
-        supabase
-          .from('event_announcements')
-          .select('id, author_id, author_name, title, body, created_at')
-          .eq('event_id', eventId)
-          .order('created_at', { ascending: false }),
-        organiserResultPromise,
-      ])
+      try {
+        const eventWorkspace = await runApiRead(
+          call => api.events.workspace(eventId, call),
+          { signal: controller.signal },
+        )
+        if (!active || controller.signal.aborted) return
 
-      if (!active) return
-      if (eventResult.error || !eventResult.data) {
-        setIsLoading(false)
-        Alert.alert('Could not load event', eventResult.error?.message ?? 'The event is unavailable.', [
-          { text: 'Go back', onPress: () => navigation.goBack() },
-        ])
-        return
-      }
+        const row = eventWorkspace.event
+        const guests: EventGuest[] = eventWorkspace.guests.map(guest => ({
+          id: guest.id,
+          name: String(guest.guest_name?.trim() || guest.guest_phone?.trim() || 'Guest'),
+          status: guest.rsvp_status === 'yes'
+            ? 'confirmed'
+            : guest.rsvp_status === 'no'
+              ? 'declined'
+              : 'pending',
+          plusOnes: Math.max(0, Number(guest.plus_ones ?? 0)),
+        }))
+        const count = (status: GuestStatus) => guests.filter(guest => guest.status === status).length
+        const budgetAmount = eventWorkspace.budget ? Number(eventWorkspace.budget.total_budget) : null
+        const shareCode = row.share_code?.trim() || null
+        const venueName = row.venue_name?.trim() || ''
+        const venueAddress = row.venue_address?.trim() || ''
+        const venueNameMapLink = normalizeMapsUrl(venueName)
+        const venueAddressMapLink = normalizeMapsUrl(venueAddress)
+        const venueMapLink = venueAddressMapLink ?? venueNameMapLink
+        const venue = venueNameMapLink
+          ? 'Map location'
+          : venueName || (venueAddressMapLink ? 'Map location' : venueAddress) || 'Venue to be confirmed'
 
-      const row = eventResult.data
-      const guests: EventGuest[] = (guestsResult.data ?? []).map(guest => ({
-        id: guest.id,
-        name: String(guest.guest_name?.trim() || guest.guest_phone?.trim() || 'Guest'),
-        status: guest.rsvp_status === 'yes' || guest.rsvp_status === 'confirmed'
-          ? 'confirmed'
-          : guest.rsvp_status === 'no' || guest.rsvp_status === 'declined'
-            ? 'declined'
-            : 'pending',
-        plusOnes: Math.max(0, Number(guest.plus_ones ?? 0)),
-      }))
-      const count = (status: GuestStatus) => guests.filter(guest => guest.status === status).length
-      const budgetAmount = budgetResult.data ? Number(budgetResult.data.total_budget) : null
-      const shareCode = row.share_code?.trim() || null
-      const venueName = row.venue_name?.trim() || ''
-      const venueAddress = row.venue_address?.trim() || ''
-      const venueNameMapLink = normalizeMapsUrl(venueName)
-      const venueAddressMapLink = normalizeMapsUrl(venueAddress)
-      const venueMapLink = venueAddressMapLink ?? venueNameMapLink
-      const venue = venueNameMapLink
-        ? 'Map location'
-        : venueName || (venueAddressMapLink ? 'Map location' : venueAddress) || 'Venue to be confirmed'
+        setEventGuests(guests)
+        setAnnouncements(eventWorkspace.announcements.map(item => ({
+          id: item.id,
+          authorId: item.author_id,
+          authorName: item.author_name,
+          title: item.title,
+          body: item.body,
+          createdAt: item.created_at,
+        })))
+        setIsEventAdmin(eventWorkspace.capabilities.is_creator || eventWorkspace.capabilities.is_organiser)
+        setCanLeaveEvent(eventWorkspace.capabilities.can_leave_event)
+        setLinkedFundPermissions(new Set(eventWorkspace.capabilities.linked_fund_permissions))
+        setEvent({
+          creatorId: row.creator_id,
+          title: row.name,
+          status: row.status ?? 'active',
+          completedAt: row.completed_at ?? null,
+          estimatedSpendAmount: row.estimated_spend_amount == null ? null : Number(row.estimated_spend_amount),
+          description: row.description ?? null,
+          date: displayEventDate(row.event_date),
+          dateIso: row.event_date,
+          time: row.event_time ?? null,
+          endDateIso: row.event_end_date ?? null,
+          endTime: row.event_end_time ?? null,
+          venue,
+          venueMapLink,
+          venueSearchText: venueAddressMapLink ? venueName : venueAddress || venueName,
+          confirmed: count('confirmed'),
+          pending: count('pending'),
+          declined: count('declined'),
+          shareCode,
+          rsvpLink: shareCode ? `RSVP code: ${shareCode}` : 'RSVP link unavailable',
+          budgetAmount: budgetAmount !== null && Number.isFinite(budgetAmount) ? budgetAmount : null,
+          budgetCurrency: eventWorkspace.budget?.currency_code ?? row.currency_code ?? 'BWP',
+          linkedFundId: row.linked_fund_id ?? null,
+        })
+        if (!row.linked_fund_id) setActiveTab(previous => previous === 'budget' ? 'guests' : previous)
 
-      setEventGuests(guests)
-      setAnnouncements((announcementsResult.data ?? []).map(item => ({
-        id: item.id,
-        authorId: item.author_id,
-        authorName: item.author_name,
-        title: item.title,
-        body: item.body,
-        createdAt: item.created_at,
-      })))
-      setIsEventAdmin(row.creator_id === userId || Boolean(organiserResult.data))
-      setCanLeaveEvent(
-        row.creator_id !== userId
-        && (Boolean(organiserResult.data) || (guestsResult.data ?? []).some(guest => guest.user_id === userId))
-      )
-      setEvent({
-        creatorId: row.creator_id,
-        title: row.name,
-        status: row.status ?? 'active',
-        completedAt: row.completed_at ?? null,
-        estimatedSpendAmount: row.estimated_spend_amount == null ? null : Number(row.estimated_spend_amount),
-        description: row.description ?? null,
-        date: displayEventDate(row.event_date),
-        dateIso: row.event_date,
-        time: row.event_time ?? null,
-        endDateIso: row.event_end_date ?? null,
-        endTime: row.event_end_time ?? null,
-        venue,
-        venueMapLink,
-        venueSearchText: venueAddressMapLink ? venueName : venueAddress || venueName,
-        confirmed: count('confirmed'),
-        pending: count('pending'),
-        declined: count('declined'),
-        shareCode,
-        rsvpLink: shareCode ? `RSVP code: ${shareCode}` : 'RSVP link unavailable',
-        budgetAmount: budgetAmount !== null && Number.isFinite(budgetAmount) ? budgetAmount : null,
-        budgetCurrency: budgetResult.data?.currency_code ?? row.currency_code ?? 'BWP',
-        linkedFundId: row.linked_fund_id ?? null,
-      })
-      if (!row.linked_fund_id) {
-        setActiveTab(previous => previous === 'budget' ? 'guests' : previous)
-      }
-
-      if (row.linked_fund_id) {
-        const [fundResult, contributionResult, expenseResult, permissionResult] = await Promise.all([
-          supabase.from('funds').select('id, owner_id, title, status, currency_code, goal_amount, fund_code, contribution_deadline, is_private').eq('id', row.linked_fund_id).single(),
-          supabase.from('contributions').select('id, contributor_name, amount, pledged_amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, notes').eq('fund_id', row.linked_fund_id).order('confirmed_at', { ascending: false }),
-          supabase.from('expenses').select('id, vendor_name, description, category, amount, created_at, has_open_query, is_sponsored, sponsored_by_user_id, sponsored_by_name').eq('fund_id', row.linked_fund_id).is('deleted_at', null).order('created_at', { ascending: false }),
-          loadMyFundPermissions(row.linked_fund_id).catch(() => new Set<FundPermission>()),
-        ])
-        if (!active) return
-
-        const fundRow = fundResult.data
-        const contributionRows = (contributionResult.data ?? []) as Contribution[]
-        const expenseRows = (expenseResult.data ?? []) as Expense[]
-        if (fundRow) {
+        const linkedFund = eventWorkspace.linked_fund
+        if (linkedFund) {
+          const fundRow = linkedFund.fund
           setFund({
             id: fundRow.id,
             ownerId: fundRow.owner_id,
@@ -328,35 +270,38 @@ export default function EventDetailScreen({ navigation, route }: Props) {
             status: fundRow.status,
             currency: fundRow.currency_code,
             goal: Number(fundRow.goal_amount ?? 0),
-            contributions: contributionRows
-              .filter(item => item.status === 'confirmed' && !item.is_refunded)
-              .reduce((sum, item) => sum + Number(item.amount), 0),
-            expenses: expenseRows
-              .filter(item => !item.is_sponsored)
-              .reduce((sum, item) => sum + Number(item.amount), 0),
+            contributions: Number(fundRow.totals.raised),
+            expenses: Number(fundRow.totals.spent),
             code: fundRow.fund_code,
             deadline: fundRow.contribution_deadline ?? null,
             isPrivate: fundRow.is_private ?? false,
           })
+          setContributions(linkedFund.contributions.map(item => ({
+            ...item,
+            amount: Number(item.amount),
+            pledged_amount: item.pledged_amount == null ? null : Number(item.pledged_amount),
+            allocated_amount: Number(item.allocated_amount),
+            outstanding_amount: item.outstanding_amount == null ? null : Number(item.outstanding_amount),
+          })))
+          setExpenses(linkedFund.expenses.map(item => ({ ...item, amount: Number(item.amount) })))
         } else {
           setFund(null)
+          setContributions([])
+          setExpenses([])
         }
-        setContributions(contributionRows)
-        setExpenses(expenseRows)
-        setLinkedFundPermissions(permissionResult)
-      } else {
-        setFund(null)
-        setContributions([])
-        setExpenses([])
-        setLinkedFundPermissions(new Set())
+      } catch (error) {
+        if (!active || controller.signal.aborted) return
+        Alert.alert('Could not load event', toApiUiError(error, controller.signal).message, [
+          { text: 'Go back', onPress: () => navigation.goBack() },
+        ])
+      } finally {
+        if (active && !controller.signal.aborted) setIsLoading(false)
       }
-
-      setIsLoading(false)
     }
 
-    loadEvent()
-    return () => { active = false }
-  }, [eventId, navigation, userId]))
+    void loadEvent()
+    return () => { active = false; controller.abort() }
+  }, [eventId, navigation]))
 
   const shareMessage = event ? `You're invited to ${event.title}. ${event.rsvpLink}` : ''
 
@@ -460,35 +405,28 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     }
 
     setIsPostingAnnouncement(true)
-    const { data, error } = await supabase
-      .from('event_announcements')
-      .insert({
-        event_id: eventId,
-        author_id: userId,
+    try {
+      const data = await api.events.createAnnouncement(eventId, {
         title: cleanTitle,
         body: cleanBody,
       })
-      .select('id, author_id, author_name, title, body, created_at')
-      .single()
-    setIsPostingAnnouncement(false)
-
-    if (error || !data) {
-      Alert.alert('Could not publish announcement', error?.message ?? 'Please try again.')
-      return
+      setAnnouncements(previous => [{
+        id: data.id,
+        authorId: data.author_id,
+        authorName: data.author_name,
+        title: data.title,
+        body: data.body,
+        createdAt: data.created_at,
+      }, ...previous])
+      setAnnouncementTitle('')
+      setAnnouncementBody('')
+      setShowAnnouncementComposer(false)
+      setActiveTab('announcements')
+    } catch (error) {
+      Alert.alert('Could not publish announcement', toApiUiError(error).message)
+    } finally {
+      setIsPostingAnnouncement(false)
     }
-
-    setAnnouncements(previous => [{
-      id: data.id,
-      authorId: data.author_id,
-      authorName: data.author_name,
-      title: data.title,
-      body: data.body,
-      createdAt: data.created_at,
-    }, ...previous])
-    setAnnouncementTitle('')
-    setAnnouncementBody('')
-    setShowAnnouncementComposer(false)
-    setActiveTab('announcements')
   }
 
   async function addEventFundOrganiser() {
@@ -508,15 +446,15 @@ export default function EventDetailScreen({ navigation, route }: Props) {
       return
     }
 
-    const { error } = await supabase.rpc('invite_event_fund_organiser', {
-      p_event_id: eventId,
-      p_name: name,
-      p_phone: phone,
-    })
-    Alert.alert(
-      error ? 'Could not send invitation' : 'Invitation sent',
-      error?.message ?? `${name} can accept the organiser invitation from Notifications.`
-    )
+    try {
+      await api.events.inviteOrganiser(eventId, {
+        name,
+        phone: normalizeOrganiserPhone(phone),
+      })
+      Alert.alert('Invitation sent', `${name} can accept the organiser invitation from Notifications.`)
+    } catch (error) {
+      Alert.alert('Could not send invitation', toApiUiError(error).message)
+    }
   }
 
   function openCloseEvent() {
@@ -534,32 +472,25 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     }
 
     setIsClosingEvent(true)
-    const completedAt = new Date().toISOString()
-    const { error } = await supabase
-      .from('events')
-      .update({
-        status: 'completed',
-        completed_at: completedAt,
-        estimated_spend_amount: amount,
-        updated_at: completedAt,
+    try {
+      const completed = await api.events.complete(eventId, {
+        estimated_spend_amount: amount == null ? null : String(amount),
       })
-      .eq('id', eventId)
-      .is('linked_fund_id', null)
-    setIsClosingEvent(false)
-
-    if (error) {
-      Alert.alert('Could not close event', error.message)
-      return
+      setEvent(previous => previous ? {
+        ...previous,
+        status: completed.status,
+        completedAt: completed.completed_at,
+        estimatedSpendAmount: completed.estimated_spend_amount == null
+          ? null
+          : Number(completed.estimated_spend_amount),
+      } : previous)
+      setShowCloseEvent(false)
+      Alert.alert('Event completed', 'The guest list and announcements remain available for reference.')
+    } catch (error) {
+      Alert.alert('Could not close event', toApiUiError(error).message)
+    } finally {
+      setIsClosingEvent(false)
     }
-
-    setEvent(previous => previous ? {
-      ...previous,
-      status: 'completed',
-      completedAt,
-      estimatedSpendAmount: amount,
-    } : previous)
-    setShowCloseEvent(false)
-    Alert.alert('Event completed', 'The guest list and announcements remain available for reference.')
   }
 
   function confirmDeleteEvent() {
@@ -577,13 +508,14 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   async function deleteEvent() {
     if (!event || event.creatorId !== userId || event.linkedFundId || isDeletingEvent) return
     setIsDeletingEvent(true)
-    const { error } = await supabase.rpc('delete_event_only', { p_event_id: eventId })
-    setIsDeletingEvent(false)
-    if (error) {
-      Alert.alert('Could not delete event', error.message)
-      return
+    try {
+      await api.events.remove(eventId)
+      navigation.reset({ index: 0, routes: [{ name: 'Tabs' as any }] })
+    } catch (error) {
+      Alert.alert('Could not delete event', toApiUiError(error).message)
+    } finally {
+      setIsDeletingEvent(false)
     }
-    navigation.reset({ index: 0, routes: [{ name: 'Tabs' as any }] })
   }
 
   function showMoreOptions() {
@@ -653,15 +585,14 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   async function leaveEvent() {
     if (!event || !canLeaveEvent || isLeavingEvent) return
     setIsLeavingEvent(true)
-    const { error } = await supabase.rpc('leave_event', { p_event_id: eventId })
-    setIsLeavingEvent(false)
-
-    if (error) {
-      Alert.alert('Could not leave event', error.message)
-      return
+    try {
+      await api.events.leave(eventId)
+      navigation.reset({ index: 0, routes: [{ name: 'Tabs' as any }] })
+    } catch (error) {
+      Alert.alert('Could not leave event', toApiUiError(error).message)
+    } finally {
+      setIsLeavingEvent(false)
     }
-
-    navigation.reset({ index: 0, routes: [{ name: 'Tabs' as any }] })
   }
 
   function toggleFundWorkspaceExpanded() {

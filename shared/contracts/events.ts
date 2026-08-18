@@ -14,6 +14,7 @@ import type {
   SearchFilter,
   Uuid,
 } from './common'
+import type { FundPermission, FundWorkspace } from './funds'
 
 export type KnownEventType = 'wedding' | 'funeral' | 'graduation' | 'birthday' | 'baby_shower' | 'kitchen_party' | 'tombstone' | 'other'
 export type EventType = ExtensibleString<KnownEventType>
@@ -103,7 +104,6 @@ export type CreateEventRequest = {
 }
 
 export type UpdateEventRequest = Partial<Omit<CreateEventRequest, 'event_type' | 'currency_code' | 'organisers'>> & {
-  event_id: Uuid
   status?: EventStatus
 }
 
@@ -113,6 +113,106 @@ export type JoinEventRequest = {
 
 export type LeaveEventRequest = {
   event_id: Uuid
+}
+
+export type EventBudget = {
+  event_id: Uuid
+  total_budget: MoneyAmount
+  currency_code: CurrencyCode
+}
+
+export type EventAnnouncement = {
+  id: Uuid
+  event_id: Uuid
+  author_id: Uuid
+  author_name: string
+  title: string
+  body: string
+  created_at: IsoDateTime
+}
+
+export type EventCapabilities = {
+  is_creator: boolean
+  is_organiser: boolean
+  can_leave_event: boolean
+  linked_fund_permissions: FundPermission[]
+}
+
+export type EventWorkspace = {
+  event: Event
+  guests: EventGuest[]
+  budget: EventBudget | null
+  announcements: EventAnnouncement[]
+  capabilities: EventCapabilities
+  linked_fund: FundWorkspace | null
+}
+
+export type EventInvitePreview = {
+  id: Uuid
+  name: string
+  event_type: EventType
+  event_emoji: string | null
+  event_date: IsoDate
+  event_time: IsoTime | null
+  venue_name: string | null
+  status: EventStatus
+  organiser_name: string
+  has_linked_fund: boolean
+  already_joined: boolean
+}
+
+export type JoinedEvent = {
+  event_id: Uuid
+  guest_id: Uuid | null
+  event_name: string
+  already_joined: boolean
+}
+
+export type LeftEvent = {
+  event_id: Uuid
+  left_as_guest: boolean
+  left_as_organiser: boolean
+}
+
+export type CreateEventFundRequest = {
+  event_name: string
+  event_type: EventType
+  event_emoji?: string | null
+  event_date: IsoDate
+  event_time: IsoTime
+  event_venue: string
+  venue_address?: string | null
+  fund_title: string
+  currency_code: CurrencyCode
+  budget: MoneyAmount
+  goal_percentage: number
+  is_private?: boolean
+  organisers?: EventOrganiserInput[]
+}
+
+export type CreatedEventFund = {
+  event_id: Uuid
+  fund_id: Uuid
+  fund_code: string | null
+  event_share_code: string | null
+  remaining_tokens: number
+  venue_address_saved: boolean
+}
+
+export type UpdateEventBudgetRequest = {
+  total_budget: MoneyAmount
+  currency_code: CurrencyCode
+}
+
+export type CreateEventAnnouncementRequest = {
+  title: string
+  body: string
+}
+
+export type InviteEventOrganiserRequest = EventOrganiserInput
+
+export type CompleteEventRequest = {
+  estimated_spend_amount: MoneyAmount | null
 }
 
 export type RespondOrganiserInviteRequest = {
@@ -138,3 +238,10 @@ export type JoinEventResponse = ApiResponse<{ event: EventSummary; guest: EventG
 export type LeaveEventResponse = EmptyResponse
 export type RespondOrganiserInviteResponse = ApiResponse<RespondOrganiserInviteResult>
 export type SyncOrganiserInvitesResponse = ApiResponse<SyncOrganiserInvitesResult>
+export type GetEventWorkspaceResponse = ApiResponse<EventWorkspace>
+export type GetEventInvitePreviewResponse = ApiResponse<EventInvitePreview>
+export type JoinEventByCodeResponse = ApiResponse<JoinedEvent>
+export type LeaveEventResultResponse = ApiResponse<LeftEvent>
+export type CreateEventFundResponse = ApiResponse<CreatedEventFund>
+export type UpdateEventBudgetResponse = ApiResponse<EventBudget>
+export type CreateEventAnnouncementResponse = ApiResponse<EventAnnouncement>

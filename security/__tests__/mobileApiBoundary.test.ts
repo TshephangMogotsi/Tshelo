@@ -8,11 +8,6 @@ const root = path.resolve(__dirname, '../..')
 const LEGACY_DIRECT_SUPABASE_DATA_FILES = [
   'lib/pushNotifications.ts',
   'lib/smsWatcher.ts',
-  'screens/main/CreateFundScreen.tsx',
-  'screens/main/EventBudgetScreen.tsx',
-  'screens/main/EventDetailScreen.tsx',
-  'screens/main/GuestListScreen.tsx',
-  'screens/main/JoinEventScreen.tsx',
 ].sort()
 
 const DIRECT_SUPABASE_DATA = /\bsupabase\s*\.\s*(?:from|rpc|functions|storage)\b/

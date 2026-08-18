@@ -22,7 +22,17 @@ import type {
   UpdateContributionRequest,
 } from '@shared/contracts/contributions'
 import { PAYMENT_METHODS } from '@shared/contracts/contributions'
-import type { CreateEventRequest, RespondOrganiserInviteRequest } from '@shared/contracts/events'
+import type {
+  CompleteEventRequest,
+  CreateEventAnnouncementRequest,
+  CreateEventFundRequest,
+  CreateEventRequest,
+  InviteEventOrganiserRequest,
+  JoinEventRequest,
+  RespondOrganiserInviteRequest,
+  UpdateEventBudgetRequest,
+  UpdateEventRequest,
+} from '@shared/contracts/events'
 import type {
   ConfigureFundAdminRequest,
   CreateFundRequest,
@@ -236,6 +246,142 @@ export function validateCreateEventRequest(input: unknown): ValidationResult<Cre
   }
 
   return finish<CreateEventRequest>(value, errors)
+}
+
+function validateEventCodeBody(input: unknown): ValidationResult<JoinEventRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['code'], errors)
+  requireString(value, 'code', errors, 8, 32)
+  return finish<JoinEventRequest>(value, errors)
+}
+
+export const validateJoinEventRequest = validateEventCodeBody
+
+export function validateCreateEventFundRequest(input: unknown): ValidationResult<CreateEventFundRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, [
+    'event_name', 'event_type', 'event_emoji', 'event_date', 'event_time',
+    'event_venue', 'venue_address', 'fund_title', 'currency_code', 'budget',
+    'goal_percentage', 'is_private', 'organisers',
+  ], errors)
+  requireString(value, 'event_name', errors, 3, 200)
+  requireString(value, 'event_type', errors, 2, 50)
+  optionalString(value, 'event_emoji', errors, 16)
+  optionalDate(value, 'event_date', errors)
+  if (value.event_date === undefined || value.event_date === null) errors.push(issue('event_date', 'required', 'This field is required.'))
+  optionalTime(value, 'event_time', errors)
+  if (value.event_time === undefined || value.event_time === null) errors.push(issue('event_time', 'required', 'This field is required.'))
+  requireString(value, 'event_venue', errors, 3, 200)
+  optionalString(value, 'venue_address', errors, 2000)
+  requireString(value, 'fund_title', errors, 3, 200)
+  validateCurrency(value, errors)
+  validateMoney(value, 'budget', errors)
+  if (!Number.isInteger(value.goal_percentage) || Number(value.goal_percentage) < 1 || Number(value.goal_percentage) > 100) {
+    errors.push(issue('goal_percentage', 'invalid_percentage', 'Must be an integer between 1 and 100.'))
+  }
+  optionalBoolean(value, 'is_private', errors)
+  if (value.organisers !== undefined) {
+    if (!Array.isArray(value.organisers) || value.organisers.length > 20) {
+      errors.push(issue('organisers', 'invalid_array', 'Must be an array containing at most 20 organisers.'))
+    } else {
+      value.organisers.forEach((organiser, index) => {
+        const record = objectValue(organiser)
+        if (!record) {
+          errors.push(issue(`organisers.${index}`, 'invalid_type', 'Must be an object.'))
+          return
+        }
+        rejectUnknownFields(record, ['name', 'phone'], errors, `organisers.${index}`)
+        if (typeof record.name !== 'string' || record.name.trim().length < 1 || record.name.trim().length > 100) {
+          errors.push(issue(`organisers.${index}.name`, 'invalid_string', 'Must contain between 1 and 100 characters.'))
+        }
+        if (typeof record.phone !== 'string' || !PHONE_PATTERN.test(record.phone)) {
+          errors.push(issue(`organisers.${index}.phone`, 'invalid_phone', 'Must be an E.164 phone number.'))
+        }
+      })
+    }
+  }
+  return finish<CreateEventFundRequest>(value, errors)
+}
+
+export function validateUpdateEventRequest(input: unknown): ValidationResult<UpdateEventRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const allowed = [
+    'name', 'description', 'event_emoji', 'event_date', 'event_time', 'event_end_date',
+    'event_end_time', 'venue_name', 'venue_address', 'status',
+  ] as const
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, allowed, errors)
+  if (value.name !== undefined) requireString(value, 'name', errors, 3, 200)
+  optionalString(value, 'description', errors, 4000)
+  optionalString(value, 'event_emoji', errors, 16)
+  optionalString(value, 'venue_name', errors, 200)
+  optionalString(value, 'venue_address', errors, 2000)
+  optionalDate(value, 'event_date', errors)
+  optionalDate(value, 'event_end_date', errors)
+  optionalTime(value, 'event_time', errors)
+  optionalTime(value, 'event_end_time', errors)
+  if (value.status !== undefined && !['active', 'completed', 'cancelled'].includes(String(value.status))) {
+    errors.push(issue('status', 'invalid_status', 'Unsupported event status.'))
+  }
+  if (allowed.every(field => value[field] === undefined)) errors.push(issue('body', 'empty_patch', 'At least one supported field is required.'))
+  return finish<UpdateEventRequest>(value, errors)
+}
+
+export function validateCompleteEventRequest(input: unknown): ValidationResult<CompleteEventRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['estimated_spend_amount'], errors)
+  const amount = value.estimated_spend_amount
+  if (amount !== null && (
+    typeof amount !== 'string'
+    || !MONEY_PATTERN.test(amount)
+    || Number(amount) < 0
+  )) {
+    errors.push(issue(
+      'estimated_spend_amount',
+      'invalid_money',
+      'Must be a non-negative decimal string with at most two decimal places, or null.',
+    ))
+  }
+  return finish<CompleteEventRequest>(value, errors)
+}
+
+export function validateUpdateEventBudgetRequest(input: unknown): ValidationResult<UpdateEventBudgetRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['total_budget', 'currency_code'], errors)
+  validateMoney(value, 'total_budget', errors)
+  validateCurrency(value, errors)
+  return finish<UpdateEventBudgetRequest>(value, errors)
+}
+
+export function validateCreateEventAnnouncementRequest(input: unknown): ValidationResult<CreateEventAnnouncementRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['title', 'body'], errors)
+  requireString(value, 'title', errors, 3, 120)
+  requireString(value, 'body', errors, 3, 4000)
+  return finish<CreateEventAnnouncementRequest>(value, errors)
+}
+
+export function validateInviteEventOrganiserRequest(input: unknown): ValidationResult<InviteEventOrganiserRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['name', 'phone'], errors)
+  requireString(value, 'name', errors, 1, 100)
+  if (typeof value.phone !== 'string' || !PHONE_PATTERN.test(value.phone)) {
+    errors.push(issue('phone', 'invalid_phone', 'Must be an E.164 phone number.'))
+  }
+  return finish<InviteEventOrganiserRequest>(value, errors)
 }
 
 export function validateUpdateCurrentUserRequest(

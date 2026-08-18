@@ -80,6 +80,7 @@ describe('security hardening invariants', () => {
 
   it('joins events as guests without granting linked-fund membership', () => {
     const joinScreen = read('screens/main/JoinEventScreen.tsx')
+    const eventApi = read('admin/lib/data/api-events.ts')
     const homeLoader = read('screens/main/home/loadHomeItems.ts')
 
     expect(eventJoinMigration).toContain('CREATE OR REPLACE FUNCTION public.find_event_by_code')
@@ -89,8 +90,10 @@ describe('security hardening invariants', () => {
     expect(eventJoinMigration).not.toContain('INSERT INTO public.fund_members')
     expect(eventJoinMigration).toContain('GRANT EXECUTE ON FUNCTION public.join_event_by_code(text) TO authenticated, service_role')
     expect(eventJoinMigration).toContain("substr(replace(gen_random_uuid()::text, '-', ''), 1, 20)")
-    expect(joinScreen).toContain(".rpc('find_event_by_code'")
-    expect(joinScreen).toContain(".rpc('join_event_by_code'")
+    expect(joinScreen).toContain('api.events.previewInvite(')
+    expect(joinScreen).toContain('api.events.join(')
+    expect(eventApi).toContain(".rpc('find_event_by_code'")
+    expect(eventApi).toContain(".rpc('join_event_by_code'")
     expect(joinScreen).not.toContain(".from('event_guests')")
     expect(homeLoader).toContain('api.home.summary')
     expect(read('admin/lib/data/api-funds.ts')).toContain("from('event_guests')")
@@ -100,6 +103,7 @@ describe('security hardening invariants', () => {
     const fundScreen = read('screens/main/FundDetailScreen.tsx')
     const fundApi = read('admin/lib/data/api-funds.ts')
     const eventScreen = read('screens/main/EventDetailScreen.tsx')
+    const eventApi = read('admin/lib/data/api-events.ts')
 
     expect(leaveMigration).toContain('CREATE OR REPLACE FUNCTION public.leave_fund')
     expect(leaveMigration).toContain('CREATE OR REPLACE FUNCTION public.leave_event')
@@ -114,7 +118,8 @@ describe('security hardening invariants', () => {
     expect(fundScreen).toContain('api.funds.leave(')
     expect(fundApi).toContain(".rpc('leave_fund'")
     expect(leaveMigration).toContain('GRANT EXECUTE ON FUNCTION public.leave_event(uuid) TO authenticated, service_role')
-    expect(eventScreen).toContain("supabase.rpc('leave_event'")
+    expect(eventScreen).toContain('api.events.leave(')
+    expect(eventApi).toContain(".rpc('leave_event'")
     expect(fundScreen).toContain('This will not remove you from the linked event.')
     expect(eventScreen).toContain('This will not remove you from the linked contribution fund.')
   })
@@ -160,8 +165,10 @@ describe('security hardening invariants', () => {
     expect(eventFundMigration).toContain('REVOKE ALL ON FUNCTION public.create_event_fund')
 
     const createScreen = read('screens/main/CreateFundScreen.tsx')
-    expect(createScreen).toContain(".rpc('create_event_fund'")
-    expect(createScreen).toContain("error?.message.includes('INSUFFICIENT_TOKENS')")
+    const eventApi = read('admin/lib/data/api-events.ts')
+    expect(createScreen).toContain('api.events.createFund(')
+    expect(eventApi).toContain(".rpc('create_event_fund'")
+    expect(eventApi).toContain("result.error.message.includes('INSUFFICIENT_TOKENS')")
   })
 
   it('accepts bounded custom Event + Fund types without weakening the paid transaction', () => {
@@ -294,8 +301,8 @@ describe('security hardening invariants', () => {
     expect(permissionPolicy).toContain("permissions.has('manage_event_guests')")
     expect(permissionPolicy).toContain("permissions.has('post_event_announcements')")
     expect(permissionPolicy).toContain("permissions.has('manage_event_budget')")
-    expect(eventBudget).toContain("permissions.has('manage_event_budget')")
-    expect(guestList).toContain("permissions.has('manage_event_guests')")
+    expect(eventBudget).toContain("linked_fund_permissions.includes('manage_event_budget')")
+    expect(guestList).toContain("linked_fund_permissions.includes('manage_event_guests')")
     expect(fundDetail).not.toMatch(/role\s*===\s*['"]admin['"]/)
   })
 
@@ -363,7 +370,9 @@ describe('security hardening invariants', () => {
     expect(eventDeletionMigration).toContain('deleted_at IS NULL')
 
     const eventScreen = read('screens/main/EventDetailScreen.tsx')
-    expect(eventScreen).toContain("supabase.rpc('delete_event_only'")
+    const eventApi = read('admin/lib/data/api-events.ts')
+    expect(eventScreen).toContain('api.events.remove(')
+    expect(eventApi).toContain(".rpc('delete_event_only'")
     expect(eventScreen).toContain('!event.linkedFundId && event.creatorId === userId')
   })
 
