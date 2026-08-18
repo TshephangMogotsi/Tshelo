@@ -12,6 +12,9 @@ describe('profile, notification, and reward API slice', () => {
   const client = read('shared/api-client/client.ts')
   const validation = read('admin/lib/api/validation.ts')
   const query = read('admin/lib/api/query.ts')
+  const connectionSearchFix = read(
+    'supabase/migrations/20260818130000_fix_connection_search_order.sql',
+  )
 
   const mutationRoutes = [
     'admin/app/api/v1/users/me/route.ts',
@@ -64,6 +67,12 @@ describe('profile, notification, and reward API slice', () => {
     expect(query).toContain('parseConnectionSearchQuery')
     expect(query).toContain('parseListNotificationsQuery')
     expect(query).toContain('Search text must contain between 2 and 100 characters.')
+  })
+
+  it('orders distinct connection results by the selected name output', () => {
+    expect(connectionSearchFix).toContain('SELECT DISTINCT u.id, u.name::text, u.phone::text')
+    expect(connectionSearchFix).toContain('ORDER BY 2')
+    expect(connectionSearchFix).not.toContain('ORDER BY u.name')
   })
 
   it('exposes every operation through the shared typed client', () => {
