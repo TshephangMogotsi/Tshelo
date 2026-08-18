@@ -4,10 +4,10 @@ This framework-neutral client is the integration boundary for the React Native
 app, Expo web, and interactive admin components. It consumes the types in
 `shared/contracts` and unwraps successful `ApiResponse<T>` envelopes.
 
-It provides typed methods for the currently implemented users, funds, events,
-contributions, support-ticket, admin-audit, moderation, and platform-admin
-routes. List filters use the same contract fields as the API, including opaque
-pagination cursors.
+It provides typed methods for the implemented users, funds, reports and exports,
+events, notifications, rewards, contributions, expenses, receipts, Rich Auntie,
+support-ticket, admin-audit, moderation, and platform-admin routes. List filters
+use the same contract fields as the API, including opaque pagination cursors.
 
 ## Authentication
 
@@ -31,6 +31,5 @@ statuses throw `TsheloApiProtocolError`.
 - Admin Server Components continue calling server-side data services directly;
   they should not make HTTP requests back into their own deployment.
 
-Existing mobile screens remain on their current Supabase path until the API
-migrations and routes are deployed. Migrate one resource flow at a time after
-running the authenticated API verifier, keeping a rollback path during rollout.
+Mobile business-data screens use this client; Supabase remains the direct mobile
+boundary only for Auth session/OTP operations and token acquisition.

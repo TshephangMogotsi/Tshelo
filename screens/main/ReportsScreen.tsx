@@ -8,10 +8,11 @@ import * as Sharing from 'expo-sharing'
 import * as FileSystem from 'expo-file-system/legacy'
 import { Asset } from 'expo-asset'
 import { useTheme } from '../../context/ThemeContext'
-import { useAuth } from '../../context/AuthContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
-import { supabase } from '../../lib/supabase'
+import { api } from '../../lib/api'
+import { runApiRead } from '../../lib/apiScreen'
+import type { FundExport, FundExportType, FundReportBundle } from '@shared/contracts'
 import LoadingOverlay from '../../components/LoadingOverlay'
 import { loadHomeItems } from './home/loadHomeItems'
 import { buildFundReportHtml } from './reports/buildFundReportHtml'
@@ -41,23 +42,7 @@ type PledgeEntry = {
   description: string
 }
 type ChartPoint = { key: string; label: string; contributions: number; expenses: number }
-type ExportRecord = { id: string; fund_id: string; export_type: string; created_at: string }
-
-type ReportQueryError = { message: string }
-
-async function fetchAllReportRows<T>(
-  loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: ReportQueryError | null }>,
-) {
-  const pageSize = 500
-  const rows: T[] = []
-  for (let from = 0; ; from += pageSize) {
-    const result = await loadPage(from, from + pageSize - 1)
-    if (result.error) throw result.error
-    const page = result.data ?? []
-    rows.push(...page)
-    if (page.length < pageSize) return rows
-  }
-}
+type ExportRecord = FundExport
 
 const PERIOD_MONTHS: Record<Period, number> = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 }
 
@@ -122,7 +107,6 @@ const stylesForChart = StyleSheet.create({
 
 export default function ReportsScreen() {
   const { colors, isDark } = useTheme()
-  const { userId } = useAuth()
   const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('6M')
   const [fundId, setFundId] = useState('all')
@@ -141,31 +125,23 @@ export default function ReportsScreen() {
   const lastLoadedAtRef = useRef(0)
   const pdfHtmlCacheRef = useRef(new Map<string, { html: string; createdAt: number }>())
   const pdfHtmlInFlightRef = useRef(new Map<string, Promise<string>>())
+  const reportByFundRef = useRef(new Map<string, FundReportBundle>())
 
   useFocusEffect(useCallback(() => {
+    const controller = new AbortController()
     let active = true
     async function loadReports() {
-      if (!userId) {
-        setIsLoading(false)
-        return
-      }
       if (hasLoadedRef.current && Date.now() - lastLoadedAtRef.current < 30_000) return
       if (!hasLoadedRef.current) setIsLoading(true)
       setLoadError(false)
       try {
-        const items = await loadHomeItems(userId)
-        const optionById = new Map<string, FundOption>()
-        items.forEach(item => {
-          if (item.fundId && !optionById.has(item.fundId)) {
-            optionById.set(item.fundId, { id: item.fundId, title: item.kind === 'eventFund' ? `${item.title} Fund` : item.title, currency: item.currency_code })
-          }
-        })
-        const fundOptions = [...optionById.values()]
-        const ids = fundOptions.map(option => option.id)
+        const items = await loadHomeItems(undefined, controller.signal)
+        const ids = [...new Set(items.flatMap(item => item.fundId ? [item.fundId] : []))]
         if (!active) return
-        setFunds(fundOptions)
 
         if (!ids.length) {
+          reportByFundRef.current.clear()
+          setFunds([])
           setEntries([])
           setPledges([])
           setExports([])
@@ -174,35 +150,32 @@ export default function ReportsScreen() {
           return
         }
 
-        const [contributionResult, expenseResult, exportResult, pledgeBalanceResult] = await Promise.all([
-          supabase.from('contributions').select('id, fund_id, amount, pledged_amount, contributor_name, status, is_refunded, confirmed_at, created_at').in('fund_id', ids).order('created_at', { ascending: false }),
-          supabase.from('expenses').select('id, fund_id, amount, description, vendor_name, created_at, is_sponsored').in('fund_id', ids).is('deleted_at', null).order('created_at', { ascending: false }),
-          supabase.from('fund_exports').select('id, fund_id, export_type, created_at').in('fund_id', ids).order('created_at', { ascending: false }).limit(20),
-          supabase.from('contributor_pledge_balances').select('pledge_id, fund_id, contributor_name, pledged_amount, allocated_amount, created_at').in('fund_id', ids).order('created_at', { ascending: false }),
-        ])
-        if (contributionResult.error) throw contributionResult.error
-        if (expenseResult.error) throw expenseResult.error
-        if (exportResult.error) throw exportResult.error
-        if (pledgeBalanceResult.error) throw pledgeBalanceResult.error
+        const reports = await Promise.all(ids.map(id => (
+          runApiRead(call => api.funds.report(id, call), { signal: controller.signal })
+        )))
         if (!active) return
 
-        const contributionEntries: LedgerEntry[] = (contributionResult.data ?? []).filter(row => row.status === 'confirmed' && !row.is_refunded && row.confirmed_at).map(row => ({
-          id: row.id, fundId: row.fund_id, type: 'contribution', amount: Number(row.amount ?? 0), date: row.confirmed_at!, description: row.contributor_name || 'Contribution',
-        }))
-        const pledgeEntries: PledgeEntry[] = (pledgeBalanceResult.data ?? []).map(row => ({
-          id: row.pledge_id,
-          fundId: row.fund_id,
-          amount: Number(row.pledged_amount ?? 0),
-          received: Number(row.allocated_amount ?? 0),
-          date: row.created_at,
-          description: row.contributor_name || 'Pledge',
-        }))
-        const expenseEntries: LedgerEntry[] = (expenseResult.data ?? []).filter(row => !row.is_sponsored).map(row => ({
-          id: row.id, fundId: row.fund_id, type: 'expense', amount: Number(row.amount ?? 0), date: row.created_at, description: row.description || row.vendor_name || 'Expense',
-        }))
+        reportByFundRef.current = new Map(reports.map(report => [report.fund.id, report]))
+        setFunds(reports.map(report => ({ id: report.fund.id, title: report.fund.title, currency: report.fund.currency_code })))
+        const contributionEntries: LedgerEntry[] = reports.flatMap(report => report.contributions
+          .filter(row => row.status === 'confirmed' && !row.is_refunded && row.confirmed_at)
+          .map(row => ({
+            id: row.id, fundId: report.fund.id, type: 'contribution' as const,
+            amount: Number(row.amount), date: row.confirmed_at!, description: row.contributor_name || 'Contribution',
+          })))
+        const pledgeEntries: PledgeEntry[] = reports.flatMap(report => report.pledge_balances.map(row => ({
+          id: row.pledge_id, fundId: report.fund.id, amount: Number(row.pledged_amount),
+          received: Number(row.allocated_amount), date: row.created_at, description: row.contributor_name || 'Pledge',
+        })))
+        const expenseEntries: LedgerEntry[] = reports.flatMap(report => report.expenses
+          .filter(row => !row.deleted_at && !row.is_sponsored)
+          .map(row => ({
+            id: row.id, fundId: report.fund.id, type: 'expense' as const,
+            amount: Number(row.amount), date: row.created_at, description: row.description || row.vendor_name || 'Expense',
+          })))
         setEntries([...contributionEntries, ...expenseEntries].sort((a, b) => b.date.localeCompare(a.date)))
         setPledges(pledgeEntries)
-        setExports((exportResult.data ?? []) as ExportRecord[])
+        setExports(reports.flatMap(report => report.export_history).sort((a, b) => b.created_at.localeCompare(a.created_at)))
         hasLoadedRef.current = true
         lastLoadedAtRef.current = Date.now()
       } catch {
@@ -212,8 +185,8 @@ export default function ReportsScreen() {
       }
     }
     loadReports()
-    return () => { active = false }
-  }, [userId]))
+    return () => { active = false; controller.abort() }
+  }, []))
 
   const selectedFund = funds.find(fund => fund.id === fundId)
   const currency = selectedFund?.currency ?? funds[0]?.currency ?? 'BWP'
@@ -265,70 +238,31 @@ export default function ReportsScreen() {
     if (existingRequest) return existingRequest
 
     const buildRequest = (async () => {
-      const [
-        fundResult,
-        contributionResult,
-        expenseResult,
-        memberResult,
-        linkedEventResult,
-        contributorResult,
-        pledgeBalanceResult,
-        sponsorshipResult,
-        awardResult,
-        profileResult,
-        auditHistory,
-        contributionEdits,
-        expenseEdits,
-        exportHistory,
-        logoDataUri,
-      ] = await Promise.all([
-        supabase.from('funds').select('id, title, description, fund_type, fund_code, currency_code, goal_amount, status, created_at, contribution_deadline, closed_at, linked_event_id, is_private').eq('id', reportFundId).single(),
-        supabase.from('contributions').select('id, contributor_id, user_id, contributor_name, contributor_phone, amount, pledged_amount, payment_method, reference_number, status, is_refunded, confirmed_at, created_at, notes').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
-        supabase.from('expenses').select('id, description, item_name, category, amount, vendor_name, receipt_url, is_sponsored, sponsored_by_user_id, sponsored_by_name, has_open_query, created_at, updated_at, deleted_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
-        supabase.from('fund_members').select('id, user_id, invited_name, invited_phone, role, status, invited_at, joined_at, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
-        supabase.from('events').select('name, event_date, event_time, venue_name').eq('linked_fund_id', reportFundId).maybeSingle(),
-        supabase.from('fund_contributors').select('id, user_id, display_name, phone, contributor_type').eq('fund_id', reportFundId).order('display_name', { ascending: true }),
-        supabase.from('contributor_pledge_balances').select('pledge_id, contributor_id, pledged_amount, allocated_amount, outstanding_amount, pledge_state').eq('fund_id', reportFundId),
-        supabase.from('fund_sponsorship_item_progress').select('id, title, target_amount, allocated_amount, outstanding_amount, status, claimed_by_user_id, funded_at, fulfilled_at, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
-        supabase.from('rich_auntie_awards').select('id, recipient_user_id, sponsorship_item_id, reason_label, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }),
-        supabase.rpc('get_fund_member_profiles', { p_fund_id: reportFundId }),
-        fetchAllReportRows((from, to) => supabase.from('audit_log').select('id, user_id, action, entity_type, entity_id, old_values, new_values, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
-        fetchAllReportRows((from, to) => supabase.from('contribution_edits').select('id, contribution_id, edited_by, field_changed, old_value, new_value, reason, created_at, contribution:contributions!inner(fund_id)').eq('contribution.fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
-        fetchAllReportRows((from, to) => supabase.from('expense_edits').select('id, expense_id, edited_by, field_changed, old_value, new_value, reason, created_at, expense:expenses!inner(fund_id)').eq('expense.fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
-        fetchAllReportRows((from, to) => supabase.from('fund_exports').select('id, exported_by, export_type, was_free, tokens_spent, created_at').eq('fund_id', reportFundId).order('created_at', { ascending: true }).range(from, to)),
+      const [report, logoDataUri] = await Promise.all([
+        reportByFundRef.current.get(reportFundId)
+          ? Promise.resolve(reportByFundRef.current.get(reportFundId)!)
+          : runApiRead(call => api.funds.report(reportFundId, call)),
         loadReportLogoDataUri(),
       ])
-
-      if (fundResult.error || !fundResult.data) throw fundResult.error ?? new Error('Fund details are unavailable.')
-      const reportErrors = [
-        contributionResult.error,
-        expenseResult.error,
-        memberResult.error,
-        linkedEventResult.error,
-        contributorResult.error,
-        pledgeBalanceResult.error,
-        sponsorshipResult.error,
-        awardResult.error,
-        profileResult.error,
-      ].filter(Boolean)
-      if (reportErrors.length) throw reportErrors[0]
+      reportByFundRef.current.set(reportFundId, report)
 
       const html = buildFundReportHtml({
-        fund: fundResult.data,
-        contributions: contributionResult.data ?? [],
-        expenses: expenseResult.data ?? [],
-        members: memberResult.data ?? [],
-        contributors: contributorResult.data ?? [],
-        pledgeBalances: pledgeBalanceResult.data ?? [],
-        linkedEvent: linkedEventResult.data,
-        sponsorshipItems: sponsorshipResult.data ?? [],
-        richAuntieAwards: awardResult.data ?? [],
-        memberProfiles: profileResult.data ?? [],
-        auditHistory,
-        contributionEdits,
-        expenseEdits,
-        exportHistory,
+        fund: report.fund,
+        contributions: report.contributions,
+        expenses: report.expenses,
+        members: report.members,
+        contributors: report.contributors,
+        pledgeBalances: report.pledge_balances,
+        linkedEvent: report.linked_event,
+        sponsorshipItems: report.sponsorship_items,
+        richAuntieAwards: report.rich_auntie_awards,
+        memberProfiles: report.member_profiles,
+        auditHistory: report.audit_history,
+        contributionEdits: report.contribution_edits,
+        expenseEdits: report.expense_edits,
+        exportHistory: report.export_history,
         logoDataUri,
+        generatedAt: report.history_snapshot_at,
       })
       pdfHtmlCacheRef.current.set(reportFundId, { html, createdAt: Date.now() })
       return html
@@ -341,10 +275,16 @@ export default function ReportsScreen() {
     }
   }
 
-  async function logExport(type: string) {
-    if (!userId || fundId === 'all') return
-    const { data } = await supabase.from('fund_exports').insert({ fund_id: fundId, exported_by: userId, export_type: type, was_free: true, tokens_spent: 0 }).select('id, fund_id, export_type, created_at').single()
-    if (data) setExports(previous => [data as ExportRecord, ...previous])
+  async function logExport(type: FundExportType) {
+    if (fundId === 'all') return
+    const data = await api.funds.createExport(fundId, { export_type: type })
+    setExports(previous => [data, ...previous.filter(record => record.id !== data.id)])
+    const report = reportByFundRef.current.get(fundId)
+    if (report) reportByFundRef.current.set(fundId, {
+      ...report,
+      export_history: [...report.export_history, data],
+    })
+    pdfHtmlCacheRef.current.delete(fundId)
   }
 
   async function exportPdf() {
@@ -361,7 +301,7 @@ export default function ReportsScreen() {
     try {
       const html = await detailedReportHtml()
       const { uri } = await Print.printToFileAsync({ html })
-      void logExport('pdf')
+      await logExport('pdf')
       if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Share fund report' })
       else Alert.alert('Report created', uri)
     } catch (error) {
@@ -408,7 +348,16 @@ export default function ReportsScreen() {
       Alert.alert('Export access required', 'You do not have permission to share reports for this fund.')
       return
     }
-    await Share.share({ message: `Tshelo report - ${selectedFund?.title ?? 'All funds'} (${period})\nTotal in: ${money(totalContributed, currency)}\nTotal out: ${money(totalExpenses, currency)}\nAvailable balance: ${money(netBalance, currency)}\nPledged: ${money(totalPledged, currency)}\nOpen pledges: ${money(totalOutstanding, currency)}` })
+    if (isExporting) return
+    setIsExporting(true)
+    try {
+      await Share.share({ message: `Tshelo report - ${selectedFund?.title ?? 'All funds'} (${period})\nTotal in: ${money(totalContributed, currency)}\nTotal out: ${money(totalExpenses, currency)}\nAvailable balance: ${money(netBalance, currency)}\nPledged: ${money(totalPledged, currency)}\nOpen pledges: ${money(totalOutstanding, currency)}` })
+      await logExport('share')
+    } catch (error) {
+      Alert.alert('Could not share report', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -443,7 +392,7 @@ export default function ReportsScreen() {
           <Text style={styles.sectionTitle}>Export report</Text>
           <View style={styles.exportRow}>
             <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={exportPdf} disabled={isExporting || !canExportSelectedFund}><Ionicons name="document-text-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>PDF</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={shareSummary} disabled={!canExportSelectedFund}><Ionicons name="share-social-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>Share</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={shareSummary} disabled={isExporting || !canExportSelectedFund}><Ionicons name="share-social-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>Share</Text></TouchableOpacity>
             <TouchableOpacity style={[styles.exportBtn, !canExportSelectedFund && styles.exportBtnDisabled]} onPress={exportCsv} disabled={isExporting || !canExportSelectedFund}><Ionicons name="grid-outline" size={19} color={canExportSelectedFund ? colors.primary : colors.textMuted} /><Text style={[styles.exportBtnText, !canExportSelectedFund && styles.exportBtnTextDisabled]}>CSV</Text></TouchableOpacity>
           </View>
           {!canExportSelectedFund && <Text style={styles.exportHint}>{fundId === 'all' ? 'Select a specific fund to export its report.' : permissionsLoading ? 'Checking your export permission…' : 'Ask the fund owner for report export permission.'}</Text>}

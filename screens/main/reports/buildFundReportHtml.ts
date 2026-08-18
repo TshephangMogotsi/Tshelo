@@ -160,9 +160,17 @@ function money(amount: number, currency: string) {
 }
 
 function formatDate(value: string | null | undefined) {
-  return value
-    ? new Date(value).toLocaleDateString('en-BW', { day: 'numeric', month: 'long', year: 'numeric' })
-    : 'Not set'
+  if (!value) return 'Not set'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString('en-BW', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatShortDate(value: string | null | undefined) {
+  if (!value) return 'Not set'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString('en-BW', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function formatDateTime(value: string | null | undefined) {
@@ -170,7 +178,7 @@ function formatDateTime(value: string | null | undefined) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleString('en-BW', {
-    day: 'numeric',
+    day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
@@ -197,6 +205,19 @@ function emptyRow(columns: number, text: string) {
   return `<tr><td colspan="${columns}" class="empty">${escapeHtml(text)}</td></tr>`
 }
 
+function maskPhone(value: string | null) {
+  if (!value) return '-'
+  const digits = value.replace(/\D/g, '')
+  if (digits.length < 4) return '•••'
+  const country = digits.startsWith('267') && digits.length > 8 ? '267 ' : ''
+  return `${country}••• ••${digits.slice(-3)}`
+}
+
+function dateSort(value: string | null | undefined) {
+  const timestamp = value ? new Date(value).getTime() : 0
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
 export function buildFundReportHtml(data: FundReportData) {
   const {
     fund,
@@ -218,11 +239,14 @@ export function buildFundReportHtml(data: FundReportData) {
   const generatedAt = data.generatedAt ?? new Date().toISOString()
   const currency = fund.currency_code
 
-  const confirmedContributions = contributions.filter(item => item.status === 'confirmed' && !item.is_refunded)
+  const confirmedContributions = contributions
+    .filter(item => item.status === 'confirmed' && !item.is_refunded)
+    .sort((a, b) => dateSort(a.confirmed_at ?? a.created_at) - dateSort(b.confirmed_at ?? b.created_at))
   const activeExpenses = expenses.filter(item => !item.deleted_at)
   const fundExpenses = activeExpenses.filter(item => !item.is_sponsored)
   const sponsoredPurchases = activeExpenses.filter(item => item.is_sponsored)
   const openPledges = pledgeBalances.filter(item => Number(item.outstanding_amount ?? 0) > 0)
+  const settledPledges = pledgeBalances.filter(item => Number(item.pledged_amount ?? 0) > 0 && Number(item.outstanding_amount ?? 0) <= 0)
 
   const totalIn = confirmedContributions.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
   const totalOut = fundExpenses.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
@@ -231,8 +255,9 @@ export function buildFundReportHtml(data: FundReportData) {
   const balance = totalIn - totalOut
   const goal = Math.max(Number(fund.goal_amount ?? 0), 0)
   const targetOutstanding = Math.max(goal - totalIn, 0)
-  const overTarget = Math.max(totalIn - goal, 0)
   const progress = goal > 0 ? Math.min(Math.round(totalIn / goal * 100), 999) : 0
+  const missingReferenceCount = confirmedContributions.filter(item => !item.reference_number).length
+  const joinedMembers = members.filter(member => member.status === 'joined')
 
   const contributorById = new Map(contributors.map(contributor => [contributor.id, contributor]))
   const nameByUserId = new Map<string, string>()
@@ -243,31 +268,51 @@ export function buildFundReportHtml(data: FundReportData) {
   const sponsorshipById = new Map(sponsorshipItems.map(item => [item.id, item]))
   const pledgeById = new Map(contributions.map(item => [item.id, item]))
 
-  const allContributionRows = contributions.map(item => {
-    const recorded = item.confirmed_at ?? item.created_at
-    const status = item.is_refunded ? 'Refunded' : humanise(item.status)
-    const amount = Number(item.amount ?? 0)
-    const pledgedAmount = Number(item.pledged_amount ?? 0)
+  const movementRows = [
+    ...confirmedContributions.map(item => ({
+      date: item.confirmed_at ?? item.created_at,
+      description: `Contribution from ${item.contributor_name}`,
+      detail: item.notes ? `Note: ${item.notes}` : 'Confirmed contribution',
+      method: humanise(item.payment_method),
+      reference: item.reference_number ?? 'Not captured',
+      incoming: Number(item.amount ?? 0),
+      outgoing: 0,
+    })),
+    ...fundExpenses.map(item => ({
+      date: item.created_at,
+      description: item.item_name ?? item.description,
+      detail: [item.vendor_name, humanise(item.category)].filter(Boolean).join(' · '),
+      method: 'Fund expense',
+      reference: item.receipt_url ? 'Receipt recorded' : 'No receipt',
+      incoming: 0,
+      outgoing: Number(item.amount ?? 0),
+    })),
+  ].sort((a, b) => dateSort(a.date) - dateSort(b.date))
+  let runningBalance = 0
+  const statementRows = movementRows.map(item => {
+    runningBalance += item.incoming - item.outgoing
     return `<tr>
-      <td>${formatDateTime(recorded)}</td>
-      <td><strong>${escapeHtml(item.contributor_name)}</strong><div class="subtle">ID: ${escapeHtml(item.id)}</div></td>
-      <td>${escapeHtml(status)}${item.is_refunded ? ' <span class="pill warning">Refunded</span>' : ''}</td>
-      <td>${escapeHtml(humanise(item.payment_method))}<div class="subtle">${item.reference_number ? `Ref: ${escapeHtml(item.reference_number)}` : 'No reference'}</div></td>
-      <td>${item.notes ? escapeHtml(item.notes) : '<span class="subtle">No note</span>'}</td>
-      <td class="amount">${pledgedAmount > 0 ? money(pledgedAmount, currency) : '-'}</td>
-      <td class="amount ${item.is_refunded ? 'expense' : 'positive'}">${money(amount, currency)}</td>
+      <td>${formatShortDate(item.date)}</td>
+      <td><strong>${escapeHtml(item.description)}</strong><div class="subtle">${escapeHtml(item.detail)}</div></td>
+      <td>${escapeHtml(item.method)}</td>
+      <td class="${item.reference === 'Not captured' || item.reference === 'No receipt' ? 'alertText' : ''}">${escapeHtml(item.reference)}</td>
+      <td class="number amount">${item.incoming ? money(item.incoming, currency) : '-'}</td>
+      <td class="number amount">${item.outgoing ? money(item.outgoing, currency) : '-'}</td>
+      <td class="number amount">${money(runningBalance, currency)}</td>
     </tr>`
   }).join('')
 
-  const contributionRows = confirmedContributions.map(item => {
-    const method = humanise(item.payment_method)
-    const reference = item.reference_number ? `Ref: ${escapeHtml(item.reference_number)}` : 'No reference'
+  const allContributionRows = contributions.map(item => {
+    const recorded = item.confirmed_at ?? item.created_at
+    const status = item.is_refunded ? 'Refunded' : humanise(item.status)
     return `<tr>
-      <td>${formatDate(item.confirmed_at ?? item.created_at)}</td>
-      <td><strong>${escapeHtml(item.contributor_name)}</strong></td>
-      <td>${escapeHtml(method)}<div class="subtle">${reference}</div></td>
+      <td>${formatDateTime(recorded)}</td>
+      <td><strong>${escapeHtml(item.contributor_name)}</strong><div class="subtle id">${escapeHtml(item.id)}</div></td>
+      <td><span class="pill ${item.is_refunded ? 'warning' : ''}">${escapeHtml(status)}</span></td>
+      <td>${escapeHtml(humanise(item.payment_method))}<div class="subtle">${item.reference_number ? `Ref: ${escapeHtml(item.reference_number)}` : 'No reference'}</div></td>
       <td>${item.notes ? escapeHtml(item.notes) : '<span class="subtle">No note</span>'}</td>
-      <td class="amount positive">${money(Number(item.amount ?? 0), currency)}</td>
+      <td class="number amount">${Number(item.pledged_amount ?? 0) > 0 ? money(Number(item.pledged_amount), currency) : '-'}</td>
+      <td class="number amount">${money(Number(item.amount ?? 0), currency)}</td>
     </tr>`
   }).join('')
 
@@ -275,35 +320,65 @@ export function buildFundReportHtml(data: FundReportData) {
     const contributor = contributorById.get(item.contributor_id ?? '')
     const sourcePledge = pledgeById.get(item.pledge_id)
     return `<tr>
+      <td><strong>${escapeHtml(contributor?.display_name ?? sourcePledge?.contributor_name ?? 'Contributor')}</strong></td>
+      <td>${sourcePledge?.notes ? escapeHtml(sourcePledge.notes) : '<span class="subtle">No purpose recorded</span>'}</td>
+      <td>${formatShortDate(sourcePledge?.created_at)}</td>
+      <td class="number amount">${money(Number(item.pledged_amount ?? 0), currency)}</td>
+      <td class="number amount">${money(Number(item.allocated_amount ?? 0), currency)}</td>
+      <td class="number amount alertText">${money(Number(item.outstanding_amount ?? 0), currency)}</td>
+    </tr>`
+  }).join('')
+
+  const settledPledgeRows = settledPledges.map(item => {
+    const contributor = contributorById.get(item.contributor_id ?? '')
+    const sourcePledge = pledgeById.get(item.pledge_id)
+    return `<tr>
       <td>${escapeHtml(contributor?.display_name ?? sourcePledge?.contributor_name ?? 'Contributor')}</td>
-      <td class="amount">${money(Number(item.pledged_amount ?? 0), currency)}</td>
-      <td class="amount positive">${money(Number(item.allocated_amount ?? 0), currency)}</td>
-      <td class="amount expense">${money(Number(item.outstanding_amount ?? 0), currency)}</td>
-      <td>${sourcePledge?.notes ? escapeHtml(sourcePledge.notes) : '<span class="subtle">No note</span>'}</td>
+      <td>${sourcePledge?.notes ? escapeHtml(sourcePledge.notes) : '<span class="subtle">No purpose recorded</span>'}</td>
+      <td>${formatShortDate(sourcePledge?.created_at)}</td>
+      <td class="number amount">${money(Number(item.pledged_amount ?? 0), currency)}</td>
+      <td><span class="pill success">Settled</span></td>
+    </tr>`
+  }).join('')
+
+  const contributorRows = contributors.map(contributor => {
+    const contributorPledges = pledgeBalances.filter(item => item.contributor_id === contributor.id)
+    const payments = confirmedContributions.filter(item => item.contributor_id === contributor.id)
+    const received = payments.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
+    const promised = contributorPledges.reduce((sum, item) => sum + Number(item.pledged_amount ?? 0), 0)
+    const due = contributorPledges.reduce((sum, item) => sum + Number(item.outstanding_amount ?? 0), 0)
+    const paymentDates = payments.map(item => item.confirmed_at ?? item.created_at).sort()
+    const paymentSummary = paymentDates.length
+      ? `First payment ${formatShortDate(paymentDates[0])}, last payment ${formatShortDate(paymentDates[paymentDates.length - 1])}`
+      : 'No confirmed payments'
+    return `<tr>
+      <td><strong>${escapeHtml(contributor.display_name)}</strong><div class="subtle">${escapeHtml(paymentSummary)}</div></td>
+      <td><span class="pill">${escapeHtml(humanise(contributor.contributor_type))}</span></td>
+      <td class="number">${escapeHtml(maskPhone(contributor.phone))}</td>
+      <td class="number amount">${payments.length}</td>
+      <td class="number amount">${money(promised, currency)}</td>
+      <td class="number amount positiveText">${money(received, currency)}</td>
+      <td class="number amount ${due > 0 ? 'alertText' : ''}">${money(due, currency)}</td>
     </tr>`
   }).join('')
 
   const expenseRows = fundExpenses.map(item => `<tr>
-    <td>${formatDate(item.created_at)}</td>
-    <td><strong>${escapeHtml(item.description)}</strong></td>
-    <td>${escapeHtml(item.vendor_name ?? '-')}<div class="subtle">${escapeHtml(humanise(item.category))}</div></td>
-    <td>${item.has_open_query ? '<span class="pill warning">Query open</span>' : '<span class="pill">Recorded</span>'}</td>
-    <td class="amount expense">${money(Number(item.amount ?? 0), currency)}</td>
+    <td>${formatShortDate(item.created_at)}</td>
+    <td><strong>${escapeHtml(item.item_name ?? item.description)}</strong><div class="subtle">${escapeHtml(humanise(item.category))}</div></td>
+    <td>${escapeHtml(item.vendor_name ?? '-')}</td>
+    <td>${item.receipt_url ? '<span class="pill success">Receipt recorded</span>' : '<span class="pill warning">No receipt</span>'}${item.has_open_query ? ' <span class="pill warning">Query open</span>' : ''}</td>
+    <td class="number amount">${money(Number(item.amount ?? 0), currency)}</td>
   </tr>`).join('')
 
   const allExpenseRows = expenses.map(item => {
-    const status = item.deleted_at
-      ? '<span class="pill warning">Deleted</span>'
-      : item.is_sponsored
-        ? '<span class="pill gold">Sponsored</span>'
-        : '<span class="pill">Recorded</span>'
+    const status = item.deleted_at ? 'Deleted' : item.is_sponsored ? 'Sponsored' : 'Recorded'
     return `<tr>
       <td>${formatDateTime(item.created_at)}</td>
-      <td><strong>${escapeHtml(item.item_name ?? item.description)}</strong><div class="subtle">ID: ${escapeHtml(item.id)}</div></td>
+      <td><strong>${escapeHtml(item.item_name ?? item.description)}</strong><div class="subtle id">${escapeHtml(item.id)}</div></td>
       <td>${escapeHtml(item.vendor_name ?? '-')}<div class="subtle">${escapeHtml(humanise(item.category))}</div></td>
-      <td>${status}${item.has_open_query ? ' <span class="pill warning">Query open</span>' : ''}</td>
-      <td>${item.receipt_url ? `<span class="receipt">Receipt recorded</span><div class="subtle breakText">${escapeHtml(item.receipt_url)}</div>` : '<span class="subtle">No receipt</span>'}</td>
-      <td class="amount ${item.deleted_at ? 'muted' : item.is_sponsored ? 'goldText' : 'expense'}">${money(Number(item.amount ?? 0), currency)}</td>
+      <td><span class="pill ${item.deleted_at ? 'warning' : item.is_sponsored ? 'gold' : 'success'}">${status}</span></td>
+      <td>${item.receipt_url ? `<strong class="positiveText">Receipt recorded</strong><div class="subtle breakText">${escapeHtml(item.receipt_url)}</div>` : '<span class="subtle">No receipt</span>'}</td>
+      <td class="number amount">${money(Number(item.amount ?? 0), currency)}</td>
     </tr>`
   }).join('')
 
@@ -312,54 +387,38 @@ export function buildFundReportHtml(data: FundReportData) {
     return `<tr>
       <td><strong>${escapeHtml(item.title)}</strong></td>
       <td>${escapeHtml(sponsor ?? 'Not claimed')}</td>
-      <td><span class="pill gold">${escapeHtml(humanise(item.status))}</span></td>
-      <td class="amount">${money(Number(item.target_amount ?? 0), currency)}</td>
-      <td class="amount positive">${money(Number(item.allocated_amount ?? 0), currency)}</td>
-      <td class="amount ${Number(item.outstanding_amount ?? 0) > 0 ? 'expense' : ''}">${money(Number(item.outstanding_amount ?? 0), currency)}</td>
+      <td><span class="pill success">${escapeHtml(humanise(item.status))}</span></td>
+      <td class="number amount">${money(Number(item.target_amount ?? 0), currency)}</td>
+      <td class="number amount positiveText">${money(Number(item.allocated_amount ?? 0), currency)}</td>
+      <td class="number amount">${money(Number(item.outstanding_amount ?? 0), currency)}</td>
     </tr>`
   }).join('')
 
   const sponsoredPurchaseRows = sponsoredPurchases.map(item => `<tr>
-    <td>${formatDate(item.created_at)}</td>
-    <td><strong>${escapeHtml(item.description)}</strong></td>
+    <td>${formatShortDate(item.created_at)}</td>
+    <td><strong>${escapeHtml(item.item_name ?? item.description)}</strong></td>
     <td>${escapeHtml(item.sponsored_by_name ?? (item.sponsored_by_user_id ? nameByUserId.get(item.sponsored_by_user_id) : null) ?? 'Sponsor')}</td>
     <td>${escapeHtml(item.vendor_name ?? '-')}</td>
-    <td class="amount goldText">${money(Number(item.amount ?? 0), currency)}</td>
+    <td class="number amount">${money(Number(item.amount ?? 0), currency)}</td>
   </tr>`).join('')
 
   const awardRows = richAuntieAwards.map(award => {
     const item = award.sponsorship_item_id ? sponsorshipById.get(award.sponsorship_item_id) : null
     return `<tr>
-      <td><span class="crown">&#9819;</span> <strong>${escapeHtml(nameByUserId.get(award.recipient_user_id) ?? 'Fund member')}</strong></td>
+      <td><strong>${escapeHtml(nameByUserId.get(award.recipient_user_id) ?? 'Fund member')}</strong></td>
       <td>${escapeHtml(award.reason_label)}</td>
       <td>${escapeHtml(item?.title ?? 'General recognition')}</td>
       <td>${formatDate(award.created_at)}</td>
     </tr>`
   }).join('')
 
-  const contributorRows = contributors.map(contributor => {
-    const contributorPledges = pledgeBalances.filter(item => item.contributor_id === contributor.id)
-    const received = confirmedContributions
-      .filter(item => item.contributor_id === contributor.id)
-      .reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
-    const promised = contributorPledges.reduce((sum, item) => sum + Number(item.pledged_amount ?? 0), 0)
-    const due = contributorPledges.reduce((sum, item) => sum + Number(item.outstanding_amount ?? 0), 0)
-    return `<tr>
-      <td><strong>${escapeHtml(contributor.display_name)}</strong><div class="subtle">${escapeHtml(humanise(contributor.contributor_type))}</div></td>
-      <td>${escapeHtml(contributor.phone ?? '-')}</td>
-      <td class="amount">${money(promised, currency)}</td>
-      <td class="amount positive">${money(received, currency)}</td>
-      <td class="amount ${due > 0 ? 'expense' : ''}">${money(due, currency)}</td>
-    </tr>`
-  }).join('')
-
   const memberRows = members.map(member => {
     const name = member.user_id ? nameByUserId.get(member.user_id) : null
     return `<tr>
-      <td><strong>${escapeHtml(name ?? member.invited_name ?? 'Unnamed member')}</strong><div class="subtle">ID: ${escapeHtml(member.id)}</div></td>
-      <td>${escapeHtml(member.invited_phone ?? '-')}</td>
-      <td>${escapeHtml(humanise(member.role))}</td>
-      <td><span class="pill ${member.status === 'joined' ? '' : 'warning'}">${escapeHtml(humanise(member.status))}</span></td>
+      <td><strong>${escapeHtml(name ?? member.invited_name ?? 'Unnamed member')}</strong><div class="subtle id">${escapeHtml(member.id)}</div></td>
+      <td><span class="pill ${member.role === 'owner' ? 'owner' : ''}">${escapeHtml(humanise(member.role))}</span></td>
+      <td>${escapeHtml(humanise(member.status))}</td>
+      <td class="number">${escapeHtml(maskPhone(member.invited_phone))}</td>
       <td>${formatDateTime(member.invited_at ?? member.created_at)}</td>
       <td>${formatDateTime(member.joined_at)}</td>
     </tr>`
@@ -375,13 +434,14 @@ export function buildFundReportHtml(data: FundReportData) {
       <td class="breakText">${escapeHtml(displayValue(newValues[field], field, currency))}</td>
     </tr>`).join('')
     const actor = entry.user_id ? nameByUserId.get(entry.user_id) ?? `User ${entry.user_id.slice(0, 8)}` : 'Tshelo system'
-    return `<div class="historyEntry">
-      <div class="historyHeader">
-        <div><strong>${escapeHtml(humanise(entry.action))} ${escapeHtml(humanise(entry.entity_type))}</strong><div class="subtle">${formatDateTime(entry.created_at)} by ${escapeHtml(actor)}</div></div>
-        <div class="historyId">Record ID: ${escapeHtml(entry.entity_id)}<br>Audit ID: ${escapeHtml(entry.id)}</div>
+    return `<article class="timelineEntry">
+      <div class="timelineHeader">
+        <div><h3>${escapeHtml(humanise(entry.action))} ${escapeHtml(humanise(entry.entity_type))}</h3><p>by ${escapeHtml(actor)}</p></div>
+        <time class="number">${formatDateTime(entry.created_at)}</time>
       </div>
+      <div class="recordMeta number">Record ${escapeHtml(entry.entity_id)} · Audit ${escapeHtml(entry.id)}</div>
       <table class="changeTable"><thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>${changeRows || emptyRow(3, 'No field-level values were stored for this action.')}</tbody></table>
-    </div>`
+    </article>`
   }).join('')
 
   const legacyEdits = [
@@ -390,7 +450,7 @@ export function buildFundReportHtml(data: FundReportData) {
   ].sort((a, b) => a.created_at.localeCompare(b.created_at))
   const legacyEditRows = legacyEdits.map(edit => `<tr>
     <td>${formatDateTime(edit.created_at)}</td>
-    <td>${escapeHtml(edit.entityType)}<div class="subtle">${escapeHtml(edit.entityId)}</div></td>
+    <td>${escapeHtml(edit.entityType)}<div class="subtle id">${escapeHtml(edit.entityId)}</div></td>
     <td>${escapeHtml(nameByUserId.get(edit.edited_by) ?? `User ${edit.edited_by.slice(0, 8)}`)}</td>
     <td>${escapeHtml(humanise(edit.field_changed))}</td>
     <td class="breakText">${escapeHtml(edit.old_value ?? 'Not set')}</td>
@@ -398,133 +458,257 @@ export function buildFundReportHtml(data: FundReportData) {
     <td>${edit.reason ? escapeHtml(edit.reason) : '<span class="subtle">No reason recorded</span>'}</td>
   </tr>`).join('')
 
-  const exportRows = exportHistory.map(record => `<tr>
-    <td>${formatDateTime(record.created_at)}</td>
-    <td>${escapeHtml(humanise(record.export_type))}</td>
-    <td>${escapeHtml(nameByUserId.get(record.exported_by) ?? `User ${record.exported_by.slice(0, 8)}`)}</td>
-    <td>${record.was_free ? 'Free export' : `${record.tokens_spent} token${record.tokens_spent === 1 ? '' : 's'}`}</td>
-    <td class="subtle">${escapeHtml(record.id)}</td>
+  const recordReferenceRows = [
+    ...contributions.map(item => ({
+      type: `Contribution, ${money(Number(item.amount ?? 0), currency)}`,
+      date: item.created_at,
+      recordId: item.id,
+      auditId: auditHistory.find(entry => entry.entity_id === item.id)?.id ?? '-',
+    })),
+    ...expenses.map(item => ({
+      type: `Expense, ${money(Number(item.amount ?? 0), currency)}`,
+      date: item.created_at,
+      recordId: item.id,
+      auditId: auditHistory.find(entry => entry.entity_id === item.id)?.id ?? '-',
+    })),
+  ].sort((a, b) => dateSort(a.date) - dateSort(b.date)).map(item => `<tr>
+    <td>${escapeHtml(item.type)}</td>
+    <td>${formatShortDate(item.date)}</td>
+    <td class="number breakText">${escapeHtml(item.recordId)}</td>
+    <td class="number breakText">${escapeHtml(item.auditId)}</td>
   </tr>`).join('')
 
-  const logoMarkup = logoDataUri
-    ? `<img class="logo" src="${escapeHtml(logoDataUri)}" alt="Tshelo logo">`
-    : '<div class="logoFallback">T</div>'
-  const targetLabel = overTarget > 0 ? 'ABOVE TARGET' : 'TARGET OUTSTANDING'
-  const targetValue = overTarget > 0 ? overTarget : targetOutstanding
-  const eventSection = linkedEvent ? `<section>
-    <h2>Linked event</h2>
-    <div class="details">
-      <div><span>EVENT</span><strong>${escapeHtml(linkedEvent.name)}</strong></div>
-      <div><span>DATE</span><strong>${formatDate(linkedEvent.event_date)}</strong></div>
-      <div><span>VENUE</span><strong>${escapeHtml(linkedEvent.venue_name ?? 'Not set')}</strong></div>
-    </div>
-  </section>` : ''
+  const exportRows = exportHistory.map(record => `<tr>
+    <td class="number">${formatDateTime(record.created_at)}</td>
+    <td>${escapeHtml(humanise(record.export_type))}</td>
+    <td>${escapeHtml(nameByUserId.get(record.exported_by) ?? `User ${record.exported_by.slice(0, 8)}`)}</td>
+    <td>${record.was_free ? 'Included' : `${record.tokens_spent} token${record.tokens_spent === 1 ? '' : 's'}`}</td>
+    <td class="number breakText">${escapeHtml(record.id)}</td>
+  </tr>`).join('')
+
+  const eventFact = linkedEvent ? `<div class="eventFact"><span>LINKED EVENT</span><strong>${escapeHtml(linkedEvent.name)}</strong><small>${formatDate(linkedEvent.event_date)}${linkedEvent.venue_name ? ` · ${escapeHtml(linkedEvent.venue_name)}` : ''}</small></div>` : ''
+  const logoMarkup = logoDataUri ? `<img class="brandMark" src="${escapeHtml(logoDataUri)}" alt="">` : ''
+  const referenceWarning = missingReferenceCount
+    ? `<div class="callout warning"><strong>${missingReferenceCount} of ${confirmedContributions.length} receipt${confirmedContributions.length === 1 ? '' : 's'} ${missingReferenceCount === 1 ? 'has' : 'have'} no payment reference.</strong> A mobile-money reference makes a recorded receipt traceable to the provider transaction. Entries without one remain part of the audit record, but Tshelo cannot independently trace the transfer.</div>`
+    : `<div class="callout success"><strong>Every confirmed receipt includes a payment reference.</strong> Keep the matching mobile-money statements with this report when it is used for formal review.</div>`
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    @page{size:A4;margin:38px 34px 46px}
+    @page{size:A4;margin:14mm 13mm 18mm}
     *{box-sizing:border-box}
     html{background:#fff}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#19151f;font-size:10px;line-height:1.38;margin:0}
-    h1{font-size:24px;line-height:1.12;margin:3px 0 5px}
-    h2{font-size:14px;line-height:1.2;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #ebe4fa;page-break-after:avoid}
+    body{margin:0;color:#182138;font-family:Arial,'Helvetica Neue',sans-serif;font-size:10px;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    h1,h2,h3,.serif{font-family:Georgia,'Times New Roman',serif;color:#151d33}
+    h1{font-size:28px;line-height:1.08;margin:8px 0 4px}
+    h2{font-size:18px;line-height:1.15;margin:0}
+    h3{font-size:12px;line-height:1.25;margin:0}
     p{margin:0}
-    section{margin:20px 0;page-break-inside:auto}
     table{width:100%;border-collapse:collapse;page-break-inside:auto}
     thead{display:table-header-group}
     tr{page-break-inside:avoid}
-    th,td{text-align:left;vertical-align:top;padding:7px 6px;border-bottom:1px solid #e8e5eb;font-size:8.6px}
-    th{font-size:7.5px;color:#6f6875;text-transform:uppercase;letter-spacing:.4px;background:#f8f6fb}
-    .reportHeader{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:15px;border-bottom:3px solid #7b2fff}
-    .brandBlock{display:flex;align-items:center;gap:11px}
-    .logoWrap{width:48px;height:48px;border-radius:12px;background:#19052f;display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .logo{width:42px;height:42px;object-fit:contain}
-    .logoFallback{color:#a35cff;font-size:28px;font-weight:900}
-    .brand{color:#7b2fff;font-size:9px;font-weight:900;letter-spacing:1.1px}
-    .muted,.subtle{color:#7d7682}
-    .subtle{font-size:7.5px;margin-top:2px}
-    .code{text-align:right;font-size:11px;font-weight:800;background:#f0e8ff;padding:8px 11px;border-radius:8px}
-    .code small{display:block;color:#7d7682;font-size:7px;letter-spacing:.5px;margin-bottom:2px}
-    .details{display:flex;gap:7px;flex-wrap:wrap}
-    .details>div{min-width:120px;flex:1;padding:8px 9px;background:#faf9fb;border:1px solid #e6e1eb;border-radius:7px}
-    .details span,.metric span{display:block;font-size:7px;color:#746d79;font-weight:800;letter-spacing:.55px;margin-bottom:3px}
-    .details strong{font-size:9px}
-    .summary{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0}
-    .metric{width:31.8%;padding:10px;background:#f6f2fb;border:1px solid #eee8f5;border-radius:8px}
-    .metric strong{font-size:14px;white-space:nowrap}
-    .progress{height:6px;background:#e6dff0;border-radius:4px;overflow:hidden;margin-top:7px}
-    .progress div{height:100%;background:#7b2fff}
-    .amount{text-align:right;font-weight:800;white-space:nowrap}
-    .positive{color:#6e2bdb}
-    .expense{color:#ba3848}
-    .goldText{color:#b06f00}
-    .pill{display:inline-block;padding:2px 6px;border-radius:8px;background:#eeeaf2;color:#5d5663;font-size:7px;font-weight:800}
-    .pill.warning{background:#fff1db;color:#9b5b00}
-    .pill.gold{background:#fff2cc;color:#a96900}
-    .crown{color:#d98a00;font-size:12px}
-    .receipt{color:#087d59;font-weight:800}
+    th,td{text-align:left;vertical-align:top;padding:7px 6px;border-bottom:1px solid #ddd9d0}
+    th{font-size:7.5px;color:#8994a8;text-transform:uppercase;letter-spacing:1.15px;background:#f6f4ef;border-bottom:1px solid #182138}
+    td{font-size:8.8px}
+    .number{font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace}
+    .amount{text-align:right;white-space:nowrap}
+    .subtle{color:#8a97ae;font-size:7.7px;margin-top:2px}
+    .id{overflow-wrap:anywhere;word-break:break-word}
     .breakText{overflow-wrap:anywhere;word-break:break-word}
-    .empty{text-align:center;color:#827b88;padding:13px}
-    .note{padding:10px 12px;background:#faf9fb;border-left:3px solid #7b2fff}
-    .scopeNote{margin:10px 0 16px;padding:9px 11px;background:#f1eaff;border:1px solid #ded0ff;border-radius:7px;color:#4c336d}
-    .historyEntry{display:block;border:1px solid #ddd5e7;border-radius:8px;margin:0 0 10px;overflow:hidden;page-break-inside:avoid;break-inside:avoid-page}
-    .historyHeader{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;background:#f8f5fb;page-break-after:avoid;break-after:avoid-page}
-    .historyId{text-align:right;color:#77707c;font-size:6.8px;overflow-wrap:anywhere;max-width:46%}
-    .changeTable th,.changeTable td{padding:5px 7px}
-    .footer{margin-top:25px;padding-top:9px;border-top:1px solid #ddd6e3;color:#817a86;font-size:7.5px}
+    .positiveText{color:#2d6d59}
+    .alertText{color:#ab342a}
+    .page{page-break-before:always;break-before:page;padding-top:1px}
+    .cover{page-break-before:auto;break-before:auto}
+    .brandLine{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #6840f2}
+    .brandIdentity{display:flex;align-items:center;gap:10px}
+    .brandMark{width:30px;height:30px;object-fit:contain;border-radius:7px}
+    .eyebrow,.label{font-size:7.5px;font-weight:800;letter-spacing:1.6px;color:#6840f2;text-transform:uppercase}
+    .coverMeta{color:#5c6980;font-size:10px}
+    .fundCode{text-align:right;max-width:170px}
+    .fundCode span{display:block;font-size:7.5px;font-weight:800;letter-spacing:1.5px;color:#8c96a8}
+    .fundCode strong{display:block;font-size:11px;margin-top:4px;overflow-wrap:anywhere}
+    .balanceGrid{display:grid;grid-template-columns:repeat(4,1fr);margin-top:14px;border:1px solid #d9d5cc}
+    .balanceGrid>div{min-height:80px;padding:12px;border-right:1px solid #d9d5cc}
+    .balanceGrid>div:last-child{border-right:0}
+    .balanceGrid span,.facts span,.integrityGrid span{display:block;font-size:7px;color:#8994a8;font-weight:800;letter-spacing:1.15px;text-transform:uppercase}
+    .balanceGrid strong{display:block;font-size:15px;margin:11px 0 5px;white-space:nowrap}
+    .balanceGrid small,.facts small,.integrityGrid small{display:block;color:#8a97ae;font-size:8px}
+    .facts{display:grid;grid-template-columns:repeat(4,1fr);margin-top:14px;background:#f7f5f0;border:1px solid #ddd9d0}
+    .facts>div{min-height:72px;padding:12px;border-right:1px solid #ddd9d0;border-bottom:1px solid #ddd9d0}
+    .facts>div:nth-child(4n){border-right:0}
+    .facts>.eventFact{grid-column:1/-1;min-height:55px;border-right:0}
+    .facts strong{display:block;font-size:11px;margin-top:10px}
+    .progress{height:4px;background:#dfdbe5;margin-top:7px;overflow:hidden}
+    .progress div{height:100%;background:#6840f2}
+    .introGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+    .callout{padding:11px 13px;background:#f7f5f0;border:1px solid #ddd9d0;border-left:4px solid #182138;page-break-inside:avoid;margin-top:14px}
+    .callout.warning{background:#fff8e8;border-left-color:#d9a514}
+    .callout.success{background:#edf6f1;border-left-color:#2d6d59}
+    .callout.purple{background:#f2edff;border-left-color:#6840f2}
+    .callout strong{font-weight:800}
+    .introGrid .callout{margin-top:0}
+    .integrity{margin-top:14px;border:1px solid #182138;padding:14px}
+    .integrity h3{font-family:Arial,'Helvetica Neue',sans-serif;color:#6840f2;font-size:8px;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:7px}
+    .integrityGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:12px;padding-top:10px;border-top:1px solid #ddd9d0}
+    .integrityGrid strong{display:block;font-size:10px;margin-top:4px}
+    .contents{margin-top:16px}
+    .contents h3{margin-bottom:7px}
+    .contentsRow{display:grid;grid-template-columns:28px 175px 1fr;padding:4px 0;border-bottom:1px dotted #c9c4ba}
+    .contentsRow b:first-child{color:#6840f2}
+    .contentsRow span{color:#8a97ae}
+    .chapterHeader{display:flex;align-items:baseline;gap:12px;padding-bottom:9px;border-bottom:1.5px solid #182138;margin-bottom:11px}
+    .chapterNo{color:#6840f2;font-size:8px;font-weight:800;letter-spacing:1.5px}
+    .chapterCount{margin-left:auto;color:#8c96a8;font-size:8px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase}
+    .chapterIntro{font-size:10px;color:#5c6980;margin-bottom:12px}
+    .sectionTitle{font-size:13px;margin:15px 0 8px;page-break-after:avoid}
+    .reconcile{margin:14px 0}
+    .reconcile td{padding:6px}
+    .reconcile tr:last-child{background:#f1edff;border-bottom:2px solid #6840f2;font-weight:800}
+    .pill{display:inline-block;padding:2px 8px;border-radius:12px;background:#efede8;color:#5f697b;font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+    .pill.success{background:#e8f3ed;color:#2d6d59}
+    .pill.warning{background:#fff0df;color:#9f5e0b}
+    .pill.gold{background:#fff1cf;color:#986814}
+    .pill.owner{background:#eee8ff;color:#6840f2}
+    .empty{text-align:center;color:#8a97ae;padding:18px;border:1px dashed #cbc6bb}
+    .timelineEntry{border-left:2px solid #c9c4ba;padding:0 0 10px 12px;margin:0 0 9px;page-break-inside:avoid;break-inside:avoid-page}
+    .timelineHeader{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+    .timelineHeader p{color:#66748b;margin-top:2px}
+    .timelineHeader time{color:#8a97ae;font-size:8px;white-space:nowrap}
+    .recordMeta{margin:6px 0;padding:5px 7px;background:#f7f5f0;color:#79869b;font-size:7px;overflow-wrap:anywhere}
+    .changeTable th,.changeTable td{padding:5px 6px}
+    .appendixTable td{font-size:7.6px}
+    .footer{position:fixed;left:0;right:0;bottom:-12mm;padding-top:5px;border-top:1px solid #d9d5cc;display:flex;justify-content:space-between;color:#505866;font-size:7px}
   </style></head><body>
-    <div class="reportHeader">
-      <div class="brandBlock"><div class="logoWrap">${logoMarkup}</div><div><div class="brand">TSHELO FUND REPORT</div><h1>${escapeHtml(fund.title)}</h1><div class="muted">Generated ${formatDate(generatedAt)}</div></div></div>
-      <div class="code"><small>FUND CODE</small>${escapeHtml(fund.fund_code)}</div>
-    </div>
+    <div class="footer"><span>Tshelo Fund Statement · ${escapeHtml(fund.title)} · ${escapeHtml(fund.fund_code)}</span><span>Complete audit report · Issued ${formatShortDate(generatedAt)}</span></div>
 
-    <div class="details">
-      <div><span>CREATED</span><strong>${formatDate(fund.created_at)}</strong></div>
-      <div><span>STATUS</span><strong>${escapeHtml(humanise(fund.status))}</strong></div>
-      <div><span>TYPE</span><strong>${escapeHtml(humanise(fund.fund_type))}</strong></div>
-      <div><span>DEADLINE</span><strong>${formatDate(fund.contribution_deadline)}</strong></div>
-      <div><span>VISIBILITY</span><strong>${fund.is_private ? 'Private' : 'Public'}</strong></div>
-      <div><span>MEMBERS</span><strong>${fundMemberCount(members.filter(member => member.status === 'joined').length)}</strong></div>
-    </div>
+    <main class="cover">
+      <div class="brandLine">
+        <div><div class="brandIdentity">${logoMarkup}<span class="eyebrow">Tshelo Fund Statement</span></div><h1>${escapeHtml(fund.title)}</h1><p class="coverMeta">Statement period ${formatDate(fund.created_at)} to ${formatDate(generatedAt)} · Issued ${formatDate(generatedAt)}</p></div>
+        <div class="fundCode"><span>FUND CODE</span><strong class="number">${escapeHtml(fund.fund_code)}</strong></div>
+      </div>
 
-    <div class="scopeNote"><strong>Complete report:</strong> this document includes current records, deleted or inactive records, every stored audit entry, legacy contribution and expense edits, and prior report exports. History is shown in chronological order without a PDF-side row limit.</div>
+      <div class="balanceGrid">
+        <div><span>Opening balance</span><strong class="number">${money(0, currency)}</strong><small>${formatDate(fund.created_at)}</small></div>
+        <div><span>Total received</span><strong class="number positiveText">${money(totalIn, currency)}</strong><small>${confirmedContributions.length} confirmed receipt${confirmedContributions.length === 1 ? '' : 's'}</small></div>
+        <div><span>Total paid out</span><strong class="number">${money(totalOut, currency)}</strong><small>${fundExpenses.length} recorded expense${fundExpenses.length === 1 ? '' : 's'}</small></div>
+        <div><span>Closing balance</span><strong class="number" style="color:#6840f2">${money(balance, currency)}</strong><small>${formatDate(generatedAt)}</small></div>
+      </div>
 
-    ${fund.description ? `<section><h2>Purpose</h2><div class="note">${escapeHtml(fund.description)}</div></section>` : ''}
+      <div class="facts">
+        <div><span>Fund opened</span><strong>${formatDate(fund.created_at)}</strong></div>
+        <div><span>Status</span><strong>${escapeHtml(humanise(fund.status))}</strong></div>
+        <div><span>Contribution deadline</span><strong>${formatDate(fund.contribution_deadline)}</strong></div>
+        <div><span>Visibility</span><strong>${fund.is_private ? 'Private' : 'Public'}</strong></div>
+        <div><span>Target</span><strong class="number">${money(goal, currency)}</strong></div>
+        <div><span>Progress to target</span><strong>${progress} percent</strong><div class="progress"><div style="width:${Math.min(progress, 100)}%"></div></div></div>
+        <div><span>MEMBERS</span><strong>${fundMemberCount(joinedMembers.length)}</strong></div>
+        <div><span>Contributors</span><strong>${contributors.length}</strong></div>
+        ${eventFact}
+      </div>
 
-    <div class="summary">
-      <div class="metric"><span>TOTAL IN</span><strong class="positive">${money(totalIn, currency)}</strong></div>
-      <div class="metric"><span>TOTAL OUT</span><strong class="expense">${money(totalOut, currency)}</strong></div>
-      <div class="metric"><span>AVAILABLE BALANCE</span><strong>${money(balance, currency)}</strong></div>
-      <div class="metric"><span>FUND TARGET</span><strong>${money(goal, currency)}</strong><div class="progress"><div style="width:${Math.min(progress, 100)}%"></div></div><div class="subtle">${progress}% funded</div></div>
-      <div class="metric"><span>${targetLabel}</span><strong class="${overTarget > 0 ? 'positive' : ''}">${money(targetValue, currency)}</strong></div>
-      <div class="metric"><span>OPEN PLEDGES</span><strong>${money(pledgeOutstanding, currency)}</strong><div class="subtle">${money(pledged, currency)} pledged overall</div></div>
-    </div>
+      <div class="introGrid">
+        <div class="callout"><strong>What this statement is.</strong> A complete report of the fund records available to Tshelo at issue time, including confirmed contributions, expenses, pledges, membership, audit entries, amendments and prior exports.</div>
+        <div class="callout warning"><strong>What it is not.</strong> Tshelo does not hold, move or process this money. The closing balance is the arithmetic of what members recorded, not a bank or mobile-money balance.</div>
+      </div>
 
-    ${eventSection}
+      <div class="integrity">
+        <h3>Audit integrity</h3>
+        <p>This report preserves stored record identifiers and the complete audit history returned for this fund. Use payment references and receipts to reconcile recorded entries with the relevant mobile-money provider or supplier.</p>
+        <div class="integrityGrid">
+          <div><span>Issued at</span><strong class="number">${formatDateTime(generatedAt)}</strong></div>
+          <div><span>Audit entries</span><strong>${auditHistory.length}</strong></div>
+          <div><span>Report scope</span><strong>Complete history</strong></div>
+        </div>
+      </div>
 
-    <section><h2>Money received (${confirmedContributions.length})</h2><table><thead><tr><th>Date</th><th>Contributor</th><th>Payment</th><th>Note</th><th class="amount">Amount</th></tr></thead><tbody>${contributionRows || emptyRow(5, 'No money received.')}</tbody></table></section>
+      <div class="contents"><h3>Contents</h3>
+        <div class="contentsRow"><b>01</b><b>Statement of account</b><span>Every confirmed movement with a running balance</span></div>
+        <div class="contentsRow"><b>02</b><b>Contributors</b><span>What each person pledged, paid and still owes</span></div>
+        <div class="contentsRow"><b>03</b><b>Expenses and sponsorship</b><span>Fund spending and items paid for directly</span></div>
+        <div class="contentsRow"><b>04</b><b>Governance</b><span>Who belongs to the fund and in which role</span></div>
+        <div class="contentsRow"><b>05</b><b>Audit trail</b><span>Stored actions and before-and-after values</span></div>
+        <div class="contentsRow"><b>06</b><b>Appendix, record references</b><span>Technical identifiers and previous exports</span></div>
+      </div>
+    </main>
 
-    <section><h2>Complete contribution ledger (${contributions.length})</h2><table><thead><tr><th>Recorded</th><th>Contributor<br>/ record</th><th>Status</th><th>Payment</th><th>Note</th><th class="amount">Pledged</th><th class="amount">Amount</th></tr></thead><tbody>${allContributionRows || emptyRow(7, 'No contributions or pledges recorded.')}</tbody></table></section>
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">01</span><h2>Statement of account</h2><span class="chapterCount">${movementRows.length} movement${movementRows.length === 1 ? '' : 's'}</span></header>
+      <p class="chapterIntro">Every confirmed movement of money in date order. The balance carries forward, so each figure can be checked against the line above it. Pledges do not appear until money is confirmed.</p>
+      <table><thead><tr><th>Date</th><th>Description</th><th>Method</th><th>Reference</th><th class="amount">In</th><th class="amount">Out</th><th class="amount">Balance</th></tr></thead><tbody>
+        <tr><td colspan="6"><strong>Opening balance, ${formatDate(fund.created_at)}</strong></td><td class="number amount"><strong>${money(0, currency)}</strong></td></tr>
+        ${statementRows || emptyRow(7, 'No confirmed money movements have been recorded.')}
+        <tr><td colspan="4"><strong>Totals for the period</strong></td><td class="number amount"><strong>${money(totalIn, currency)}</strong></td><td class="number amount"><strong>${money(totalOut, currency)}</strong></td><td></td></tr>
+        <tr style="background:#f1edff;border-bottom:2px solid #6840f2"><td colspan="6"><strong>Closing balance, ${formatDate(generatedAt)}</strong></td><td class="number amount"><strong>${money(balance, currency)}</strong></td></tr>
+      </tbody></table>
+      ${referenceWarning}
+      <h3 class="sectionTitle">Reconciliation</h3>
+      <table class="reconcile"><tbody>
+        <tr><td>Opening balance</td><td class="number amount">${money(0, currency)}</td></tr>
+        <tr><td>Add: confirmed receipts</td><td class="number amount">${money(totalIn, currency)}</td></tr>
+        <tr><td>Less: expenses paid by the fund</td><td class="number amount">${money(totalOut, currency)}</td></tr>
+        <tr><td>Closing balance held by the organiser</td><td class="number amount">${money(balance, currency)}</td></tr>
+      </tbody></table>
+      <div class="callout"><strong>The closing balance is held by the organiser, not by Tshelo.</strong> It is the total recorded as received less the total recorded as spent. Tshelo has not seen the organiser's account.</div>
+      <h3 class="sectionTitle">Complete contribution ledger (${contributions.length})</h3>
+      <table><thead><tr><th>Recorded</th><th>Contributor / record</th><th>Status</th><th>Payment</th><th>Note</th><th class="amount">Pledged</th><th class="amount">Amount</th></tr></thead><tbody>${allContributionRows || emptyRow(7, 'No contributions or pledges recorded.')}</tbody></table>
+    </section>
 
-    <section><h2>Open pledges (${openPledges.length})</h2><table><thead><tr><th>Contributor</th><th class="amount">Pledged</th><th class="amount">Received</th><th class="amount">Outstanding</th><th>Note</th></tr></thead><tbody>${pledgeRows || emptyRow(5, 'No open pledges.')}</tbody></table></section>
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">02</span><h2>Contributors</h2><span class="chapterCount">${contributors.length} ${contributors.length === 1 ? 'person' : 'people'}</span></header>
+      <p class="chapterIntro">What each person promised, what has arrived, and what is still outstanding. Contact numbers are partly masked in this document.</p>
+      <table><thead><tr><th>Contributor</th><th>Standing</th><th>Contact</th><th class="amount">Payments</th><th class="amount">Pledged</th><th class="amount">Received</th><th class="amount">Outstanding</th></tr></thead><tbody>${contributorRows || emptyRow(7, 'No contributors recorded.')}</tbody></table>
+      <h3 class="sectionTitle">Pledges outstanding</h3>
+      <p class="chapterIntro">A pledge is a stated intention to contribute. It is not money and is excluded from every balance in this statement.</p>
+      <table><thead><tr><th>Contributor</th><th>Purpose</th><th>Pledged on</th><th class="amount">Pledged</th><th class="amount">Received</th><th class="amount">Outstanding</th></tr></thead><tbody>${pledgeRows || emptyRow(6, 'No pledges are outstanding.')}</tbody></table>
+      <h3 class="sectionTitle">Pledges settled in full</h3>
+      <table><thead><tr><th>Contributor</th><th>Purpose</th><th>Pledged on</th><th class="amount">Pledged</th><th>Status</th></tr></thead><tbody>${settledPledgeRows || emptyRow(5, 'No settled pledges are stored.')}</tbody></table>
+      <div class="callout purple"><strong>Progress against target.</strong> ${money(totalIn, currency)} received against a target of ${money(goal, currency)}, leaving ${money(targetOutstanding, currency)} to raise. ${money(pledgeOutstanding, currency)} is already covered by open pledges.</div>
+    </section>
 
-    <section><h2>Expenses paid (${fundExpenses.length})</h2><table><thead><tr><th>Date</th><th>Expense</th><th>Vendor / category</th><th>Status</th><th class="amount">Amount</th></tr></thead><tbody>${expenseRows || emptyRow(5, 'No fund expenses paid.')}</tbody></table></section>
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">03</span><h2>Expenses and sponsorship</h2><span class="chapterCount">${fundExpenses.length} paid, ${sponsorshipItems.length + sponsoredPurchases.length} sponsored</span></header>
+      <p class="chapterIntro">Expenses paid by the fund reduce the balance. Sponsored items are paid for directly by an individual and do not touch the fund balance.</p>
+      <h3 class="sectionTitle">Expenses paid by the fund</h3>
+      <table><thead><tr><th>Date</th><th>Expense</th><th>Vendor</th><th>Evidence / status</th><th class="amount">Amount</th></tr></thead><tbody>${expenseRows || emptyRow(5, `No expenses have been recorded. The full ${money(totalIn, currency)} received remains unspent.`)}</tbody></table>
+      <h3 class="sectionTitle">Items sponsored directly</h3>
+      <table><thead><tr><th>Item</th><th>Sponsor</th><th>Status</th><th class="amount">Target cost</th><th class="amount">Covered</th><th class="amount">Outstanding</th></tr></thead><tbody>${sponsorshipRows || emptyRow(6, 'No sponsorship items have been recorded.')}</tbody></table>
+      ${sponsoredPurchases.length ? `<h3 class="sectionTitle">Sponsored purchases</h3><table><thead><tr><th>Date</th><th>Item</th><th>Sponsor</th><th>Vendor</th><th class="amount">Value</th></tr></thead><tbody>${sponsoredPurchaseRows}</tbody></table>` : ''}
+      <h3 class="sectionTitle">Contributor recognition</h3>
+      <table><thead><tr><th>Recipient</th><th>Recognition</th><th>Sponsored item</th><th>Date</th></tr></thead><tbody>${awardRows || emptyRow(4, 'No Rich Auntie recognition has been awarded.')}</tbody></table>
+      <div class="callout"><strong>Recognition carries no monetary value.</strong> It is excluded from every financial total and appears here only to explain recorded generosity.</div>
+      <h3 class="sectionTitle">Complete expense ledger (${expenses.length})</h3>
+      <table><thead><tr><th>Recorded</th><th>Expense / record</th><th>Vendor / category</th><th>Status</th><th>Receipt</th><th class="amount">Amount</th></tr></thead><tbody>${allExpenseRows || emptyRow(6, 'No expense records, including deleted expenses.')}</tbody></table>
+    </section>
 
-    <section><h2>Complete expense ledger (${expenses.length})</h2><table><thead><tr><th>Recorded</th><th>Expense<br>/ record</th><th>Vendor<br>/ category</th><th>Status</th><th>Receipt</th><th class="amount">Amount</th></tr></thead><tbody>${allExpenseRows || emptyRow(6, 'No expense records, including deleted expenses.')}</tbody></table></section>
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">04</span><h2>Governance</h2><span class="chapterCount">${fundMemberCount(joinedMembers.length)} member${fundMemberCount(joinedMembers.length) === 1 ? '' : 's'}</span></header>
+      <p class="chapterIntro">Who belongs to this fund, which role is recorded for each person, and when they joined. Inactive and invited membership rows remain visible for audit completeness.</p>
+      <h3 class="sectionTitle">Complete member register (${members.length})</h3>
+      <table><thead><tr><th>Member / record</th><th>Role</th><th>Status</th><th>Contact</th><th>Invited</th><th>Joined</th></tr></thead><tbody>${memberRows || emptyRow(6, 'No membership rows were stored; the organiser is still counted in the summary.')}</tbody></table>
+      <div class="callout warning"><strong>Read authority alongside the audit trail.</strong> A person's recorded role helps explain why they could create or amend a record. The audit trail below shows the named account and exact time stored for each action.</div>
+      ${linkedEvent ? `<h3 class="sectionTitle">Linked event</h3><div class="integrityGrid"><div><span>Event</span><strong>${escapeHtml(linkedEvent.name)}</strong></div><div><span>Date</span><strong>${formatDate(linkedEvent.event_date)}</strong></div><div><span>Venue</span><strong>${escapeHtml(linkedEvent.venue_name ?? 'Not set')}</strong></div></div>` : ''}
+      ${fund.description ? `<h3 class="sectionTitle">Fund purpose</h3><div class="callout">${escapeHtml(fund.description)}</div>` : ''}
+    </section>
 
-    <section><h2>Sponsored items (${sponsorshipItems.length})</h2><table><thead><tr><th>Item</th><th>Sponsor</th><th>Status</th><th class="amount">Target</th><th class="amount">Covered</th><th class="amount">Outstanding</th></tr></thead><tbody>${sponsorshipRows || emptyRow(6, 'No sponsored items.')}</tbody></table>${sponsoredPurchases.length ? `<h2 style="margin-top:15px">Sponsored purchases (${sponsoredPurchases.length})</h2><table><thead><tr><th>Date</th><th>Item</th><th>Sponsor</th><th>Vendor</th><th class="amount">Value</th></tr></thead><tbody>${sponsoredPurchaseRows}</tbody></table>` : ''}</section>
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">05</span><h2>Audit trail</h2><span class="chapterCount">${auditHistory.length} action${auditHistory.length === 1 ? '' : 's'}</span></header>
+      <p class="chapterIntro">Every stored action returned for this fund, oldest first, with the person responsible and exact time. Where before-and-after values are available, both appear below.</p>
+      ${auditRows || '<div class="empty">No audit entries are stored for this fund.</div>'}
+      <h3 class="sectionTitle">Legacy field edit history (${legacyEdits.length})</h3>
+      <table><thead><tr><th>Edited</th><th>Record</th><th>Editor</th><th>Field</th><th>Before</th><th>After</th><th>Reason</th></tr></thead><tbody>${legacyEditRows || emptyRow(7, 'No legacy contribution or expense edits are stored.')}</tbody></table>
+      <div class="callout success"><strong>Audit history is intentionally complete.</strong> Entries are not truncated by the PDF generator. Long histories continue onto additional pages with their identifiers and recorded values intact.</div>
+    </section>
 
-    <section><h2>Rich Auntie recognition (${richAuntieAwards.length})</h2><table><thead><tr><th>Recipient</th><th>Recognition</th><th>Sponsored item</th><th>Awarded</th></tr></thead><tbody>${awardRows || emptyRow(4, 'No Rich Auntie recognition awarded.')}</tbody></table></section>
-
-    <section><h2>Contributor summary (${contributors.length})</h2><table><thead><tr><th>Contributor</th><th>Phone</th><th class="amount">Pledged</th><th class="amount">Received</th><th class="amount">Outstanding</th></tr></thead><tbody>${contributorRows || emptyRow(5, 'No contributors recorded.')}</tbody></table></section>
-
-    <section><h2>Complete member register (${members.length})</h2><table><thead><tr><th>Member / record</th><th>Invited phone</th><th>Role</th><th>Status</th><th>Invited</th><th>Joined</th></tr></thead><tbody>${memberRows || emptyRow(6, 'No membership rows were stored; the organiser is still counted above.')}</tbody></table></section>
-
-    <section><h2>Complete fund history (${auditHistory.length})</h2><div class="note" style="margin-bottom:10px">Every stored audit action is listed from oldest to newest. Each changed field shows its recorded value before and after the action.</div>${auditRows || '<div class="empty">No audit entries are stored for this fund.</div>'}</section>
-
-    <section><h2>Legacy field edit history (${legacyEdits.length})</h2><table><thead><tr><th>Edited</th><th>Record</th><th>Editor</th><th>Field</th><th>Before</th><th>After</th><th>Reason</th></tr></thead><tbody>${legacyEditRows || emptyRow(7, 'No legacy contribution or expense edits are stored.')}</tbody></table></section>
-
-    <section><h2>Report export history (${exportHistory.length})</h2><table><thead><tr><th>Exported</th><th>Format</th><th>Exported by</th><th>Charge</th><th>Export record</th></tr></thead><tbody>${exportRows || emptyRow(5, 'No earlier report exports are stored.')}</tbody></table></section>
-
-    <div class="footer">This full report reflects all fund records available to Tshelo at the time it was generated. Sponsored purchases are reported separately from money paid out by the fund. Deleted and inactive records remain visible in the complete ledgers. Confirm supporting receipts and payment references before relying on this report for formal accounting.</div>
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">06</span><h2>Appendix, record references</h2><span class="chapterCount">For technical review</span></header>
+      <p class="chapterIntro">System identifiers for financial records in this statement. These are useful when a contribution, expense, dispute or audit entry must be traced inside Tshelo.</p>
+      <table class="appendixTable"><thead><tr><th>Record</th><th>Date</th><th>Record identifier</th><th>Audit identifier</th></tr></thead><tbody>${recordReferenceRows || emptyRow(4, 'No financial record identifiers are available.')}</tbody></table>
+      <h3 class="sectionTitle">Statements previously issued for this fund</h3>
+      <table><thead><tr><th>Issued</th><th>Format</th><th>Issued by</th><th>Charge</th><th>Export reference</th></tr></thead><tbody>${exportRows || emptyRow(5, 'No earlier report exports are stored.')}</tbody></table>
+      <h3 class="sectionTitle">How to read this statement</h3>
+      <div class="introGrid">
+        <div class="callout"><strong>Tshelo can confirm</strong> the records, identifiers, timestamps, before-and-after values and arithmetic presented from its stored data at issue time.</div>
+        <div class="callout warning"><strong>Tshelo cannot confirm</strong> that money physically moved, that a closing balance exists in an account, or that a named contributor was the person who paid.</div>
+      </div>
+      <div class="callout"><strong>Reliance by a third party.</strong> Treat this document as a detailed record of what was entered into Tshelo. Where a decision depends on whether money actually moved, request the matching provider statements and compare their references and dates with the statement of account.</div>
+    </section>
   </body></html>`
 }

@@ -74,22 +74,35 @@ const fixture: FundReportData = {
 }
 
 describe('buildFundReportHtml', () => {
-  it('creates a branded report with distinct accounting and recognition sections', () => {
+  it('creates a statement-style audit report with distinct accounting and governance chapters', () => {
     const html = buildFundReportHtml(fixture)
 
     expect(html).toContain('data:image/png;base64,logo-data')
-    expect(html).toContain('TOTAL IN')
-    expect(html).toContain('ABOVE TARGET')
-    expect(html).toContain('Money received (1)')
-    expect(html).toContain('Expenses paid (1)')
-    expect(html).toContain('Sponsored items (1)')
-    expect(html).toContain('Rich Auntie recognition (1)')
+    expect(html).toContain('Tshelo Fund Statement')
+    expect(html).toContain('Opening balance')
+    expect(html).toContain('Total received')
+    expect(html).toContain('Closing balance')
+    expect(html).toContain('Statement of account')
+    expect(html).toContain('Expenses and sponsorship')
+    expect(html).toContain('Contributor recognition')
+    expect(html).toContain('Governance')
+    expect(html).toContain('Audit trail')
+    expect(html).toContain('Appendix, record references')
     expect(html).toContain('Complete contribution ledger (1)')
     expect(html).toContain('Complete expense ledger (1)')
-    expect(html).toContain('Complete fund history (1)')
     expect(html).toContain('Legacy field edit history (1)')
-    expect(html).toContain('Report export history (1)')
-    expect(html).not.toContain('Spending breakdown')
+    expect(html).toContain('Statements previously issued for this fund')
+  })
+
+  it('reconciles money movements into a running closing balance', () => {
+    const html = buildFundReportHtml(fixture)
+
+    expect(html).toContain('Contribution from John David')
+    expect(html).toContain('Venue deposit')
+    expect(html).toContain('P 22,000.00')
+    expect(html).toContain('P 1,100.00')
+    expect(html).toContain('P 20,900.00')
+    expect(html).toContain('Closing balance held by the organiser')
   })
 
   it('includes every recorded before-and-after value without truncating the audit history', () => {
@@ -120,6 +133,21 @@ describe('buildFundReportHtml', () => {
   it('preserves and escapes contribution notes', () => {
     const html = buildFundReportHtml(fixture)
     expect(html).toContain('For the tent &amp; chairs')
+  })
+
+  it('masks contributor contact details in the exported statement', () => {
+    const html = buildFundReportHtml(fixture)
+
+    expect(html).toContain('••• ••567')
+    expect(html).not.toContain('71234567')
+  })
+
+  it('does not invent independent verification when the report has no verification hash', () => {
+    const html = buildFundReportHtml(fixture)
+
+    expect(html).toContain('Audit integrity')
+    expect(html).not.toContain('tshelo.com/verify')
+    expect(html).not.toContain('genuine and unaltered')
   })
 
   it('counts the organiser when legacy membership rows are missing', () => {

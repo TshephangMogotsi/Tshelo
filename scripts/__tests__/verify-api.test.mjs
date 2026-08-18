@@ -87,14 +87,14 @@ test('sends bearer authentication without logging or transforming the token', as
 
 test('always verifies every unauthenticated route and only enables token suites explicitly', () => {
   const unauthenticated = buildVerificationCases({})
-  assert.equal(unauthenticated.length, 16)
+  assert.equal(unauthenticated.length, 70)
   assert.ok(unauthenticated.every(testCase => testCase.expectedStatus === 401))
 
   const authenticated = buildVerificationCases({
     API_ACCESS_TOKEN: 'user-token',
     API_ADMIN_ACCESS_TOKEN: 'admin-token',
   })
-  assert.equal(authenticated.length, 25)
+  assert.equal(authenticated.length, 91)
   assert.ok(authenticated.some(testCase => testCase.expectedStatus === 422))
   assert.ok(authenticated.some(testCase => testCase.name === 'platform admin list audit entries'))
 })
@@ -118,8 +118,8 @@ test('runs the unauthenticated black-box suite with a supplied fetch implementat
     onPass: result => passes.push(result),
   })
 
-  assert.equal(result.passed, 16)
-  assert.equal(calls, 16)
-  assert.equal(passes.length, 16)
+  assert.equal(result.passed, 70)
+  assert.equal(calls, 70)
+  assert.equal(passes.length, 70)
   assert.equal(result.authenticatedUserChecks, false)
 })

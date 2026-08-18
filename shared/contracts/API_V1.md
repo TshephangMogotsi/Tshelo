@@ -1,6 +1,6 @@
 # Tshelo API v1 endpoints
 
-Status: initial read and mutation slice, 17 August 2026
+Status: mobile API migration, 18 August 2026
 
 Mutation endpoints accept JSON request bodies. Every endpoint returns the shared `ApiResponse<T>` JSON envelope, sets `Cache-Control: no-store`, and includes the same generated request ID in the JSON `request_id` field and `X-Request-Id` response header.
 
@@ -22,6 +22,8 @@ Authenticated calls require `Authorization: Bearer <supabase-access-token>`. The
 | `GET` | `/api/v1/funds` | `ListFundsRequest` query | `Paginated<FundSummary>` | Caller-scoped `funds` query; RLS decides visibility. |
 | `GET` | `/api/v1/funds/:fundId` | UUID path parameter | `FundDetail` | Caller-scoped fund, membership, contribution, expense, and member queries; RLS decides visibility. |
 | `POST` | `/api/v1/funds` | `CreateFundRequest` | `Fund` | A linked `eventFund` uses `create_fund_for_existing_event(...)`; an unlinked standalone fund is one caller-scoped RLS insert. |
+| `GET` | `/api/v1/funds/:fundId/report` | UUID path parameter | `FundReportBundle` | `get_fund_report_bundle(...)` returns all report and audit/edit history from one caller-scoped database statement snapshot. |
+| `POST` | `/api/v1/funds/:fundId/exports` | `CreateFundExportRequest` | `FundExport` | `log_fund_export(...)` derives the exporter from `auth.uid()` and enforces `export_reports`. |
 | `GET` | `/api/v1/contributions` | `ListContributionsRequest` query | `Paginated<ContributionSummary>` | Caller-scoped `contributions` query; RLS decides visibility. |
 | `GET` | `/api/v1/contributions/:contributionId` | UUID path parameter | `Contribution` | Caller-scoped `contributions` query; RLS decides visibility. |
 | `GET` | `/api/v1/admin/support-tickets` | `ListSupportTicketsRequest` query | `Paginated<SupportTicketSummary>` | Caller-scoped query after active platform-admin authorization. |
