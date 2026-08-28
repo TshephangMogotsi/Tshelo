@@ -235,6 +235,7 @@ export type UpdateFundSponsorshipRequest = Partial<CreateFundSponsorshipRequest>
 export type FundWorkspaceContribution = {
   id: Uuid
   contributor_id: Uuid
+  user_id: Uuid | null
   contributor_name: string
   contributor_type: 'member' | 'guest'
   amount: MoneyAmount
@@ -309,11 +310,13 @@ export type HomeSummaryItem = {
   budget_amount: MoneyAmount | null
   budget_currency_code: CurrencyCode
   total_contributions: MoneyAmount
+  contribution_count: number
   balance: MoneyAmount
   member_count: number
   guest_count: number
   role: FundMemberRole | 'organiser'
   event_date: IsoDate | null
+  contribution_deadline: IsoDate | null
   venue_name: string | null
   category: string
   emoji: string

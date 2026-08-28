@@ -87,11 +87,14 @@ describe('buildFundReportHtml', () => {
     expect(html).toContain('Contributor recognition')
     expect(html).toContain('Governance')
     expect(html).toContain('Audit trail')
+    expect(html).toContain('Notes and definitions')
     expect(html).toContain('Appendix, record references')
     expect(html).toContain('Complete contribution ledger (1)')
     expect(html).toContain('Complete expense ledger (1)')
     expect(html).toContain('Legacy field edit history (1)')
     expect(html).toContain('Statements previously issued for this fund')
+    expect(html).toContain("body{margin:0;padding:14mm 13mm 18mm")
+    expect(html).toContain('@media print')
   })
 
   it('reconciles money movements into a running closing balance', () => {

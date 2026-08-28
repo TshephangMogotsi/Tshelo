@@ -3,7 +3,10 @@
 import { TsheloApiError, TsheloApiProtocolError, type ApiCallOptions } from '@shared/api-client'
 
 export function apiErrorMessage(error: unknown) {
-  if (error instanceof TsheloApiError) return error.message
+  if (error instanceof TsheloApiError) {
+    const messages = error.apiError.field_errors?.map(fieldError => `${fieldError.field.replace(/_/g, ' ')}: ${fieldError.message}`)
+    return messages?.join(' ') || error.message
+  }
   if (error instanceof TsheloApiProtocolError) return 'The server returned an unexpected response. Please try again.'
   if (error instanceof TypeError || (error instanceof Error && error.message === 'Tshelo API request timed out.')) return 'Check your connection and try again.'
   if (error instanceof Error && error.name === 'AbortError') return ''

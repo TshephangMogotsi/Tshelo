@@ -343,7 +343,7 @@ export async function getApiFundWorkspace(client: SupabaseClient, actorUserId: s
   const fundResult = await getApiFund(client, actorUserId, fundId)
   if (fundResult.error || !fundResult.data) return fundResult as ApiDataResult<FundWorkspace | null>
   const [contributions, expenses, members, pledges, contributors, sponsorships, permissions] = await Promise.all([
-    client.from('contributions').select('id, contributor_id, contributor_name, amount, pledged_amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, created_at, notes').eq('fund_id', fundId).order('created_at', { ascending: false }),
+    client.from('contributions').select('id, contributor_id, user_id, contributor_name, amount, pledged_amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, created_at, notes').eq('fund_id', fundId).order('created_at', { ascending: false }),
     client.from('expenses').select('id, vendor_name, description, category, amount, created_at, has_open_query, is_sponsored, sponsored_by_user_id, sponsored_by_name').eq('fund_id', fundId).is('deleted_at', null).order('created_at', { ascending: false }),
     loadMemberDirectory(client, fundId),
     client.from('contributor_pledge_balances').select('pledge_id, allocated_amount, outstanding_amount, pledge_state').eq('fund_id', fundId),
@@ -364,6 +364,7 @@ export async function getApiFundWorkspace(client: SupabaseClient, actorUserId: s
       return {
         id: row.id as string,
         contributor_id: row.contributor_id as string,
+        user_id: row.user_id as string | null,
         contributor_name: row.contributor_name as string,
         contributor_type: (contributorTypeById.get(row.contributor_id as string) ?? 'guest') as 'member' | 'guest',
         amount: money(row.amount), pledged_amount: row.pledged_amount === null ? null : money(row.pledged_amount),
@@ -419,26 +420,23 @@ export async function getApiFundActivityDetail(client: SupabaseClient, fundId: s
 }
 
 export async function getApiHomeSummary(client: SupabaseClient, actorUserId: string): Promise<ApiDataResult<HomeSummary>> {
-  const [memberships, ownedFunds, organisers, guestRoles, unread] = await Promise.all([
+  const [memberships, organisers, guestRoles, unread] = await Promise.all([
     client.from('fund_members').select('fund_id, role').eq('user_id', actorUserId).not('status', 'in', '(left,removed,declined,pending)'),
-    client.from('funds').select('id').eq('owner_id', actorUserId).is('deleted_at', null),
     client.from('event_organisers').select('event_id').eq('user_id', actorUserId).not('status', 'in', '(left,removed)'),
     client.from('event_guests').select('event_id').eq('user_id', actorUserId),
     client.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', actorUserId).eq('is_read', false),
   ])
-  for (const result of [memberships, ownedFunds, organisers, guestRoles, unread]) if (result.error) return dataFailure({ kind: 'database', error: result.error })
+  for (const result of [memberships, organisers, guestRoles, unread]) if (result.error) return dataFailure({ kind: 'database', error: result.error })
   const memberFundIds = new Set((memberships.data ?? []).map(row => row.fund_id as string))
-  const ownedFundIds = new Set((ownedFunds.data ?? []).map(row => row.id as string))
-  const fundIds = [...new Set([...memberFundIds, ...ownedFundIds])]
+  const fundIds = [...memberFundIds]
   const roleByFund = new Map((memberships.data ?? []).map(row => [row.fund_id as string, row.role as 'owner' | 'admin' | 'member']))
-  ownedFundIds.forEach(id => { if (!roleByFund.has(id)) roleByFund.set(id, 'owner') })
   const coOrgIds = (organisers.data ?? []).map(row => row.event_id as string)
   const relatedEventIds = [...new Set([...coOrgIds, ...(guestRoles.data ?? []).map(row => row.event_id as string)])]
   const eventFilter = relatedEventIds.length ? `creator_id.eq.${actorUserId},id.in.(${relatedEventIds.join(',')})` : `creator_id.eq.${actorUserId}`
   const [funds, events, links] = await Promise.all([
-    fundIds.length ? client.from('funds').select('id, title, status, goal_amount, currency_code, fund_type, fund_emoji, linked_event_id, created_at').in('id', fundIds).is('deleted_at', null).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+    fundIds.length ? client.from('funds').select('id, title, status, goal_amount, currency_code, fund_type, fund_emoji, linked_event_id, contribution_deadline, created_at').in('id', fundIds).is('deleted_at', null).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
     client.from('events').select('id, creator_id, name, status, event_type, event_emoji, event_date, venue_name, linked_fund_id, created_at').or(eventFilter).is('deleted_at', null).order('created_at', { ascending: false }),
-    client.from('event_fund_links').select('event_id, fund_id').eq('is_active', true),
+    fundIds.length ? client.from('event_fund_links').select('event_id, fund_id').in('fund_id', fundIds).eq('is_active', true) : Promise.resolve({ data: [], error: null }),
   ])
   if (funds.error) return dataFailure({ kind: 'database', error: funds.error })
   if (events.error) return dataFailure({ kind: 'database', error: events.error })
@@ -458,6 +456,7 @@ export async function getApiHomeSummary(client: SupabaseClient, actorUserId: str
   if (guests.error) return dataFailure({ kind: 'database', error: guests.error })
   if (budgets.error) return dataFailure({ kind: 'database', error: budgets.error })
   const contributionsByFund = new Map<string, bigint>(); (contributions.data ?? []).forEach(row => contributionsByFund.set(row.fund_id as string, (contributionsByFund.get(row.fund_id as string) ?? BigInt(0)) + minorUnits(row.amount)))
+  const contributionCountByFund = new Map<string, number>(); (contributions.data ?? []).forEach(row => contributionCountByFund.set(row.fund_id as string, (contributionCountByFund.get(row.fund_id as string) ?? 0) + 1))
   const expensesByFund = new Map<string, bigint>(); (expenses.data ?? []).filter(row => !row.is_sponsored).forEach(row => expensesByFund.set(row.fund_id as string, (expensesByFund.get(row.fund_id as string) ?? BigInt(0)) + minorUnits(row.amount)))
   const membersByFund = new Map<string, number>(); (memberRows.data ?? []).forEach(row => membersByFund.set(row.fund_id as string, (membersByFund.get(row.fund_id as string) ?? 0) + 1))
   const guestsByEvent = new Map<string, number>(); (guests.data ?? []).forEach(row => guestsByEvent.set(row.event_id as string, (guestsByEvent.get(row.event_id as string) ?? 0) + 1 + Math.max(0, Number(row.plus_ones ?? 0))))
@@ -469,9 +468,9 @@ export async function getApiHomeSummary(client: SupabaseClient, actorUserId: str
     const linkedId = (row.linked_event_id as string | null) ?? linkedEventByFund.get(row.id as string); const event = linkedId ? eventById.get(linkedId) : null
     if (event) renderedEvents.add(event.id as string)
     const kind = event ? 'eventFund' as const : 'fund' as const; const total = contributionsByFund.get(row.id as string) ?? BigInt(0); const spent = expensesByFund.get(row.id as string) ?? BigInt(0); const budget = event ? budgetByEvent.get(event.id as string) : null; const goal = minorUnits(row.goal_amount)
-    return { id: kind === 'eventFund' ? `eventFund-${event!.id}-${row.id}` : row.id as string, fund_id: row.id as string, event_id: event?.id as string | undefined, kind, title: (event?.name ?? row.title) as string, status: row.status as string, goal_amount: money(goal), budget_amount: event ? budget ? money(budget.total_budget) : null : goal > BigInt(0) ? money(goal) : null, budget_currency_code: (budget?.currency_code ?? row.currency_code ?? 'BWP') as CurrencyCode, total_contributions: money(total), balance: money(total - spent), member_count: Math.max(1, membersByFund.get(row.id as string) ?? 0), guest_count: event ? guestsByEvent.get(event.id as string) ?? 0 : 0, role: roleByFund.get(row.id as string) ?? 'member', event_date: (event?.event_date ?? null) as string | null, venue_name: (event?.venue_name ?? null) as string | null, category: kind === 'eventFund' ? 'Event + Fund' : label(row.fund_type), emoji: (event?.event_emoji ?? row.fund_emoji ?? '💜') as string, currency_code: (row.currency_code ?? 'BWP') as CurrencyCode, created_at: (event?.created_at ?? row.created_at) as string }
+    return { id: kind === 'eventFund' ? `eventFund-${event!.id}-${row.id}` : row.id as string, fund_id: row.id as string, event_id: event?.id as string | undefined, kind, title: (event?.name ?? row.title) as string, status: row.status as string, goal_amount: money(goal), budget_amount: event ? budget ? money(budget.total_budget) : null : goal > BigInt(0) ? money(goal) : null, budget_currency_code: (budget?.currency_code ?? row.currency_code ?? 'BWP') as CurrencyCode, total_contributions: money(total), contribution_count: contributionCountByFund.get(row.id as string) ?? 0, balance: money(total - spent), member_count: Math.max(1, membersByFund.get(row.id as string) ?? 0), guest_count: event ? guestsByEvent.get(event.id as string) ?? 0 : 0, role: roleByFund.get(row.id as string) ?? 'member', event_date: (event?.event_date ?? null) as string | null, contribution_deadline: (row.contribution_deadline ?? null) as string | null, venue_name: (event?.venue_name ?? null) as string | null, category: kind === 'eventFund' ? 'Event + Fund' : label(row.fund_type), emoji: (event?.event_emoji ?? row.fund_emoji ?? '💜') as string, currency_code: (row.currency_code ?? 'BWP') as CurrencyCode, created_at: (event?.created_at ?? row.created_at) as string }
   })
   const coOrgSet = new Set(coOrgIds)
-  const eventItems = (events.data ?? []).filter(row => !renderedEvents.has(row.id as string)).map(row => { const budget = budgetByEvent.get(row.id as string); return { id: row.id as string, event_id: row.id as string, kind: 'event' as const, title: row.name as string, status: row.status as string, goal_amount: '0.00', budget_amount: null, budget_currency_code: (budget?.currency_code ?? 'BWP') as CurrencyCode, total_contributions: '0.00', balance: '0.00', member_count: 0, guest_count: guestsByEvent.get(row.id as string) ?? 0, role: row.creator_id === actorUserId || coOrgSet.has(row.id as string) ? 'organiser' as const : 'member' as const, event_date: row.event_date as string | null, venue_name: row.venue_name as string | null, category: label(row.event_type), emoji: (row.event_emoji ?? '🎉') as string, currency_code: (budget?.currency_code ?? 'BWP') as CurrencyCode, created_at: row.created_at as string } })
+  const eventItems = (events.data ?? []).filter(row => !renderedEvents.has(row.id as string)).map(row => { const budget = budgetByEvent.get(row.id as string); return { id: row.id as string, event_id: row.id as string, kind: 'event' as const, title: row.name as string, status: row.status as string, goal_amount: '0.00', budget_amount: null, budget_currency_code: (budget?.currency_code ?? 'BWP') as CurrencyCode, total_contributions: '0.00', contribution_count: 0, balance: '0.00', member_count: 0, guest_count: guestsByEvent.get(row.id as string) ?? 0, role: row.creator_id === actorUserId || coOrgSet.has(row.id as string) ? 'organiser' as const : 'member' as const, event_date: row.event_date as string | null, contribution_deadline: null, venue_name: row.venue_name as string | null, category: label(row.event_type), emoji: (row.event_emoji ?? '🎉') as string, currency_code: (budget?.currency_code ?? 'BWP') as CurrencyCode, created_at: row.created_at as string } })
   return dataSuccess({ items: [...fundItems, ...eventItems], unread_notification_count: unread.count ?? 0 })
 }

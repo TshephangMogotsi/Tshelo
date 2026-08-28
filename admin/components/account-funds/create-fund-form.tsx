@@ -8,6 +8,7 @@ import { HandCoins } from 'lucide-react'
 import type { CreateFundRequest, CurrencyCode, FundType } from '@shared/contracts'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage } from '@/lib/api-ui'
+import { invalidateHomeSummary } from '@/lib/home-summary-cache'
 
 const FUND_TYPES = [
   ['funeral', 'Funeral'], ['tombstone', 'Tombstone'], ['lobola', 'Lobola'],
@@ -38,6 +39,7 @@ export function CreateFundForm() {
     setError('')
     try {
       const fund = await createApiClient().funds.create(request)
+      invalidateHomeSummary()
       router.replace(`/account/funds/${fund.id}?created=1` as Route)
     } catch (cause) {
       setError(apiErrorMessage(cause))
@@ -48,7 +50,7 @@ export function CreateFundForm() {
   return (
     <>
       <section className="member-pagehead">
-        <div><h1>Create a <em>fund</em></h1><p>Set the purpose, target, privacy, and contribution deadline. You can change these later.</p></div>
+        <div><h1>Create a <em>fund</em></h1></div>
         <div className="member-page-actions"><Link href="/account/funds">Cancel</Link></div>
       </section>
       <section className="member-card member-form-card">

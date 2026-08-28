@@ -260,6 +260,13 @@ export async function updateApiExpense(client: SupabaseClient, expenseId: string
   return dataSuccess(result.data ? toExpense(result.data as Record<string, unknown>) : null)
 }
 
+export async function deleteApiExpense(client: SupabaseClient, expenseId: string) {
+  if (!validUuid(expenseId)) return dataFailure({ kind: 'validation', message: 'expense_id must be a valid UUID.' })
+  const result = await client.from('expenses').update({ deleted_at: new Date().toISOString() }).eq('id', expenseId).is('deleted_at', null).select('id').maybeSingle()
+  if (result.error) return dataFailure({ kind: 'database', error: result.error })
+  return dataSuccess(result.data ? {} : null)
+}
+
 export async function createApiReceiptUploadSession(
   client: SupabaseClient,
   actorUserId: string,

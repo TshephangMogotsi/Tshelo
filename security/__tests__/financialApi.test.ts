@@ -41,6 +41,7 @@ describe('contribution, expense, and receipt API slice', () => {
     expect(data).toContain("client.rpc('record_detected_contribution'")
     expect(data).not.toContain('service_role')
     expect(data).not.toContain('createClient(')
+    expect(data).toContain("update({ deleted_at: new Date().toISOString() })")
   })
 
   it('uses short-lived direct uploads and caller-scoped parse finalisation', () => {
@@ -70,7 +71,7 @@ describe('contribution, expense, and receipt API slice', () => {
     for (const method of [
       'assignDetected(', 'listContributors(', 'listPledgeBalances(',
       'createPledgeAllocation(', 'createSponsorshipAllocation(',
-      'createUploadSession(',
+      'createUploadSession(', 'remove(expenseId',
     ]) expect(client).toContain(method)
     expect(client).toContain("'/api/v1/receipts/parse'")
     expect(client).toContain("'/api/v1/expenses'")

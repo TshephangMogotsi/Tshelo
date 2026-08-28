@@ -122,7 +122,7 @@ export async function getApiUser(
 
   const { data, error } = await client
     .from('users')
-    .select('id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, is_flagged, is_banned, last_active_at, created_at, updated_at')
+    .select('id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, privacy_accepted_at, privacy_version, marketing_consent, marketing_consent_at, marketing_email_enabled, marketing_sms_enabled, data_processing_consent, data_processing_consent_at, is_flagged, is_banned, last_active_at, created_at, updated_at')
     .eq('id', userId)
     .is('deleted_at', null)
     .maybeSingle()

@@ -9,6 +9,7 @@ import {
 import { withPlatformAdminOperation } from '@/lib/api/platform-admin'
 import { validateModerateUserRequest } from '@/lib/api/validation'
 import { moderateApiUser } from '@/lib/data/api-mutations'
+import { invalidateAppUser } from '@/lib/app-user'
 
 export const runtime = 'nodejs'
 
@@ -34,5 +35,6 @@ export async function POST(request: Request) {
     return databaseErrorResponse(authorized.data.error, requestId)
   }
 
+  invalidateAppUser(body.value.user_id)
   return successResponse(authorized.data.data, requestId)
 }

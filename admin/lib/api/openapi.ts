@@ -615,6 +615,7 @@ export const tsheloOpenApiDocument = {
     },
     '/expenses/{expenseId}': {
       patch: { tags: ['Expenses'], operationId: 'updateExpense', summary: 'Edit an expense', parameters: [uuidPathParameter('expenseId', 'Expense UUID.')], requestBody: jsonBody({ type: 'object', minProperties: 1 }), responses: { '200': response('Expense updated.', success({ type: 'object' })), ...standardErrors } },
+      delete: { tags: ['Expenses'], operationId: 'deleteExpense', summary: 'Remove an expense while retaining its audit history', parameters: [uuidPathParameter('expenseId', 'Expense UUID.')], responses: { '200': response('Expense removed.', success({ type: 'object' })), ...standardErrors } },
     },
     '/receipts/upload-session': {
       post: { tags: ['Receipts'], operationId: 'createReceiptUploadSession', summary: 'Authorise a short-lived direct receipt upload', description: 'Returns a caller- and fund-scoped Supabase Storage signed upload URL; the image does not pass through Next.js.', requestBody: jsonBody({ type: 'object', required: ['fund_id', 'content_type', 'size_bytes'] }), responses: { '201': response('Upload session created.', success({ type: 'object' })), ...standardErrors } },
@@ -853,6 +854,14 @@ export const tsheloOpenApiDocument = {
               token_balance: { type: 'integer' },
               onboarding_completed: { type: 'boolean' },
               notifications_enabled: { type: 'boolean' },
+              privacy_accepted_at: { type: ['string', 'null'], format: 'date-time' },
+              privacy_version: { type: ['string', 'null'] },
+              marketing_consent: { type: 'boolean' },
+              marketing_consent_at: { type: ['string', 'null'], format: 'date-time' },
+              marketing_email_enabled: { type: 'boolean' },
+              marketing_sms_enabled: { type: 'boolean' },
+              data_processing_consent: { type: 'boolean' },
+              data_processing_consent_at: { type: ['string', 'null'], format: 'date-time' },
               last_active_at: { type: ['string', 'null'], format: 'date-time' },
               updated_at: { type: 'string', format: 'date-time' },
             },
@@ -870,6 +879,8 @@ export const tsheloOpenApiDocument = {
           terms_accepted_at: { type: 'string', format: 'date-time' }, terms_version: { type: 'string' },
           privacy_accepted_at: { type: 'string', format: 'date-time' }, privacy_version: { type: 'string' },
           data_processing_consent: { type: 'boolean' }, data_processing_consent_at: { type: 'string', format: 'date-time' },
+          marketing_consent: { type: 'boolean' }, marketing_consent_at: { type: 'string', format: 'date-time' },
+          marketing_email_enabled: { type: 'boolean' }, marketing_sms_enabled: { type: 'boolean' },
         },
       },
       ConnectionSummary: {

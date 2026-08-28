@@ -1,3 +1,4 @@
+import type { Route } from 'next'
 import { redirect } from 'next/navigation'
 import { LoginForm } from '@/components/login-form'
 import { getSignedInDestination } from '@/lib/data/session'
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export default async function LoginPage() {
   const supabase = await createClient()
   const destination = await getSignedInDestination(supabase)
-  if (destination) redirect(destination)
+  if (destination) redirect(destination as Route)
 
   return <LoginForm />
 }

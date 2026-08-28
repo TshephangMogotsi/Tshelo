@@ -58,6 +58,9 @@ Create a Vercel project from the existing `Tshelo` repository and set:
 - Framework Preset: Next.js
 - Environment variables: `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- Optional token checkout: `NEXT_PUBLIC_TOKEN_PORTAL_URL` must be an HTTPS
+  checkout URL. The checkout service must create the order and only credit
+  tokens after its verified payment webhook completes.
 
 Interactive browser components use the same-origin API.
 

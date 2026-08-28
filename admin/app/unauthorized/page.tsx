@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { Route } from 'next'
 import { ShieldX } from 'lucide-react'
 
 export default function UnauthorizedPage() {
@@ -9,7 +10,7 @@ export default function UnauthorizedPage() {
         <p className="eyebrow">Access denied</p>
         <h1>This account is not authorised.</h1>
         <p>Ask the system owner to add your existing Tshelo account to the platform-admin allowlist.</p>
-        <Link className="account-link" href="/account">Go to My Tshelo</Link>
+        <Link className="account-link" href={'/account/overview' as Route}>Go to My Tshelo</Link>
         <form action="/logout" method="post"><button className="primary-button link-button" type="submit">Sign out</button></form>
       </div>
     </main>

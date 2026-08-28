@@ -35,6 +35,14 @@ export type User = UserSummary & {
   token_balance: number
   onboarding_completed: boolean
   notifications_enabled: boolean
+  privacy_accepted_at: IsoDateTime | null
+  privacy_version: string | null
+  marketing_consent: boolean
+  marketing_consent_at: IsoDateTime | null
+  marketing_email_enabled: boolean
+  marketing_sms_enabled: boolean
+  data_processing_consent: boolean
+  data_processing_consent_at: IsoDateTime | null
   last_active_at: IsoDateTime | null
   updated_at: IsoDateTime
 }
@@ -70,6 +78,10 @@ export type UpdateCurrentUserRequest = {
   privacy_version?: string
   data_processing_consent?: boolean
   data_processing_consent_at?: IsoDateTime
+  marketing_consent?: boolean
+  marketing_consent_at?: IsoDateTime
+  marketing_email_enabled?: boolean
+  marketing_sms_enabled?: boolean
 }
 
 export type ConnectionSummary = {

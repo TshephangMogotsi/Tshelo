@@ -16,7 +16,7 @@ export type AccountMembership = {
 }
 
 export type AccountContribution = Pick<ContributionSummary, 'id' | 'amount' | 'currency_code' | 'status' | 'created_at'> & {
-  fund: { title: string } | null
+  fund: { id: string; title: string } | null
 }
 
 type AccountFundSummaryRow = Omit<AccountFundSummary, 'goal_amount'> & {
@@ -29,7 +29,7 @@ type AccountMembershipRow = Omit<AccountMembership, 'fund'> & {
 
 type AccountContributionRow = Omit<AccountContribution, 'amount' | 'fund'> & {
   amount: number | string
-  funds: { title: string } | { title: string }[] | null
+  funds: { id: string; title: string } | { id: string; title: string }[] | null
 }
 
 export type AccountOverviewData = {
@@ -157,7 +157,7 @@ export async function getAccountOverviewData(
       .limit(6),
     client
       .from('contributions')
-      .select('id, amount, currency_code, status, created_at, funds(title)')
+      .select('id, amount, currency_code, status, created_at, funds(id, title)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     client

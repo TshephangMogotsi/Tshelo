@@ -245,6 +245,7 @@ describe('shared Tshelo API client', () => {
       fund_id: '00000000-0000-4000-8000-000000000001',
       items: [{ description: 'Catering', amount: '250.00', currency_code: 'BWP' }],
     })
+    await client.expenses.remove('00000000-0000-4000-8000-000000000003')
     await client.receipts.createUploadSession({
       fund_id: '00000000-0000-4000-8000-000000000001',
       content_type: 'image/jpeg',
@@ -258,6 +259,7 @@ describe('shared Tshelo API client', () => {
     expect(calls.map(call => [new URL(call.url).pathname, call.options?.method])).toEqual([
       ['/api/v1/contributions/detected-assignment', 'POST'],
       ['/api/v1/expenses', 'POST'],
+      ['/api/v1/expenses/00000000-0000-4000-8000-000000000003', 'DELETE'],
       ['/api/v1/receipts/upload-session', 'POST'],
       ['/api/v1/receipts/parse', 'POST'],
     ])

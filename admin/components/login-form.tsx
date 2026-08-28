@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react'
 import Image from 'next/image'
 import { ArrowLeft, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
+import { createApiClient } from '@/lib/api-client'
 
 type Step = 'phone' | 'code'
 
@@ -61,7 +62,7 @@ export function LoginForm() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const [{ data: admin }, { data: appUser }] = user
+    const [{ data: admin }, appUser] = user
       ? await Promise.all([
           supabase
             .from('platform_admins')
@@ -69,24 +70,18 @@ export function LoginForm() {
             .eq('user_id', user.id)
             .eq('is_active', true)
             .maybeSingle(),
-          supabase
-            .from('users')
-            .select('id')
-            .eq('id', user.id)
-            .eq('is_banned', false)
-            .is('deleted_at', null)
-            .maybeSingle(),
+          createApiClient().users.me().catch(() => null),
         ])
-      : [{ data: null }, { data: null }]
+      : [{ data: null }, null]
 
-    if (!appUser) {
+    if (!appUser || appUser.status === 'banned') {
       await supabase.auth.signOut()
       setLoading(false)
       setMessage('This Tshelo account is not available. Contact support if you need help.')
       return
     }
 
-    window.location.replace(admin ? '/' : '/account')
+    window.location.replace(admin ? '/' : '/account/overview')
   }
 
   return (

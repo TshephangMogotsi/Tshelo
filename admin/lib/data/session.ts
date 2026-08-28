@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { ServerClient } from './client'
 
-export type SignedInDestination = '/' | '/account' | null
+export type SignedInDestination = '/' | '/account/overview' | null
 
 export async function getSignedInDestination(client: ServerClient): Promise<SignedInDestination> {
   const {
@@ -28,6 +28,6 @@ export async function getSignedInDestination(client: ServerClient): Promise<Sign
   ])
 
   if (admin) return '/'
-  if (appUser) return '/account'
+  if (appUser) return '/account/overview'
   return null
 }

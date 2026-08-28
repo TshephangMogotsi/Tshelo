@@ -33,7 +33,7 @@ import {
   resolvePageWindow,
 } from './api-pagination'
 
-const USER_SELECT = 'id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, is_flagged, is_banned, last_active_at, created_at, updated_at'
+const USER_SELECT = 'id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, privacy_accepted_at, privacy_version, marketing_consent, marketing_consent_at, marketing_email_enabled, marketing_sms_enabled, data_processing_consent, data_processing_consent_at, is_flagged, is_banned, last_active_at, created_at, updated_at'
 const NOTIFICATION_SELECT = 'id, user_id, fund_id, type, title, body, data, is_read, read_at, delivered_at, opened_at, clicked_at, response_action, created_at'
 
 function values<T>(value: T | T[] | undefined): T[] {

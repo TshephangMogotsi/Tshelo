@@ -267,6 +267,11 @@ export function buildFundReportHtml(data: FundReportData) {
   memberProfiles.forEach(profile => nameByUserId.set(profile.user_id, profile.name))
   const sponsorshipById = new Map(sponsorshipItems.map(item => [item.id, item]))
   const pledgeById = new Map(contributions.map(item => [item.id, item]))
+  const ownerMember = members.find(member => member.role === 'owner')
+  const ownerName = ownerMember?.user_id
+    ? nameByUserId.get(ownerMember.user_id) ?? ownerMember.invited_name ?? 'Not recorded'
+    : ownerMember?.invited_name ?? 'Not recorded'
+  const ownerContact = maskPhone(ownerMember?.invited_phone ?? null)
 
   const movementRows = [
     ...confirmedContributions.map(item => ({
@@ -496,7 +501,7 @@ export function buildFundReportHtml(data: FundReportData) {
     @page{size:A4;margin:14mm 13mm 18mm}
     *{box-sizing:border-box}
     html{background:#fff}
-    body{margin:0;color:#182138;font-family:Arial,'Helvetica Neue',sans-serif;font-size:10px;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{margin:0;padding:14mm 13mm 18mm;color:#182138;font-family:Arial,'Helvetica Neue',sans-serif;font-size:10px;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     h1,h2,h3,.serif{font-family:Georgia,'Times New Roman',serif;color:#151d33}
     h1{font-size:28px;line-height:1.08;margin:8px 0 4px}
     h2{font-size:18px;line-height:1.15;margin:0}
@@ -549,6 +554,16 @@ export function buildFundReportHtml(data: FundReportData) {
     .integrity h3{font-family:Arial,'Helvetica Neue',sans-serif;color:#6840f2;font-size:8px;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:7px}
     .integrityGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:12px;padding-top:10px;border-top:1px solid #ddd9d0}
     .integrityGrid strong{display:block;font-size:10px;margin-top:4px}
+    .termsGrid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px;row-gap:0;border-top:1px solid #182138}
+    .termsGrid article{padding:10px 0;border-bottom:1px solid #ddd9d0;page-break-inside:avoid}
+    .termsGrid h3{font-family:Arial,'Helvetica Neue',sans-serif;font-size:9px;color:#182138;margin-bottom:3px}
+    .termsGrid p{color:#5c6980;font-size:8.7px}
+    .assurance{margin-top:14px;border:1px solid #ddd9d0}
+    .assuranceRow{display:grid;grid-template-columns:132px 1fr}
+    .assuranceRow+ .assuranceRow{border-top:1px solid #ddd9d0}
+    .assuranceRow h3{padding:11px 12px;background:#f7f5f0;font-family:Arial,'Helvetica Neue',sans-serif;font-size:8px;letter-spacing:.8px;text-transform:uppercase}
+    .assuranceRow p{padding:11px 12px;color:#5c6980}
+    .accountability .integrityGrid{grid-template-columns:1.2fr 1fr 1fr}
     .contents{margin-top:16px}
     .contents h3{margin-bottom:7px}
     .contentsRow{display:grid;grid-template-columns:28px 175px 1fr;padding:4px 0;border-bottom:1px dotted #c9c4ba}
@@ -575,7 +590,11 @@ export function buildFundReportHtml(data: FundReportData) {
     .recordMeta{margin:6px 0;padding:5px 7px;background:#f7f5f0;color:#79869b;font-size:7px;overflow-wrap:anywhere}
     .changeTable th,.changeTable td{padding:5px 6px}
     .appendixTable td{font-size:7.6px}
-    .footer{position:fixed;left:0;right:0;bottom:-12mm;padding-top:5px;border-top:1px solid #d9d5cc;display:flex;justify-content:space-between;color:#505866;font-size:7px}
+    .footer{position:fixed;left:13mm;right:13mm;bottom:6mm;padding-top:5px;border-top:1px solid #d9d5cc;display:flex;justify-content:space-between;color:#505866;font-size:7px}
+    @media print{
+      body{padding:0}
+      .footer{left:0;right:0;bottom:-12mm}
+    }
   </style></head><body>
     <div class="footer"><span>Tshelo Fund Statement · ${escapeHtml(fund.title)} · ${escapeHtml(fund.fund_code)}</span><span>Complete audit report · Issued ${formatShortDate(generatedAt)}</span></div>
 
@@ -625,7 +644,8 @@ export function buildFundReportHtml(data: FundReportData) {
         <div class="contentsRow"><b>03</b><b>Expenses and sponsorship</b><span>Fund spending and items paid for directly</span></div>
         <div class="contentsRow"><b>04</b><b>Governance</b><span>Who belongs to the fund and in which role</span></div>
         <div class="contentsRow"><b>05</b><b>Audit trail</b><span>Stored actions and before-and-after values</span></div>
-        <div class="contentsRow"><b>06</b><b>Appendix, record references</b><span>Technical identifiers and previous exports</span></div>
+        <div class="contentsRow"><b>06</b><b>Notes and definitions</b><span>What this statement can confirm and how to read it</span></div>
+        <div class="contentsRow"><b>07</b><b>Appendix, record references</b><span>Technical identifiers and previous exports</span></div>
       </div>
     </main>
 
@@ -698,17 +718,41 @@ export function buildFundReportHtml(data: FundReportData) {
     </section>
 
     <section class="page">
-      <header class="chapterHeader"><span class="chapterNo">06</span><h2>Appendix, record references</h2><span class="chapterCount">For technical review</span></header>
+      <header class="chapterHeader"><span class="chapterNo">06</span><h2>Notes and definitions</h2><span class="chapterCount">How to read this statement</span></header>
+      <p class="chapterIntro">The terms below explain how financial records and assurance are represented in this statement. They do not replace the original provider records, receipts or agreements between members.</p>
+      <h3 class="sectionTitle">Terms used in this statement</h3>
+      <div class="termsGrid">
+        <article><h3>Pledge</h3><p>A stated intention to contribute. A pledge is not money and remains outside the statement balance until a receipt is confirmed.</p></article>
+        <article><h3>Confirmed contribution</h3><p>An amount recorded as received in Tshelo. It contributes to the running balance and should be checked against its payment reference.</p></article>
+        <article><h3>Payment reference</h3><p>The provider reference stored with a contribution. It helps members compare a recorded receipt with the relevant mobile-money or bank statement.</p></article>
+        <article><h3>Sponsored item</h3><p>An item paid for directly by a member or supporter. It is shown for transparency but does not increase or reduce the fund balance.</p></article>
+        <article><h3>Closing balance</h3><p>Confirmed contributions less expenses paid by the fund. It is an arithmetic record, not a balance independently held or verified by Tshelo.</p></article>
+        <article><h3>Audit history</h3><p>Stored actions, timestamps and, where available, before-and-after values associated with records in this fund.</p></article>
+      </div>
+      <h3 class="sectionTitle">Assurance given, and withheld</h3>
+      <div class="assurance">
+        <div class="assuranceRow"><h3>Tshelo can confirm</h3><p>The records, identifiers, timestamps, stored values and arithmetic presented from its data at the time this statement was issued.</p></div>
+        <div class="assuranceRow"><h3>Tshelo cannot confirm</h3><p>That money physically moved, that the organiser holds the closing balance, or that the named contributor was the person who paid.</p></div>
+      </div>
+      <div class="callout warning"><strong>Reliance by a third party.</strong> Where a decision depends on whether money actually moved, request the matching provider statements and compare their references and dates with the statement of account.</div>
+      <div class="integrity accountability">
+        <h3>Fund accountability</h3>
+        <p>The statement identifies the fund and the scope of records returned at issue time. Use the fund code and record identifiers when a member needs to raise a question or reconcile a line item.</p>
+        <div class="integrityGrid">
+          <div><span>Fund organiser</span><strong>${escapeHtml(ownerName)}</strong><small>${escapeHtml(ownerContact)}</small></div>
+          <div><span>Fund code</span><strong class="number">${escapeHtml(fund.fund_code)}</strong></div>
+          <div><span>Records covered</span><strong>${contributions.length + expenses.length} financial record${contributions.length + expenses.length === 1 ? '' : 's'}</strong></div>
+        </div>
+      </div>
+      <div class="callout"><strong>Keep the source evidence with this statement.</strong> Payment references, mobile-money or bank statements, receipts and member approvals remain the records to rely on when checking a transaction outside Tshelo.</div>
+    </section>
+
+    <section class="page">
+      <header class="chapterHeader"><span class="chapterNo">07</span><h2>Appendix, record references</h2><span class="chapterCount">For technical review</span></header>
       <p class="chapterIntro">System identifiers for financial records in this statement. These are useful when a contribution, expense, dispute or audit entry must be traced inside Tshelo.</p>
       <table class="appendixTable"><thead><tr><th>Record</th><th>Date</th><th>Record identifier</th><th>Audit identifier</th></tr></thead><tbody>${recordReferenceRows || emptyRow(4, 'No financial record identifiers are available.')}</tbody></table>
       <h3 class="sectionTitle">Statements previously issued for this fund</h3>
       <table><thead><tr><th>Issued</th><th>Format</th><th>Issued by</th><th>Charge</th><th>Export reference</th></tr></thead><tbody>${exportRows || emptyRow(5, 'No earlier report exports are stored.')}</tbody></table>
-      <h3 class="sectionTitle">How to read this statement</h3>
-      <div class="introGrid">
-        <div class="callout"><strong>Tshelo can confirm</strong> the records, identifiers, timestamps, before-and-after values and arithmetic presented from its stored data at issue time.</div>
-        <div class="callout warning"><strong>Tshelo cannot confirm</strong> that money physically moved, that a closing balance exists in an account, or that a named contributor was the person who paid.</div>
-      </div>
-      <div class="callout"><strong>Reliance by a third party.</strong> Treat this document as a detailed record of what was entered into Tshelo. Where a decision depends on whether money actually moved, request the matching provider statements and compare their references and dates with the statement of account.</div>
     </section>
   </body></html>`
 }

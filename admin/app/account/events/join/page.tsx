@@ -1,7 +1,6 @@
-import type { Metadata } from 'next'
-import { Suspense } from 'react'
-import { JoinEventForm } from '@/components/account-events/join-event-form'
+import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = { title: 'Join an event', description: 'Join a Tshelo event with an invitation code.' }
-
-export default function JoinEventPage() { return <Suspense fallback={<section className="member-card"><div className="member-empty">Loading…</div></section>}><JoinEventForm /></Suspense> }
+export default async function JoinEventPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
+  const { code } = await searchParams
+  redirect(code ? `/account/events?joinCode=${encodeURIComponent(code)}` : '/account/events')
+}

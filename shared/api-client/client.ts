@@ -557,6 +557,9 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       update(expenseId: string, input: UpdateExpenseRequest, call?: ApiCallOptions) {
         return request<Expense>(`/api/v1/expenses/${encodeURIComponent(expenseId)}`, { ...call, method: 'PATCH', body: input })
       },
+      remove(expenseId: string, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/expenses/${encodeURIComponent(expenseId)}`, { ...call, method: 'DELETE' })
+      },
     },
     receipts: {
       createUploadSession(input: CreateReceiptUploadSessionRequest, call?: ApiCallOptions) {

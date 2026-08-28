@@ -396,6 +396,7 @@ export function validateUpdateCurrentUserRequest(
     'bank_account_number', 'profile_completed', 'onboarding_completed',
     'terms_accepted_at', 'terms_version', 'privacy_accepted_at', 'privacy_version',
     'data_processing_consent', 'data_processing_consent_at',
+    'marketing_consent', 'marketing_consent_at', 'marketing_email_enabled', 'marketing_sms_enabled',
   ] as const
   const errors: ApiFieldError[] = []
   rejectUnknownFields(value, allowed, errors)
@@ -437,10 +438,10 @@ export function validateUpdateCurrentUserRequest(
 
   for (const field of [
     'notifications_enabled', 'profile_completed', 'onboarding_completed',
-    'data_processing_consent',
+    'data_processing_consent', 'marketing_consent', 'marketing_email_enabled', 'marketing_sms_enabled',
   ]) optionalBoolean(value, field, errors)
   for (const field of [
-    'terms_accepted_at', 'privacy_accepted_at', 'data_processing_consent_at',
+    'terms_accepted_at', 'privacy_accepted_at', 'data_processing_consent_at', 'marketing_consent_at',
   ]) optionalIsoDateTime(value, field, errors)
 
   if (allowed.every(field => value[field] === undefined)) {
