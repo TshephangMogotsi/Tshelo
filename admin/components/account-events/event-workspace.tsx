@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { BellRing, CircleCheck, Clipboard, HandCoins, MapPin, RefreshCw, Settings, UsersRound, WalletCards } from 'lucide-react'
 import type { EventWorkspace, UpdateEventRequest } from '@shared/contracts'
 import { StatusPill } from '@/components/status-pill'
@@ -12,11 +12,43 @@ import { normalizeEventTime } from '@/lib/event-form'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
 import { invalidateHomeSummary } from '@/lib/home-summary-cache'
 
+type EventWorkspaceTab = 'overview' | 'guests' | 'announcements' | 'budget' | 'settings'
+
+const eventWorkspaceTabs: Array<{ id: EventWorkspaceTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'guests', label: 'Guests' },
+  { id: 'announcements', label: 'Updates' },
+  { id: 'budget', label: 'Budget' },
+  { id: 'settings', label: 'Settings' },
+]
+
 function Summary({ workspace }: { workspace: EventWorkspace }) {
   const event = workspace.event
   const confirmed = workspace.guests.filter(guest => guest.rsvp_status === 'yes').reduce((sum, guest) => sum + 1 + guest.plus_ones, 0)
   const pending = workspace.guests.filter(guest => guest.rsvp_status === 'pending' || guest.rsvp_status === 'maybe').length
-  return <section className="member-card"><div className="member-workspace-summary"><div className="member-workspace-emoji">{event.event_emoji ?? '🎉'}</div><div className="member-workspace-copy"><span>{titleCase(event.event_type)} · {event.event_code}</span><h2>{event.name}</h2><p>{event.description || 'No description has been added yet.'}</p></div><StatusPill value={event.status} /></div><div className="member-workspace-stats"><div><span>Date</span><strong>{formatDate(event.event_date)}</strong></div><div><span>Confirmed</span><strong>{confirmed}</strong></div><div><span>Awaiting RSVP</span><strong>{pending}</strong></div><div><span>Budget</span><strong>{workspace.budget ? formatMoney(workspace.budget.total_budget, workspace.budget.currency_code) : '—'}</strong></div></div><div className="member-event-location"><MapPin size={16} /><div><strong>{event.venue_name || 'Venue to be confirmed'}</strong><span>{event.venue_address || [event.event_time, event.event_end_time].filter(Boolean).join(' – ') || 'Time to be confirmed'}</span></div></div></section>
+  const guestCount = workspace.guests.reduce((sum, guest) => sum + 1 + guest.plus_ones, 0)
+  const schedule = [event.event_time, event.event_end_time].filter(Boolean).join(' – ') || 'Time to be confirmed'
+
+  return <section className="member-card member-fund-overview">
+    <div className="member-fund-overview-head">
+      <div className="member-workspace-emoji" aria-hidden="true">{event.event_emoji ?? '🎉'}</div>
+      <div className="member-workspace-copy"><span>{titleCase(event.event_type)} · {event.event_code}</span><h2>{event.name}</h2><p>{event.description || 'No description has been added yet.'}</p></div>
+      <StatusPill value={event.status} />
+    </div>
+    <div className="member-fund-overview-metrics">
+      <section className="member-fund-goal-card" aria-label="Event schedule">
+        <div className="member-fund-goal-heading"><div><span>Event date</span><strong>{formatDate(event.event_date)}</strong></div><b>{titleCase(event.status)}</b></div>
+        <dl className="member-fund-goal-details"><div><dt>Venue</dt><dd>{event.venue_name || 'To be confirmed'}</dd></div><div><dt>Time</dt><dd>{schedule}</dd></div></dl>
+      </section>
+      <div className="member-fund-metric-grid" aria-label="Event metrics">
+        <article><span>Confirmed</span><strong>{confirmed}</strong><small>Guests attending</small></article>
+        <article><span>Awaiting RSVP</span><strong>{pending}</strong><small>Need a response</small></article>
+        <article><span>Guest list</span><strong>{guestCount}</strong><small>People invited</small></article>
+        <article><span>Budget</span><strong>{workspace.budget ? formatMoney(workspace.budget.total_budget, workspace.budget.currency_code) : '—'}</strong><small>Planned event spend</small></article>
+      </div>
+    </div>
+    <div className="member-event-location"><MapPin size={16} /><div><strong>{event.venue_name || 'Venue to be confirmed'}</strong><span>{event.venue_address || schedule}</span></div></div>
+  </section>
 }
 
 function GuestDirectory({ workspace }: { workspace: EventWorkspace }) {
@@ -73,11 +105,64 @@ function EventSettings({ workspace, reload }: { workspace: EventWorkspace; reloa
 }
 
 export function EventWorkspaceView({ eventId }: { eventId: string }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams(); const [workspace, setWorkspace] = useState<EventWorkspace | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [version, setVersion] = useState(0)
   const reload = useCallback(() => { invalidateHomeSummary(); setError(''); setVersion(value => value + 1) }, [])
   useEffect(() => { const controller = new AbortController(); runApiRead(call => createApiClient().events.workspace(eventId, call), controller.signal).then(setWorkspace).catch(cause => { const message = apiErrorMessage(cause); if (message) setError(message) }).finally(() => { if (!controller.signal.aborted) setLoading(false) }); return () => controller.abort() }, [eventId, version])
   const notice = useMemo(() => searchParams.get('created') === '1' ? 'Event created. Share its invitation code when you are ready.' : searchParams.get('joined') === '1' ? 'You joined this event successfully.' : '', [searchParams])
+  const requestedTab = searchParams.get('tab')
+  const activeTab: EventWorkspaceTab = eventWorkspaceTabs.some(tab => tab.id === requestedTab) ? requestedTab as EventWorkspaceTab : 'overview'
+
+  function selectTab(tab: EventWorkspaceTab) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (tab === 'overview') params.delete('tab')
+    else params.set('tab', tab)
+    const query = params.toString()
+    router.replace((query ? `${pathname}?${query}` : pathname) as never, { scroll: false })
+  }
+
   if (loading) return <section className="member-card"><div className="member-empty">Loading event workspace…</div></section>
   if (!workspace) return <section className="member-card"><div className="member-api-state error"><p>{error || 'This event could not be loaded.'}</p><div><button type="button" onClick={reload}><RefreshCw size={14} /> Try again</button><Link href="/account/events">Back to events</Link></div></div></section>
-  return <><section className="member-pagehead"><div><Link className="member-back-link" href="/account/events">← My events</Link><h1>Event <em>workspace</em></h1></div><nav className="member-page-actions" aria-label="Event workspace sections"><a href="#guests">Guests</a><a href="#announcements">Updates</a><a href="#budget">Budget</a><a href="#settings">Settings</a></nav></section>{notice && <p className="member-success-note"><CircleCheck size={16} /> {notice}</p>}{error && <p className="member-form-error" role="alert">{error}</p>}<Summary workspace={workspace} />{workspace.event.linked_fund_id && <section className="member-event-linked"><HandCoins size={18} /><div><strong>Event + Fund workspace</strong><span>Contributions, expenses, members and sponsorships live in the linked fund.</span></div><Link href={`/account/funds/${workspace.event.linked_fund_id}` as never}>Manage fund</Link></section>}<GuestDirectory workspace={workspace} /><Announcements workspace={workspace} reload={reload} /><EventBudgetPanel workspace={workspace} reload={reload} /><EventSettings workspace={workspace} reload={reload} /></>
+  return <>
+    <section className="member-pagehead">
+      <div>
+        <nav className="fund-breadcrumbs" aria-label="Breadcrumb">
+          <Link href="/account/events">My events</Link>
+          <span aria-hidden="true">›</span>
+          <span aria-current="page">{workspace.event.name}</span>
+        </nav>
+        <h1>Event <em>workspace</em></h1>
+      </div>
+    </section>
+
+    {notice && <p className="member-success-note"><CircleCheck size={16} /> {notice}</p>}
+    {error && <p className="member-form-error" role="alert">{error}</p>}
+
+    <div className="fund-workspace-tab-view">
+      <nav className="fund-workspace-tabs" role="tablist" aria-label="Event workspace sections">
+        {eventWorkspaceTabs.map(tab => <button
+          key={tab.id}
+          id={`event-workspace-tab-${tab.id}`}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab.id}
+          aria-controls="event-workspace-panel"
+          className={activeTab === tab.id ? 'active' : ''}
+          onClick={() => selectTab(tab.id)}
+        >{tab.label}</button>)}
+      </nav>
+
+      <div id="event-workspace-panel" role="tabpanel" aria-labelledby={`event-workspace-tab-${activeTab}`}>
+        {activeTab === 'overview' && <>
+          <Summary workspace={workspace} />
+          {workspace.event.linked_fund_id && <section className="member-event-linked"><HandCoins size={18} /><div><strong>Event + Fund workspace</strong><span>Contributions, expenses, members and sponsorships live in the linked fund.</span></div><Link href={`/account/funds/${workspace.event.linked_fund_id}` as never}>Manage fund</Link></section>}
+        </>}
+        {activeTab === 'guests' && <GuestDirectory workspace={workspace} />}
+        {activeTab === 'announcements' && <Announcements workspace={workspace} reload={reload} />}
+        {activeTab === 'budget' && <EventBudgetPanel workspace={workspace} reload={reload} />}
+        {activeTab === 'settings' && <EventSettings workspace={workspace} reload={reload} />}
+      </div>
+    </div>
+  </>
 }
