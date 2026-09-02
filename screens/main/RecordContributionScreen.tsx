@@ -15,6 +15,7 @@ import { detectProvider, type MobileMoneyProvider } from '../../lib/providers'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 import { useFundPermissions } from '../../lib/useFundPermissions'
+import { notifyFundWorkspaceChanged } from '../../lib/fundWorkspaceRefresh'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'RecordContribution'>
@@ -363,6 +364,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
           amount: String(Math.min(parsedAmount, selectedOpenPledge.outstanding_amount)),
           })
         } catch {
+          notifyFundWorkspaceChanged(fundId)
           hapticError()
           Alert.alert(
             'Contribution saved without allocation',
@@ -385,6 +387,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
             amount: String(Math.min(parsedAmount, selectedSponsorshipItem.outstanding_amount)),
           })
         } catch {
+          notifyFundWorkspaceChanged(fundId)
           hapticError()
           Alert.alert(
             'Contribution saved without item allocation',
@@ -395,6 +398,7 @@ export default function RecordContributionScreen({ navigation, route }: Props) {
         }
       }
 
+      notifyFundWorkspaceChanged(fundId)
       hapticSuccess()
       navigation.goBack()
     } catch (e) {

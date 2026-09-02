@@ -18,6 +18,7 @@ import ChooseMethodStep from './recordExpense/ChooseMethodStep'
 import ManualEntryStep, { PayerOption } from './recordExpense/ManualEntryStep'
 import ReviewStep, { ReviewItem } from './recordExpense/ReviewStep'
 import { useFundPermissions } from '../../lib/useFundPermissions'
+import { notifyFundWorkspaceChanged } from '../../lib/fundWorkspaceRefresh'
 import LoadingOverlay from '../../components/LoadingOverlay'
 
 type Props = {
@@ -167,6 +168,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
           ...(payer ? { sponsored_by_user_id: payer.userId, sponsored_by_name: payer.name } : {}),
         }],
       })
+      notifyFundWorkspaceChanged(fundId)
 
       if (!result.sponsorship_fulfilled) {
         hapticError()
@@ -217,6 +219,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
         items: rows,
         fulfill_sponsorship_item_id: sponsorshipItemId ?? null,
       })
+      notifyFundWorkspaceChanged(fundId)
 
       if (!result.sponsorship_fulfilled) {
         hapticError()

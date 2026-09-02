@@ -10,6 +10,7 @@ type Props = {
   inviteType: 'Event' | 'Fund'
   title: string
   inviteValue: string
+  inviteLink?: string
   helpText: string
   shareMessage: string
   onClose: () => void
@@ -20,6 +21,7 @@ export default function InviteDetailsModal({
   inviteType,
   title,
   inviteValue,
+  inviteLink,
   helpText,
   shareMessage,
   onClose,
@@ -44,8 +46,13 @@ export default function InviteDetailsModal({
   }
 
   function copyInvite() {
-    Clipboard.setString(inviteValue)
+    Clipboard.setString(inviteLink ?? inviteValue)
     onClose()
+    Alert.alert('Copied', `${inviteType} invite ${inviteLink ? 'link' : 'code'} copied.`)
+  }
+
+  function copyCode() {
+    Clipboard.setString(inviteValue)
     Alert.alert('Copied', `${inviteType} invite code copied.`)
   }
 
@@ -73,8 +80,34 @@ export default function InviteDetailsModal({
           <Text style={styles.help}>{helpText}</Text>
           <View style={styles.codeBox}>
             <Text style={styles.codeLabel}>{inviteType.toUpperCase()} INVITE CODE</Text>
-            <Text style={styles.codeText} selectable numberOfLines={2}>{inviteValue}</Text>
+            <View style={styles.codeRow}>
+              <Text style={styles.codeText} selectable numberOfLines={2}>{inviteValue}</Text>
+              <TouchableOpacity
+                style={styles.codeCopyButton}
+                onPress={copyCode}
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                accessibilityLabel={`Copy ${inviteType.toLowerCase()} invite code`}
+              >
+                <Ionicons name="copy-outline" size={17} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
+          {inviteLink ? (
+            <TouchableOpacity
+              style={styles.linkBox}
+              onPress={() => { void Linking.openURL(inviteLink) }}
+              activeOpacity={0.76}
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${inviteType.toLowerCase()} invite link`}
+            >
+              <Text style={styles.codeLabel}>{inviteType.toUpperCase()} INVITE LINK</Text>
+              <View style={styles.linkRow}>
+                <Text style={styles.linkText} selectable>{inviteLink}</Text>
+                <Ionicons name="open-outline" size={17} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.options}>
             <TouchableOpacity style={styles.option} onPress={() => { void shareToWhatsApp() }}>
@@ -87,7 +120,7 @@ export default function InviteDetailsModal({
             </TouchableOpacity>
             <TouchableOpacity style={styles.option} onPress={copyInvite}>
               <View style={styles.optionIcon}><Ionicons name="copy-outline" size={21} color={colors.textPrimary} /></View>
-              <Text style={styles.optionText}>Copy</Text>
+              <Text style={styles.optionText}>{inviteLink ? 'Copy link' : 'Copy code'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.option} onPress={() => { void shareMore() }}>
               <View style={styles.optionIcon}><Ionicons name="ellipsis-horizontal" size={21} color={colors.textPrimary} /></View>
@@ -112,8 +145,13 @@ function makeStyles(colors: AppColors) {
     closeButton: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
     help: { marginTop: 12, fontSize: 10, lineHeight: 16, fontFamily: fonts.inter.regular, color: colors.textSecondary },
     codeBox: { marginTop: 14, padding: 14, borderRadius: 14, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.border },
+    codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    codeCopyButton: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+    linkBox: { marginTop: 9, padding: 14, borderRadius: 14, backgroundColor: colors.background },
+    linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     codeLabel: { marginBottom: 4, fontSize: 8, fontFamily: fonts.inter.black, color: colors.primary, letterSpacing: 0.55 },
-    codeText: { fontSize: 14, lineHeight: 20, fontFamily: fonts.inter.extraBold, color: colors.textPrimary, letterSpacing: 0.4 },
+    codeText: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20, fontFamily: fonts.inter.extraBold, color: colors.textPrimary, letterSpacing: 0.4 },
+    linkText: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 16, fontFamily: fonts.inter.semiBold, color: colors.textPrimary },
     options: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
     option: { width: '24%', alignItems: 'center' },
     optionIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },

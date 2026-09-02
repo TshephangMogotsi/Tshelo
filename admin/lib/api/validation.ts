@@ -49,6 +49,7 @@ import {
 } from '@shared/contracts/funds'
 import type { MarkNotificationsReadRequest } from '@shared/contracts/notifications'
 import type { CreateExpensesRequest, UpdateExpenseRequest } from '@shared/contracts/expenses'
+import { isExpenseCategory } from '@shared/contracts/expenses'
 import type { CreateReceiptUploadSessionRequest, ParseReceiptRequest } from '@shared/contracts/receipts'
 import { RECEIPT_MEDIA_TYPES } from '@shared/contracts/receipts'
 import type { CreateRichAuntieAwardRequest } from '@shared/contracts/rich-auntie'
@@ -787,16 +788,25 @@ export function validateCreateSponsorshipAllocationRequest(input: unknown): Vali
 
 function validateExpenseItem(value: JsonObject, errors: ApiFieldError[], prefix: string, partial: boolean) {
   const allowed = partial
-    ? ['description', 'item_name', 'category', 'amount', 'quantity', 'unit_price', 'vendor_name', 'sponsored_by_user_id', 'sponsored_by_name']
-    : ['description', 'item_name', 'category', 'amount', 'currency_code', 'quantity', 'unit_price', 'vendor_name', 'receipt_path', 'sponsored_by_user_id', 'sponsored_by_name']
+    ? ['description', 'item_name', 'category', 'custom_category', 'amount', 'quantity', 'unit_price', 'vendor_name', 'sponsored_by_user_id', 'sponsored_by_name']
+    : ['description', 'item_name', 'category', 'custom_category', 'amount', 'currency_code', 'quantity', 'unit_price', 'vendor_name', 'receipt_path', 'sponsored_by_user_id', 'sponsored_by_name']
   rejectUnknownFields(value, allowed, errors, prefix)
   const field = (name: string) => `${prefix}.${name}`
   if (!partial || value.description !== undefined) {
     if (typeof value.description !== 'string' || value.description.trim().length < 1 || value.description.trim().length > 500) errors.push(issue(field('description'), 'invalid_string', 'Must contain between 1 and 500 characters.'))
   }
-  for (const name of ['item_name', 'category', 'vendor_name', 'sponsored_by_name'] as const) {
+  for (const name of ['item_name', 'vendor_name', 'sponsored_by_name'] as const) {
     const candidate = value[name]
     if (candidate !== undefined && candidate !== null && (typeof candidate !== 'string' || candidate.length > 200)) errors.push(issue(field(name), 'invalid_string', 'Must be a string of at most 200 characters or null.'))
+  }
+  if (value.category !== undefined && value.category !== null && !isExpenseCategory(value.category)) {
+    errors.push(issue(field('category'), 'invalid_category', 'Choose a valid expense category.'))
+  }
+  if (value.custom_category !== undefined && value.custom_category !== null && (typeof value.custom_category !== 'string' || value.custom_category.trim().length < 2 || value.custom_category.trim().length > 80)) {
+    errors.push(issue(field('custom_category'), 'invalid_string', 'Custom category must contain between 2 and 80 characters.'))
+  }
+  if (value.custom_category && value.category !== 'other') {
+    errors.push(issue(field('custom_category'), 'invalid_category', 'Custom categories must use the Other category.'))
   }
   for (const name of ['amount', 'quantity', 'unit_price'] as const) {
     const candidate = value[name]

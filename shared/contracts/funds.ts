@@ -258,6 +258,7 @@ export type FundWorkspaceExpense = {
   vendor_name: string | null
   description: string
   category: string | null
+  custom_category: string | null
   amount: MoneyAmount
   created_at: IsoDateTime
   notes: string | null

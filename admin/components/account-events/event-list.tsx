@@ -12,6 +12,7 @@ import { invalidateHomeSummary, loadHomeSummary } from '@/lib/home-summary-cache
 import { JoinEventDialog } from './join-event-dialog'
 
 type EventTabId = 'organised' | 'eventFund' | 'attending' | 'past'
+type EventFundView = 'organised' | 'member' | 'closed'
 
 function EventCard({ item }: { item: HomeSummaryItem }) {
   const eventId = item.event_id ?? item.id
@@ -37,6 +38,7 @@ export function EventList() {
   const [error, setError] = useState('')
   const [version, setVersion] = useState(0)
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
+  const [eventFundView, setEventFundView] = useState<EventFundView>('organised')
   const retry = useCallback(() => { setLoading(true); setError(''); setVersion(value => value + 1) }, [])
 
   useEffect(() => {
@@ -51,10 +53,16 @@ export function EventList() {
 
   const active = events.filter(item => item.status === 'active')
   const eventFunds = active.filter(item => item.kind === 'eventFund')
+  const allEventFunds = events.filter(item => item.kind === 'eventFund')
   const eventOnly = active.filter(item => item.kind !== 'eventFund')
   const organised = eventOnly.filter(item => item.role === 'organiser' || item.role === 'owner')
   const attending = eventOnly.filter(item => item.role !== 'organiser' && item.role !== 'owner')
   const past = events.filter(item => item.status !== 'active')
+  const eventFundTabs: Array<{ id: EventFundView; label: string; items: HomeSummaryItem[]; empty: string }> = [
+    { id: 'organised', label: 'Event + Funds I organise', items: eventFunds.filter(item => item.role === 'organiser' || item.role === 'owner'), empty: 'Create an Event + Fund to organise contributions and an event budget together.' },
+    { id: 'member', label: "Event + Funds I’m part of", items: eventFunds.filter(item => item.role !== 'organiser' && item.role !== 'owner'), empty: 'Event + Funds you join will appear here.' },
+    { id: 'closed', label: 'Closed Event + Funds', items: allEventFunds.filter(item => item.status !== 'active'), empty: 'Completed and closed Event + Funds will appear here.' },
+  ]
   const requestedTab = searchParams.get('tab')
   const initialJoinCode = searchParams.get('joinCode')?.trim() ?? ''
   const showJoinDialog = joinDialogOpen || Boolean(initialJoinCode)
@@ -66,6 +74,8 @@ export function EventList() {
     { id: 'past', label: 'Past events', items: past, empty: 'Completed and cancelled events will appear here.' },
   ]
   const selectedTab = tabs.find(tab => tab.id === activeTab)!
+  const selectedEventFundTab = eventFundTabs.find(tab => tab.id === eventFundView)!
+  const showEventFundDashboard = activeTab === 'eventFund'
 
   function selectTab(tab: EventTabId) {
     const params = new URLSearchParams(searchParams.toString())
@@ -98,11 +108,22 @@ export function EventList() {
   }
 
   return <div className="tshelo-dashboard">
-    <section className="member-pagehead"><div><h1>My <em>events</em></h1></div><div className="member-page-actions"><button type="button" onClick={() => setJoinDialogOpen(true)}>Join with a code</button><Link className="primary" href={'/account/events/new' as Route}>Create an event</Link></div></section>
+    <section className="member-pagehead"><div><h1>{showEventFundDashboard ? <>Event + <em>Funds</em></> : <>My <em>events</em></>}</h1></div><div className="member-page-actions"><button type="button" onClick={() => setJoinDialogOpen(true)}>Join with a code</button><Link className="primary" href={(showEventFundDashboard ? '/account/events/new?mode=eventFund' : '/account/events/new') as Route}>{showEventFundDashboard ? 'Create Event + Fund' : 'Create an event'}</Link></div></section>
     {searchParams.get('joined') === '1' && <p className="member-success-note"><CircleCheck size={16} /> You joined the event successfully.</p>}
     {loading && <section className="card"><div className="member-empty">Loading your events…</div></section>}
     {error && <section className="card"><div className="member-api-state error"><p>{error}</p><button type="button" onClick={retry}><RefreshCw size={14} /> Try again</button></div></section>}
-    {!loading && !error && <div className="fund-tabs-view">
+    {!loading && !error && showEventFundDashboard && <div className="fund-tabs-view">
+      <div className="fund-tabbar">
+        <div className="fund-tabs" role="tablist" aria-label="Event + Fund groups">
+          {eventFundTabs.map(tab => <button key={tab.id} className={`fund-tab ${tab.id === eventFundView ? 'active' : ''}`} type="button" role="tab" aria-selected={tab.id === eventFundView} onClick={() => setEventFundView(tab.id)}><span>{tab.label}</span><b>{tab.items.length}</b></button>)}
+        </div>
+      </div>
+      <section className="card fund-tab-panel" role="tabpanel">
+        <header className="fund-panel-heading"><h2>{selectedEventFundTab.label}</h2><span>{selectedEventFundTab.items.length} {selectedEventFundTab.items.length === 1 ? 'event + fund' : 'event + funds'}</span></header>
+        <div className="body member-events-list">{selectedEventFundTab.items.map(item => <EventCard key={item.id} item={item} />)}{!selectedEventFundTab.items.length && <div className="member-empty">{selectedEventFundTab.empty}</div>}</div>
+      </section>
+    </div>}
+    {!loading && !error && !showEventFundDashboard && <div className="fund-tabs-view">
       <div className="fund-tabbar">
         <div className="fund-tabs" role="tablist" aria-label="Event groups">
           {tabs.map((tab, index) => <button key={tab.id} id={`event-tab-${tab.id}`} className={`fund-tab ${tab.id === activeTab ? 'active' : ''}`} type="button" role="tab" aria-selected={tab.id === activeTab} aria-controls="event-panel" tabIndex={tab.id === activeTab ? 0 : -1} onClick={() => selectTab(tab.id)} onKeyDown={event => handleTabKeyDown(event, index)}><span>{tab.label}</span><b>{tab.items.length}</b></button>)}

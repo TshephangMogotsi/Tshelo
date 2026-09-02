@@ -222,7 +222,7 @@ export function FundList() {
     try {
       const workspace = await runApiRead(call => createApiClient().funds.workspace(item.fund_id!, call))
       setInvite({
-        code: workspace.fund.share_code || workspace.fund.fund_code,
+        code: workspace.fund.fund_code,
         fundTitle: workspace.fund.title,
         memberCount: workspace.fund.totals.member_count,
       })

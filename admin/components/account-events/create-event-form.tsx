@@ -3,8 +3,8 @@
 import { useRef, useState, type FormEvent } from 'react'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { CalendarPlus, ChevronDown, HandCoins } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { CalendarPlus, ChevronDown } from 'lucide-react'
 import type { CreateEventFundRequest, CreateEventRequest, CurrencyCode, EventOrganiserInput, EventType } from '@shared/contracts'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage } from '@/lib/api-ui'
@@ -25,20 +25,15 @@ function organiser(form: FormData): EventOrganiserInput[] {
 
 export function CreateEventForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const formRef = useRef<HTMLFormElement>(null)
-  const [mode, setMode] = useState<'event' | 'eventFund'>('event')
+  const mode = searchParams.get('mode') === 'eventFund' ? 'eventFund' : 'event'
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const stepLabels = ['Event details', 'Time & location', 'Co-organisers']
   const stepTitle = step === 0 && mode === 'eventFund' ? 'Event and fund details' : stepLabels[step]
-
-  function chooseMode(nextMode: 'event' | 'eventFund') {
-    setMode(nextMode)
-    setStep(0)
-    setError('')
-  }
 
   function advance() {
     const missingPicker = formRef.current?.querySelector<HTMLButtonElement>(`[data-event-step="${step}"] [data-event-required="true"][data-event-value=""]`)
@@ -106,8 +101,7 @@ export function CreateEventForm() {
   }
 
   return <>
-    <section className="member-pagehead"><div><h1>Create an <em>event</em></h1></div><div className="member-page-actions"><Link href={'/account/events' as Route}>Cancel</Link></div></section>
-    <div className="member-create-choice" role="group" aria-label="Event creation type"><button type="button" className={mode === 'event' ? 'active' : ''} aria-pressed={mode === 'event'} onClick={() => chooseMode('event')}><CalendarPlus size={18} /><span><strong>Event only</strong>Invitations, RSVPs, organisers and announcements</span></button><button type="button" className={mode === 'eventFund' ? 'active' : ''} aria-pressed={mode === 'eventFund'} onClick={() => chooseMode('eventFund')}><HandCoins size={18} /><span><strong>Event + Fund</strong>Add contribution tracking and a budget · costs 15 tokens</span></button></div>
+    <section className="member-pagehead"><div><h1>Create an <em>{mode === 'eventFund' ? 'event + fund' : 'event'}</em></h1></div><div className="member-page-actions"><Link href={'/account/events' as Route}>Cancel</Link></div></section>
     <section className="member-card member-form-card"><header><div className="member-section-title"><span><CalendarPlus size={18} /></span><h2>{stepTitle}</h2></div></header>
       <ol className="member-event-stepper" aria-label="Event creation progress">
         {stepLabels.map((label, index) => <li key={label} className={index === step ? 'active' : index < step ? 'complete' : ''}><button type="button" disabled={index > step} aria-current={index === step ? 'step' : undefined} onClick={() => index < step && setStep(index)}><span>{index + 1}</span>{label}</button></li>)}

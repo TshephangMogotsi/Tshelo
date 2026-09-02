@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BadgeDollarSign, CircleCheck, RefreshCw, Settings, UsersRound } from 'lucide-react'
-import type { FundMemberStatus, FundWorkspace, UpdateFundRequest, User } from '@shared/contracts'
+import { Award, BadgeDollarSign, Check, CircleCheck, Copy, RefreshCw, Settings, Share2, UsersRound } from 'lucide-react'
+import { isExpenseCategory, type FundMemberStatus, type FundSponsorshipItem, type FundWorkspace, type RichAuntieAward, type UpdateFundRequest, type User } from '@shared/contracts'
 import { StatusPill } from '@/components/status-pill'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage, runApiRead } from '@/lib/api-ui'
-import { formatMoney, titleCase } from '@/lib/format'
+import { formatDate, formatMoney, titleCase } from '@/lib/format'
 import { invalidateHomeSummary } from '@/lib/home-summary-cache'
-import { FundContributions, FundExpenses } from './fund-finances'
+import { ExpenseCategoryPicker, FundContributions, FundExpenses } from './fund-finances'
 import { FundOperations, FundRichAuntie } from './fund-operations'
 import { InviteMembersDialog } from './invite-members-dialog'
 
@@ -28,23 +28,130 @@ const workspaceTabs: Array<{ id: WorkspaceTab; label: string }> = [
   { id: 'settings', label: 'Settings' },
 ]
 
-function Summary({ data }: { data: WorkspaceData }) {
-  const { fund } = data.workspace
-  const progress = Number(fund.goal_amount) > 0 ? Math.min(100, Math.round((Number(fund.totals.raised) / Number(fund.goal_amount)) * 100)) : 0
+type OverviewActivity = {
+  id: string
+  kind: 'contribution' | 'expense' | 'refund'
+  title: string
+  detail: string
+  amount: number | string
+  createdAt: string
+}
+
+function Summary({ data, onViewActivity }: { data: WorkspaceData; onViewActivity: () => void }) {
+  const { workspace, user } = data
+  const { fund } = workspace
+  const canInvite = fund.status === 'active' && (fund.owner_id === user.id || workspace.permissions.includes('manage_members'))
+  const relativeInviteUrl = `/account/funds?joinCode=${encodeURIComponent(fund.fund_code)}`
+  const [copied, setCopied] = useState<'code' | 'invite' | null>(null)
+  const goal = Number(fund.goal_amount ?? 0)
+  const raised = Number(fund.totals.raised)
+  const progress = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0
+  const remaining = Math.max(goal - raised, 0)
+  const recentActivity = useMemo<OverviewActivity[]>(() => [
+    ...workspace.contributions.map(contribution => ({
+      id: `contribution-${contribution.id}`,
+      kind: contribution.is_refunded ? 'refund' as const : 'contribution' as const,
+      title: contribution.contributor_name || 'Anonymous contribution',
+      detail: contribution.is_refunded ? 'Contribution refunded' : contribution.pledge_state === 'pledged' ? 'Pledge recorded' : 'Contribution recorded',
+      amount: contribution.amount,
+      createdAt: contribution.confirmed_at ?? contribution.created_at,
+    })),
+    ...workspace.expenses.map(expense => ({
+      id: `expense-${expense.id}`,
+      kind: 'expense' as const,
+      title: expense.vendor_name || expense.description || 'Expense recorded',
+      detail: expense.category ? `${expense.custom_category ?? titleCase(expense.category)} expense` : 'Expense recorded',
+      amount: expense.amount,
+      createdAt: expense.created_at,
+    })),
+  ].sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt)).slice(0, 5), [workspace.contributions, workspace.expenses])
+
+  async function copy(value: string, target: 'code' | 'invite') {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(target)
+      window.setTimeout(() => setCopied(current => current === target ? null : current), 1800)
+    } catch {
+      setCopied(null)
+    }
+  }
+
   return (
-    <section className="member-card">
-      <div className="member-workspace-summary">
+    <section className="member-card member-fund-overview">
+      <div className="member-fund-overview-head">
         <div className="member-workspace-emoji" aria-hidden="true">{fund.fund_emoji ?? '💜'}</div>
-        <div className="member-workspace-copy"><span>{titleCase(fund.fund_type)} · {fund.fund_code}</span><h2>{fund.title}</h2><p>{fund.description || 'No description has been added yet.'}</p></div>
+        <div className="member-workspace-copy">
+          <span>{titleCase(fund.fund_type)}</span>
+          <h2>{fund.title}</h2>
+          <p>{fund.description || 'No description has been added yet.'}</p>
+        </div>
         <StatusPill value={fund.status} />
       </div>
-      <div className="member-workspace-stats">
-        <div><span>Raised</span><strong>{formatMoney(fund.totals.raised, fund.currency_code)}</strong></div>
-        <div><span>Spent</span><strong>{formatMoney(fund.totals.spent, fund.currency_code)}</strong></div>
-        <div><span>Balance</span><strong>{formatMoney(fund.totals.balance, fund.currency_code)}</strong></div>
-        <div><span>Members</span><strong>{fund.totals.member_count}</strong></div>
+
+      <div className="member-fund-overview-layout">
+        <div className="member-fund-overview-metrics">
+        <aside className="member-workspace-share-panel" aria-label="Share this fund">
+          <div className="member-workspace-share-heading">
+            <span aria-hidden="true"><Share2 size={15} /></span>
+            <div><strong>Share this fund</strong><small>Send a quick code or a ready-to-use invitation link.</small></div>
+          </div>
+          <div className="member-workspace-invites">
+            <div className="member-workspace-invite-detail">
+              <div><span>Fund code</span><code>{fund.fund_code}</code></div>
+              <button type="button" onClick={() => copy(fund.fund_code, 'code')} aria-label={copied === 'code' ? 'Fund code copied' : 'Copy fund code'} title={copied === 'code' ? 'Copied' : 'Copy fund code'}>
+                {copied === 'code' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+              </button>
+            </div>
+            {canInvite && <div className="member-workspace-invite-detail invite-link">
+              <div><span>Invite link</span><code>{relativeInviteUrl}</code></div>
+              <button type="button" onClick={() => copy(new URL(relativeInviteUrl, window.location.origin).toString(), 'invite')} aria-label={copied === 'invite' ? 'Invite link copied' : 'Copy invite link'} title={copied === 'invite' ? 'Copied' : 'Copy invite link'}>
+                {copied === 'invite' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+              </button>
+            </div>}
+          </div>
+        </aside>
+
+          <section className="member-fund-goal-card" aria-label="Fund goal">
+            <div className="member-fund-goal-heading">
+              <div><span>Fund goal</span><strong>{goal > 0 ? formatMoney(fund.goal_amount, fund.currency_code) : 'No goal set'}</strong></div>
+              {goal > 0 && <b>{progress}% funded</b>}
+            </div>
+            {goal > 0 ? <>
+              <div className="member-fund-goal-raised"><span>Raised so far</span><strong>{formatMoney(fund.totals.raised, fund.currency_code)}</strong></div>
+              <div className="member-fund-goal-progress" aria-label={`${progress}% of goal funded`}><i style={{ width: `${progress}%` }} /></div>
+              <dl className="member-fund-goal-details">
+                <div><dt>Still needed</dt><dd>{formatMoney(remaining, fund.currency_code)}</dd></div>
+                <div><dt>Deadline</dt><dd>{formatDate(fund.contribution_deadline)}</dd></div>
+              </dl>
+            </> : <p>Set a target in Settings to keep every contribution focused on what the fund needs.</p>}
+          </section>
+
+          <div className="member-fund-metric-grid" aria-label="Fund metrics">
+            <article><span>Raised</span><strong>{formatMoney(fund.totals.raised, fund.currency_code)}</strong><small>{fund.totals.contribution_count} {fund.totals.contribution_count === 1 ? 'contribution' : 'contributions'}</small></article>
+            <article><span>Spent</span><strong>{formatMoney(fund.totals.spent, fund.currency_code)}</strong><small>Recorded fund expenses</small></article>
+            <article><span>Available</span><strong>{formatMoney(fund.totals.balance, fund.currency_code)}</strong><small>Ready to use</small></article>
+            <article><span>Members</span><strong>{fund.totals.member_count}</strong><small>People in this fund</small></article>
+          </div>
+        </div>
+
+        <aside className="member-fund-activity-card" aria-label="Recent activity">
+          <div className="member-fund-activity-heading">
+            <div><span>Live ledger</span><h3>Recent activity</h3></div>
+            <button type="button" onClick={onViewActivity}>View all</button>
+          </div>
+          {recentActivity.length ? <ol className="member-fund-activity-list">
+            {recentActivity.map(activity => <li key={activity.id}>
+              <span className={`member-fund-activity-icon ${activity.kind}`} aria-hidden="true"><BadgeDollarSign size={15} /></span>
+              <div>
+                <strong>{activity.title}</strong>
+                <p>{activity.detail}</p>
+                <time dateTime={activity.createdAt}>{formatDate(activity.createdAt)}</time>
+              </div>
+              <b className={activity.kind}>{activity.kind === 'contribution' ? '+' : '−'}{formatMoney(activity.amount, fund.currency_code)}</b>
+            </li>)}
+          </ol> : <div className="member-fund-activity-empty"><BadgeDollarSign size={20} aria-hidden="true" /><strong>Your fund activity will appear here.</strong><p>Contributions and recorded expenses are shown together in date order.</p></div>}
+        </aside>
       </div>
-      <div className="member-workspace-progress"><div><span>{progress}% funded</span><span>{formatMoney(fund.goal_amount, fund.currency_code)} goal</span></div><div><i style={{ width: `${progress}%` }} /></div></div>
     </section>
   )
 }
@@ -55,6 +162,19 @@ function MemberDirectory({ data, reload }: { data: WorkspaceData; reload: () => 
   const canManage = workspace.fund.status === 'active' && (isOwner || workspace.permissions.includes('manage_members'))
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [awards, setAwards] = useState<RichAuntieAward[]>([])
+  const awardsByRecipient = useMemo(() => awards.reduce((counts, award) => {
+    counts.set(award.recipient_user_id, (counts.get(award.recipient_user_id) ?? 0) + 1)
+    return counts
+  }, new Map<string, number>()), [awards])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    runApiRead(call => createApiClient().richAuntie.listAwards({ fund_id: workspace.fund.id, limit: 100 }, call), controller.signal)
+      .then(page => setAwards(page.items))
+      .catch(() => { if (!controller.signal.aborted) setAwards([]) })
+    return () => controller.abort()
+  }, [workspace.fund.id])
 
   async function changeMember(memberId: string, status: Extract<FundMemberStatus, 'joined' | 'declined' | 'removed'>) {
     setBusy(`${memberId}:${status}`)
@@ -74,10 +194,11 @@ function MemberDirectory({ data, reload }: { data: WorkspaceData; reload: () => 
       <header><div className="member-section-title"><span><UsersRound size={18} /></span><h2>Members</h2></div><small>{workspace.members.length} total</small></header>
       <div className="member-card-body">
         <div className="member-directory">
-          {workspace.members.map(member => (
-            <article key={member.id}>
+          {workspace.members.map(member => {
+            const awardCount = member.user_id ? awardsByRecipient.get(member.user_id) ?? 0 : 0
+            return <article key={member.id}>
               <div className="member-directory-avatar">{member.display_name.slice(0, 2).toUpperCase()}</div>
-              <div><strong>{member.display_name}</strong><p>{member.phone || 'Phone unavailable'} · {titleCase(member.role)}</p></div>
+              <div><div className="member-directory-name"><strong>{member.display_name}</strong>{awardCount > 0 && <span className="member-rich-auntie-badge" title={`${awardCount} Rich Auntie award${awardCount === 1 ? '' : 's'}`}><Award size={13} aria-hidden="true" /><span>Rich Auntie</span></span>}</div><p>{member.phone || 'Phone unavailable'} · {titleCase(member.role)}</p></div>
               <StatusPill value={member.status} />
               {canManage && member.user_id !== data.user.id && (
                 <div className="member-inline-actions">
@@ -86,13 +207,51 @@ function MemberDirectory({ data, reload }: { data: WorkspaceData; reload: () => 
                 </div>
               )}
             </article>
-          ))}
+          })}
           {!workspace.members.length && <div className="member-empty">No members are listed yet.</div>}
         </div>
         {error && <p className="member-form-error" role="alert">{error}</p>}
       </div>
     </section>
   )
+}
+
+function sponsorshipCategoryValue(category: string, customCategory: string) {
+  return category === 'other' ? customCategory.trim() || null : category || null
+}
+
+function SponsorshipItemEditor({
+  item,
+  customCategories,
+  busy,
+  onCancel,
+  onSave,
+}: {
+  item: FundSponsorshipItem
+  customCategories: string[]
+  busy: boolean
+  onCancel: () => void
+  onSave: (values: { title: string; description: string; category: string | null; targetAmount: string }) => void
+}) {
+  const existingCategory = item.category ?? ''
+  const [title, setTitle] = useState(item.title)
+  const [description, setDescription] = useState(item.description ?? '')
+  const [category, setCategory] = useState(isExpenseCategory(existingCategory) ? existingCategory : existingCategory ? 'other' : '')
+  const [customCategory, setCustomCategory] = useState(isExpenseCategory(existingCategory) ? '' : existingCategory)
+  const [targetAmount, setTargetAmount] = useState(item.target_amount)
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    onSave({ title: title.trim(), description: description.trim(), category: sponsorshipCategoryValue(category, customCategory), targetAmount })
+  }
+
+  return <form className="member-inline-editor" onSubmit={submit}>
+    <label className="wide"><span>Item</span><input value={title} onChange={event => setTitle(event.target.value)} required minLength={2} maxLength={200} /></label>
+    <div className="member-category-field"><span>Category</span><ExpenseCategoryPicker category={category} customCategory={customCategory} savedCustomCategories={customCategories} onCategoryChange={setCategory} onCustomCategoryChange={setCustomCategory} /></div>
+    <label><span>Target</span><input value={targetAmount} onChange={event => setTargetAmount(event.target.value)} type="number" min="0.01" step="0.01" required /></label>
+    <label className="wide"><span>Description</span><textarea value={description} onChange={event => setDescription(event.target.value)} rows={2} maxLength={1000} /></label>
+    <div className="member-form-actions wide"><button type="button" onClick={onCancel}>Cancel</button><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save item'}</button></div>
+  </form>
 }
 
 function SponsorshipBoard({ data, reload }: { data: WorkspaceData; reload: () => void }) {
@@ -102,20 +261,30 @@ function SponsorshipBoard({ data, reload }: { data: WorkspaceData; reload: () =>
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [editing, setEditing] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [newCustomCategory, setNewCustomCategory] = useState('')
+  const customCategories = useMemo(() => Array.from(new Set([
+    ...workspace.expenses.map(item => item.custom_category?.trim() ?? ''),
+    ...workspace.sponsorship_items.map(item => item.category?.trim() ?? '').filter(item => item && !isExpenseCategory(item)),
+  ].filter(Boolean))).sort((left, right) => left.localeCompare(right)), [workspace.expenses, workspace.sponsorship_items])
 
   async function createItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const formElement = event.currentTarget
     const form = new FormData(formElement)
+    const category = sponsorshipCategoryValue(newCategory, newCustomCategory)
+    if (newCategory === 'other' && !category) { setError('Add a custom category or choose a listed category.'); return }
     setBusy('create')
     setError('')
     try {
       await createApiClient().funds.createSponsorship(workspace.fund.id, {
         title: String(form.get('title') ?? '').trim(),
-        category: String(form.get('category') ?? '').trim() || null,
+        category,
         target_amount: String(form.get('target_amount') ?? '').trim(),
       })
       formElement.reset()
+      setNewCategory('')
+      setNewCustomCategory('')
       setBusy('')
       reload()
     } catch (cause) {
@@ -138,16 +307,14 @@ function SponsorshipBoard({ data, reload }: { data: WorkspaceData; reload: () =>
     }
   }
 
-  async function updateItem(event: FormEvent<HTMLFormElement>, itemId: string) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
+  async function updateItem(itemId: string, values: { title: string; description: string; category: string | null; targetAmount: string }) {
     setBusy(itemId); setError('')
     try {
       await createApiClient().funds.updateSponsorship(workspace.fund.id, itemId, {
-        title: String(form.get('title') ?? '').trim(),
-        description: String(form.get('description') ?? '').trim() || null,
-        category: String(form.get('category') ?? '').trim() || null,
-        target_amount: String(form.get('target_amount') ?? '').trim(),
+        title: values.title,
+        description: values.description || null,
+        category: values.category,
+        target_amount: values.targetAmount,
       })
       setEditing(''); setBusy(''); reload()
     } catch (cause) { setError(apiErrorMessage(cause)); setBusy('') }
@@ -167,7 +334,7 @@ function SponsorshipBoard({ data, reload }: { data: WorkspaceData; reload: () =>
         {canManage && (
           <form className="member-compact-form" onSubmit={createItem}>
             <label><span>Item</span><input name="title" required minLength={2} maxLength={200} placeholder="e.g. Venue deposit" /></label>
-            <label><span>Category</span><input name="category" maxLength={100} placeholder="Venue" /></label>
+            <div className="member-category-field"><span>Category</span><ExpenseCategoryPicker category={newCategory} customCategory={newCustomCategory} savedCustomCategories={customCategories} onCategoryChange={setNewCategory} onCustomCategoryChange={setNewCustomCategory} /></div>
             <label><span>Target amount</span><input name="target_amount" type="number" min="0.01" step="0.01" required /></label>
             <button type="submit" disabled={Boolean(busy)}>{busy === 'create' ? 'Adding…' : 'Add item'}</button>
           </form>
@@ -183,13 +350,7 @@ function SponsorshipBoard({ data, reload }: { data: WorkspaceData; reload: () =>
                 {canManage && item.status !== 'cancelled' && <button type="button" disabled={Boolean(busy)} onClick={() => setEditing(editing === item.id ? '' : item.id)}>Edit</button>}
                 {canManage && !['fulfilled', 'cancelled'].includes(item.status) && <button type="button" className="danger" disabled={Boolean(busy)} onClick={() => cancelItem(item.id)}>Cancel item</button>}
               </div>
-              {editing === item.id && <form className="member-inline-editor" onSubmit={event => updateItem(event, item.id)}>
-                <label className="wide"><span>Item</span><input name="title" defaultValue={item.title} required minLength={2} maxLength={200} /></label>
-                <label><span>Category</span><input name="category" defaultValue={item.category ?? ''} maxLength={100} /></label>
-                <label><span>Target</span><input name="target_amount" type="number" min="0.01" step="0.01" defaultValue={item.target_amount} required /></label>
-                <label className="wide"><span>Description</span><textarea name="description" rows={2} defaultValue={item.description ?? ''} maxLength={1000} /></label>
-                <div className="member-form-actions wide"><button type="button" onClick={() => setEditing('')}>Cancel</button><button className="primary" disabled={busy === item.id}>{busy === item.id ? 'Saving…' : 'Save item'}</button></div>
-              </form>}
+              {editing === item.id && <SponsorshipItemEditor item={item} customCategories={customCategories} busy={busy === item.id} onCancel={() => setEditing('')} onSave={values => updateItem(item.id, values)} />}
             </article>
           ))}
           {!workspace.sponsorship_items.length && <div className="member-empty">No sponsorship items have been added.</div>}
@@ -209,7 +370,7 @@ function FundSettings({ data, reload }: { data: WorkspaceData; reload: () => voi
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
-  const inviteCode = fund.share_code || fund.fund_code
+  const inviteCode = fund.fund_code
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -359,7 +520,7 @@ export function FundWorkspaceView({ fundId }: { fundId: string }) {
           {workspaceTabs.map(tab => <button key={tab.id} id={`fund-workspace-tab-${tab.id}`} className={tab.id === activeTab ? 'active' : ''} type="button" role="tab" aria-selected={tab.id === activeTab} aria-controls="fund-workspace-panel" onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
         </nav>
         <div id="fund-workspace-panel" role="tabpanel" aria-labelledby={`fund-workspace-tab-${activeTab}`}>
-          {activeTab === 'overview' && <Summary data={data} />}
+          {activeTab === 'overview' && <Summary data={data} onViewActivity={() => selectTab('activity')} />}
           {activeTab === 'contributions' && <FundContributions data={data} reload={reload} />}
           {activeTab === 'expenses' && <FundExpenses data={data} reload={reload} />}
           {activeTab === 'sponsorships' && <SponsorshipBoard data={data} reload={reload} />}

@@ -39,6 +39,7 @@ import { calculateFundFinancialSummary, isFundReadOnly, isVisibleInFundMoneyView
 import LoadingOverlay from '../../components/LoadingOverlay'
 import InviteDetailsModal from '../../components/InviteDetailsModal'
 import { FUND_PERMISSION_KEYS, type FundPermission } from '../../lib/fundPermissions'
+import { subscribeToFundWorkspaceChanges } from '../../lib/fundWorkspaceRefresh'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'FundDetail'>
@@ -90,41 +91,51 @@ export default function FundDetailScreen({
   const canManageSponsorships = can('manage_sponsorships')
   const canAwardRecognition = can('award_recognition')
 
+  const loadFundWorkspace = useCallback(async (signal?: AbortSignal) => {
+    if (!userId) return
+    setIsLoading(true)
+    setLoadError(null)
+    try {
+      const workspace = await runApiRead(call => api.funds.workspace(fundId, call), { signal })
+      if (signal?.aborted) return
+      setFund({ id: workspace.fund.id, owner_id: workspace.fund.owner_id, title: workspace.fund.title,
+        status: workspace.fund.status, currency_code: workspace.fund.currency_code,
+        goal_amount: Number(workspace.fund.goal_amount ?? 0), total_contributions: Number(workspace.fund.totals.raised),
+        total_expenses: Number(workspace.fund.totals.spent), balance: Number(workspace.fund.totals.balance),
+        member_count: workspace.fund.totals.member_count, fund_code: workspace.fund.fund_code,
+        linked_event_id: workspace.fund.linked_event_id, contribution_deadline: workspace.fund.contribution_deadline,
+        is_private: workspace.fund.is_private })
+      setContributions(workspace.contributions.map(item => ({ ...item, amount: Number(item.amount), pledged_amount: item.pledged_amount === null ? null : Number(item.pledged_amount), allocated_amount: Number(item.allocated_amount), outstanding_amount: item.outstanding_amount === null ? null : Number(item.outstanding_amount) })))
+      setExpenses(workspace.expenses.map(item => ({ ...item, amount: Number(item.amount) })))
+      setSponsorshipItems(workspace.sponsorship_items.filter(item => item.status !== 'cancelled').map(item => ({ ...item, target_amount: Number(item.target_amount), allocated_amount: Number(item.allocated_amount), outstanding_amount: Number(item.outstanding_amount) })))
+      setMembers(workspace.members.filter(item => item.status === 'joined').map(item => ({ id: item.id, user_id: item.user_id, display_name: item.display_name, phone: item.phone ?? '', role: item.role as MemberRole, joined_at: item.joined_at ?? item.requested_at ?? '' })))
+      setPendingRequests(workspace.members.filter(item => item.status === 'pending').map(item => ({ id: item.id, user_id: item.user_id, display_name: item.display_name, phone: item.phone ?? '', requested_at: item.requested_at ?? item.joined_at ?? '' })))
+      setRichAuntieUserIds(new Set(workspace.members.filter(item => item.is_rich_auntie && item.user_id).map(item => item.user_id!)))
+    } catch (error) {
+      if (!signal?.aborted) setLoadError(toApiUiError(error, signal).message)
+    } finally {
+      if (!signal?.aborted) setIsLoading(false)
+    }
+  }, [fundId, userId])
+
   useFocusEffect(
     useCallback(() => {
       const controller = new AbortController()
-
-      async function loadData() {
-        if (!userId) return
-        setIsLoading(true)
-        setLoadError(null)
-        try {
-          const workspace = await runApiRead(call => api.funds.workspace(fundId, call), { signal: controller.signal })
-          if (controller.signal.aborted) return
-          setFund({ id: workspace.fund.id, owner_id: workspace.fund.owner_id, title: workspace.fund.title,
-            status: workspace.fund.status, currency_code: workspace.fund.currency_code,
-            goal_amount: Number(workspace.fund.goal_amount ?? 0), total_contributions: Number(workspace.fund.totals.raised),
-            total_expenses: Number(workspace.fund.totals.spent), balance: Number(workspace.fund.totals.balance),
-            member_count: workspace.fund.totals.member_count, fund_code: workspace.fund.fund_code,
-            linked_event_id: workspace.fund.linked_event_id, contribution_deadline: workspace.fund.contribution_deadline,
-            is_private: workspace.fund.is_private })
-          setContributions(workspace.contributions.map(item => ({ ...item, amount: Number(item.amount), pledged_amount: item.pledged_amount === null ? null : Number(item.pledged_amount), allocated_amount: Number(item.allocated_amount), outstanding_amount: item.outstanding_amount === null ? null : Number(item.outstanding_amount) })))
-          setExpenses(workspace.expenses.map(item => ({ ...item, amount: Number(item.amount) })))
-          setSponsorshipItems(workspace.sponsorship_items.filter(item => item.status !== 'cancelled').map(item => ({ ...item, target_amount: Number(item.target_amount), allocated_amount: Number(item.allocated_amount), outstanding_amount: Number(item.outstanding_amount) })))
-          setMembers(workspace.members.filter(item => item.status === 'joined').map(item => ({ id: item.id, user_id: item.user_id, display_name: item.display_name, phone: item.phone ?? '', role: item.role as MemberRole, joined_at: item.joined_at ?? item.requested_at ?? '' })))
-          setPendingRequests(workspace.members.filter(item => item.status === 'pending').map(item => ({ id: item.id, user_id: item.user_id, display_name: item.display_name, phone: item.phone ?? '', requested_at: item.requested_at ?? item.joined_at ?? '' })))
-          setRichAuntieUserIds(new Set(workspace.members.filter(item => item.is_rich_auntie && item.user_id).map(item => item.user_id!)))
-        } catch (error) {
-          if (!controller.signal.aborted) setLoadError(toApiUiError(error, controller.signal).message)
-        } finally {
-          if (!controller.signal.aborted) setIsLoading(false)
-        }
-      }
-
-      loadData()
+      void loadFundWorkspace(controller.signal)
       return () => controller.abort()
-    }, [fundId, userId])
+    }, [loadFundWorkspace])
   )
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const unsubscribe = subscribeToFundWorkspaceChanges(fundId, () => {
+      void loadFundWorkspace(controller.signal)
+    })
+    return () => {
+      controller.abort()
+      unsubscribe()
+    }
+  }, [fundId, loadFundWorkspace])
 
   async function handleApprove(memberId: string) {
     if (!canManageMembers || decidingId || !requireActiveFund()) return
@@ -533,6 +544,9 @@ export default function FundDetailScreen({
           amountOverTarget={financialSummary.amountOverTarget}
           onBack={() => navigation.goBack()}
           onViewHistory={() => setShowActivityLog(true)}
+          onInviteMembers={canManageMembers && !isFundReadOnly(fund.status) && fund.fund_code
+            ? () => setShowFundInvite(true)
+            : undefined}
           onMoreOptions={handleMoreOptions}
         />
       )}
@@ -750,6 +764,7 @@ export default function FundDetailScreen({
         inviteType="Fund"
         title={fund.title}
         inviteValue={fund.fund_code}
+        inviteLink={fundPreviewUrl(fund.fund_code)}
         helpText="This invite joins the contribution fund only. It does not invite someone to the event or give them fund-management permissions."
         shareMessage={`Join *${fund.title}* on Tshelo 🙏\n\n${fundPreviewUrl(fund.fund_code)}`}
         onClose={() => setShowFundInvite(false)}

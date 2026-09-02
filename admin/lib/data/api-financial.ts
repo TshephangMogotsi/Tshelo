@@ -40,7 +40,7 @@ import {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const CONTRIBUTION_SELECT = 'id, fund_id, contributor_id, user_id, contributor_name, contributor_phone, amount, pledged_amount, currency_code, payment_method, reference_number, status, detected_via, is_refunded, confirmed_at, receipt_number, notes, created_at, updated_at'
-const EXPENSE_SELECT = 'id, fund_id, added_by, description, item_name, category, amount, currency_code, quantity, unit_price, vendor_name, receipt_url, is_sponsored, sponsored_by_user_id, sponsored_by_name, has_open_query, created_at, updated_at'
+const EXPENSE_SELECT = 'id, fund_id, added_by, description, item_name, category, custom_category, amount, currency_code, quantity, unit_price, vendor_name, receipt_url, is_sponsored, sponsored_by_user_id, sponsored_by_name, has_open_query, created_at, updated_at'
 const RECEIPT_BUCKET = 'receipts'
 const RECEIPT_SESSION_SECONDS = 2 * 60 * 60
 
@@ -63,6 +63,7 @@ function toExpense(row: Record<string, unknown>): Expense {
     description: row.description as string,
     item_name: row.item_name as string | null,
     category: row.category as string | null,
+    custom_category: row.custom_category as string | null,
     amount: money(row.amount),
     currency_code: row.currency_code as Expense['currency_code'],
     quantity: row.quantity === null ? null : money(row.quantity),
@@ -231,7 +232,7 @@ export async function createApiExpenses(client: SupabaseClient, actorUserId: str
   }
   const rows = input.items.map(item => ({
     fund_id: input.fund_id, added_by: actorUserId, description: item.description.trim(),
-    item_name: item.item_name ?? null, category: item.category ?? null, amount: item.amount,
+    item_name: item.item_name ?? null, category: item.category ?? null, custom_category: item.custom_category?.trim() || null, amount: item.amount,
     currency_code: item.currency_code, quantity: item.quantity ?? null, unit_price: item.unit_price ?? null,
     vendor_name: item.vendor_name ?? null, receipt_url: item.receipt_path ?? null,
     is_sponsored: Boolean(item.sponsored_by_user_id), sponsored_by_user_id: item.sponsored_by_user_id ?? null,
@@ -254,6 +255,7 @@ export async function createApiExpenses(client: SupabaseClient, actorUserId: str
 export async function updateApiExpense(client: SupabaseClient, expenseId: string, input: UpdateExpenseRequest): Promise<ApiDataResult<Expense | null>> {
   const changes: Record<string, unknown> = { ...input }
   if (input.description) changes.item_name = input.item_name ?? input.description
+  if (input.custom_category !== undefined) changes.custom_category = input.custom_category?.trim() || null
   if (input.sponsored_by_user_id !== undefined) changes.is_sponsored = Boolean(input.sponsored_by_user_id)
   const result = await client.from('expenses').update(changes).eq('id', expenseId).is('deleted_at', null).select(EXPENSE_SELECT).maybeSingle()
   if (result.error) return dataFailure({ kind: 'database', error: result.error })

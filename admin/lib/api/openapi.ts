@@ -103,7 +103,7 @@ export const tsheloOpenApiDocument = {
   },
   servers: [
     { url: '/api/v1', description: 'Current host' },
-    { url: 'https://tshelo-admin.vercel.app/api/v1', description: 'Production' },
+    { url: 'https://app.tshelo.com/api/v1', description: 'Production' },
   ],
   tags: [
     { name: 'Users', description: 'User profiles and platform-admin user discovery.' },

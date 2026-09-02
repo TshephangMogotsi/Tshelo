@@ -1,0 +1,27 @@
+# Local dependencies and generated web output are installed and built by Vercel.
+node_modules/
+admin/node_modules/
+admin/.next/
+.next/
+
+# Native mobile projects are not part of the Next.js admin deployment.
+ios/
+android/
+modules/sms-listener/android/build/
+
+# Local tooling artifacts and credentials.
+.expo/
+dist/
+web-build/
+.vercel/
+.env
+.env*.local
+*.tsbuildinfo
+
+# Local agent state, credentials, and non-application artifacts.
+.claude/
+.mcp.json
+*firebase-adminsdk*.json
+tmp/
+output/
+Tshelo_docs/

@@ -35,13 +35,16 @@ const accountLinks = [
 export function AccountNavigation() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const isEventFundContext = (pathname === '/account/events' && searchParams.get('tab') === 'eventFund')
+    || (pathname === '/account/events/new' && searchParams.get('mode') === 'eventFund')
 
   function isWorkspaceLinkActive(link: (typeof workspaceLinks)[number]) {
     if (link.id === 'event-fund') {
-      return pathname === '/account/events' && searchParams.get('tab') === 'eventFund'
+      return isEventFundContext
     }
     if (link.id === 'events') {
       return pathname.startsWith('/account/events')
+        && !isEventFundContext
         && !(pathname === '/account/events' && searchParams.get('tab') === 'eventFund')
     }
     return pathname === link.href || pathname.startsWith(`${link.href}/`)

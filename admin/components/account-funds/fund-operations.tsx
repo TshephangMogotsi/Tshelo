@@ -306,7 +306,7 @@ function ActivityAndReports({ data }: { data: WorkspaceData }) {
   async function share() {
     setBusy('share'); setError('')
     try {
-      const text = `${workspace.fund.title} · Invite code ${workspace.fund.share_code || workspace.fund.fund_code}`
+      const text = `${workspace.fund.title} · Invite code ${workspace.fund.fund_code}`
       if (navigator.share) await navigator.share({ title: workspace.fund.title, text, url: window.location.href })
       else { await navigator.clipboard.writeText(`${text}\n${window.location.href}`); window.alert('Fund link copied.') }
       await createApiClient().funds.createExport(workspace.fund.id, { export_type: 'share' })

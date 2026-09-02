@@ -1,0 +1,6 @@
+project_id = "albihofmlafjzbusancu"
+
+# Public invite-preview page. It performs a service-role lookup through the
+# deliberately narrow find_fund_by_code RPC and never exposes fund records.
+[functions.fund-preview]
+verify_jwt = false

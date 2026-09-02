@@ -2,11 +2,14 @@ import 'server-only'
 
 import type { MoneyAmount } from '@shared/contracts/common'
 import type { ContributionStatus, ContributionSummary } from '@shared/contracts/contributions'
+import type { Event } from '@shared/contracts/events'
 import type { Fund, FundMemberRole, FundMemberStatus, FundSummary } from '@shared/contracts/funds'
 import type { AppUser } from '@/lib/app-user'
 import type { ServerClient } from './client'
 
-export type AccountFundSummary = Pick<FundSummary, 'id' | 'title' | 'fund_code' | 'status' | 'goal_amount' | 'currency_code' | 'created_at'>
+export type AccountFundSummary = Pick<Fund, 'id' | 'title' | 'fund_code' | 'status' | 'goal_amount' | 'currency_code' | 'created_at'>
+
+export type AccountEventSummary = Pick<Event, 'id' | 'name' | 'event_code' | 'share_code' | 'event_type' | 'linked_fund_id' | 'status' | 'created_at'>
 
 export type AccountMembership = {
   id: string
@@ -39,6 +42,7 @@ export type AccountOverviewData = {
   memberships: AccountMembership[]
   contributions: AccountContribution[]
   eventCount: number
+  events: AccountEventSummary[]
 }
 
 export type ContributionFund = Pick<FundSummary, 'id' | 'title'>
@@ -136,7 +140,7 @@ export async function getAccountOverviewData(
   userId: string,
   userPromise: Promise<AppUser>,
 ): Promise<AccountOverviewData> {
-  const [user, ownedFundsResult, membershipCountResult, membershipsResult, contributionsResult, eventsResult] = await Promise.all([
+  const [user, ownedFundsResult, membershipCountResult, membershipsResult, contributionsResult, eventsResult, eventItemsResult] = await Promise.all([
     userPromise,
     client
       .from('funds')
@@ -153,8 +157,7 @@ export async function getAccountOverviewData(
       .select('id, role, status, funds(id, title, fund_code, status, goal_amount, currency_code, created_at)')
       .eq('user_id', userId)
       .in('status', ['joined', 'pending'])
-      .order('created_at', { ascending: false })
-      .limit(6),
+      .order('created_at', { ascending: false }),
     client
       .from('contributions')
       .select('id, amount, currency_code, status, created_at, funds(id, title)')
@@ -165,6 +168,11 @@ export async function getAccountOverviewData(
       .select('*', { count: 'exact', head: true })
       .eq('creator_id', userId)
       .is('deleted_at', null),
+    client
+      .from('events')
+      .select('id, name, event_code, share_code, event_type, linked_fund_id, status, created_at')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false }),
   ])
 
   const memberships = ((membershipsResult.data ?? []) as unknown as AccountMembershipRow[]).map(({ funds, ...membership }) => ({
@@ -184,6 +192,7 @@ export async function getAccountOverviewData(
     memberships,
     contributions,
     eventCount: eventsResult.count ?? 0,
+    events: (eventItemsResult.data ?? []) as AccountEventSummary[],
   }
 }
 

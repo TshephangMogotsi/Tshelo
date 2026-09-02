@@ -55,6 +55,7 @@ type Props = {
   amountOverTarget: number
   onBack: () => void
   onViewHistory: () => void
+  onInviteMembers?: () => void
   onViewEvent?: () => void
   onMoreOptions: () => void
 }
@@ -67,6 +68,7 @@ export default function FundHeader({
   amountOverTarget,
   onBack,
   onViewHistory,
+  onInviteMembers,
   onViewEvent,
   onMoreOptions,
 }: Props) {
@@ -86,6 +88,18 @@ export default function FundHeader({
           <Ionicons name="arrow-back" size={20} color="#0D0D0D" />
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          {onInviteMembers ? (
+            <TouchableOpacity
+              style={styles.inviteButton}
+              onPress={onInviteMembers}
+              activeOpacity={0.78}
+              accessibilityRole="button"
+              accessibilityLabel="Invite members to this fund"
+            >
+              <Ionicons name="person-add-outline" size={16} color={colors.primary} />
+              <Text style={styles.inviteButtonText}>Invite</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             style={styles.iconButton}
             onPress={onMoreOptions}
@@ -181,6 +195,22 @@ function makeStyles(colors: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+    },
+    inviteButton: {
+      minHeight: 34,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      borderRadius: 17,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#F1F1F1',
+    },
+    inviteButtonText: {
+      fontSize: 11,
+      fontFamily: fonts.inter.bold,
+      color: colors.primary,
     },
     titleRow: {
       flexDirection: 'row',
