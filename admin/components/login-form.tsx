@@ -5,10 +5,15 @@ import Image from 'next/image'
 import { ArrowLeft, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { createApiClient } from '@/lib/api-client'
+import {
+  invitationContinuation,
+  onboardingPathFor,
+  safePostLoginPath,
+} from '@/lib/post-login'
 
 type Step = 'phone' | 'code'
 
-export function LoginForm() {
+export function LoginForm({ nextPath }: { nextPath?: string | null }) {
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
@@ -17,6 +22,7 @@ export function LoginForm() {
 
   const digits = phone.replace(/\D/g, '').replace(/^267/, '').slice(0, 8)
   const fullPhone = `+267${digits}`
+  const invitation = invitationContinuation(nextPath)
 
   async function sendCode(event: FormEvent) {
     event.preventDefault()
@@ -27,12 +33,14 @@ export function LoginForm() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
-      options: { shouldCreateUser: false },
+      options: { shouldCreateUser: Boolean(invitation) },
     })
     setLoading(false)
 
     if (error) {
-      setMessage('We could not send a code. Check the number or contact the system owner.')
+      setMessage(invitation
+        ? 'We could not send a code. Check the number and try again.'
+        : 'We could not send a code. Check the number or contact the system owner.')
       return
     }
 
@@ -81,7 +89,12 @@ export function LoginForm() {
       return
     }
 
-    window.location.replace(admin ? '/' : '/account/overview')
+    const continuation = safePostLoginPath(nextPath)
+    if (invitation && !appUser.profile_completed) {
+      window.location.replace(onboardingPathFor(invitation.path))
+      return
+    }
+    window.location.replace(appUser && continuation ? continuation : admin ? '/' : '/account/overview')
   }
 
   return (
@@ -113,10 +126,12 @@ export function LoginForm() {
           )}
           <div className="login-icon"><LockKeyhole size={22} /></div>
           <p className="eyebrow">Secure sign in</p>
-          <h2>{step === 'phone' ? 'Welcome back' : 'Enter your code'}</h2>
+          <h2>{step === 'phone' ? (invitation ? 'Open your invitation' : 'Welcome back') : 'Enter your code'}</h2>
           <p className="form-intro">
             {step === 'phone'
-              ? 'Use the Botswana number linked to your Tshelo account.'
+              ? invitation
+                ? `Enter your Botswana mobile number to continue to this ${invitation.kind} invitation. We will create your Tshelo account if you are new.`
+                : 'Use the Botswana number linked to your Tshelo account.'
               : `We sent a six-digit code to ${fullPhone}.`}
           </p>
 
@@ -124,7 +139,7 @@ export function LoginForm() {
             <form onSubmit={sendCode}>
               <label htmlFor="phone">Phone number</label>
               <div className="phone-field">
-                <span>🇧🇼</span>
+                <span className="country-label">BW</span>
                 <span className="country-code">+267</span>
                 <input
                   id="phone"
@@ -157,7 +172,7 @@ export function LoginForm() {
                 autoFocus
               />
               <button className="primary-button" disabled={code.length !== 6 || loading}>
-                {loading ? 'Checking…' : 'Continue to dashboard'}
+                {loading ? 'Checking…' : invitation ? 'Continue to invitation' : 'Continue to dashboard'}
               </button>
             </form>
           )}

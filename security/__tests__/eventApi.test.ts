@@ -9,6 +9,7 @@ describe('event API slice', () => {
   const client = read('shared/api-client/client.ts')
   const data = read('admin/lib/data/api-events.ts')
   const validation = read('admin/lib/api/validation.ts')
+  const guestMigration = read('supabase/migrations/20260902130000_event_guest_management.sql')
   const screens = [
     'screens/main/CreateFundScreen.tsx',
     'screens/main/EventDetailScreen.tsx',
@@ -22,6 +23,10 @@ describe('event API slice', () => {
     'admin/app/api/v1/events/[eventId]/complete/route.ts',
     'admin/app/api/v1/events/[eventId]/budget/route.ts',
     'admin/app/api/v1/events/[eventId]/announcements/route.ts',
+    'admin/app/api/v1/events/[eventId]/guests/route.ts',
+    'admin/app/api/v1/events/[eventId]/guests/[guestId]/route.ts',
+    'admin/app/api/v1/events/[eventId]/rsvp/route.ts',
+    'admin/app/api/v1/events/[eventId]/guest-capacity/route.ts',
     'admin/app/api/v1/events/[eventId]/organiser-invites/route.ts',
     'admin/app/api/v1/events/join/route.ts',
     'admin/app/api/v1/events/event-funds/route.ts',
@@ -31,6 +36,8 @@ describe('event API slice', () => {
     for (const contract of [
       'EventWorkspace', 'EventInvitePreview', 'CreatedEventFund', 'JoinedEvent',
       'LeftEvent', 'EventBudget', 'EventAnnouncement', 'EventCapabilities',
+      'EventGuestDirectory', 'EventGuestSummary', 'EventGuestCapacity',
+      'InviteEventGuestsRequest', 'UpdateEventGuestRequest', 'RespondEventRsvpRequest',
     ]) expect(contracts).toContain(`type ${contract}`)
   })
 
@@ -38,7 +45,8 @@ describe('event API slice', () => {
     for (const method of [
       'createFund(', 'update(', 'remove(', 'workspace(', 'previewInvite(', 'join(',
       'leave(', 'complete(', 'budget(', 'updateBudget(', 'createAnnouncement(',
-      'inviteOrganiser(',
+      'listGuests(', 'getGuest(', 'inviteGuests(', 'updateGuest(', 'removeGuest(',
+      'myRsvp(', 'respondRsvp(', 'guestCapacity(', 'unlockGuestCapacity(', 'inviteOrganiser(',
     ]) expect(client).toContain(method)
   })
 
@@ -58,6 +66,9 @@ describe('event API slice', () => {
     for (const rpc of [
       'delete_event_only', 'leave_event', 'find_event_by_code', 'join_event_by_code',
       'create_event_fund', 'invite_event_fund_organiser', 'get_my_fund_permissions',
+      'can_manage_event_guests', 'get_event_guest_overview', 'invite_event_guests',
+      'update_event_guest', 'remove_event_guest', 'respond_event_rsvp',
+      'unlock_event_guest_capacity',
     ]) expect(data).toContain(`'${rpc}'`)
     expect(data).not.toContain('service_role')
     expect(data).not.toContain('createClient(')
@@ -68,10 +79,25 @@ describe('event API slice', () => {
       'validateJoinEventRequest', 'validateCreateEventFundRequest',
       'validateUpdateEventRequest', 'validateCompleteEventRequest',
       'validateUpdateEventBudgetRequest', 'validateCreateEventAnnouncementRequest',
-      'validateInviteEventOrganiserRequest',
+      'validateInviteEventOrganiserRequest', 'validateInviteEventGuestsRequest',
+      'validateUpdateEventGuestRequest', 'validateRespondEventRsvpRequest',
     ]) expect(validation).toContain(validator)
     expect(validation).toContain('PHONE_PATTERN')
     expect(validation).toContain('MONEY_PATTERN')
+  })
+
+  it('enforces guest management, RSVP ownership, and paid capacity in the database', () => {
+    expect(guestMigration).toContain("'event_guests_above_100'")
+    expect(guestMigration).toContain('CREATE TRIGGER enforce_event_guest_capacity')
+    expect(guestMigration).toContain('CREATE OR REPLACE FUNCTION public.can_manage_event_guests')
+    expect(guestMigration).toContain('CREATE OR REPLACE FUNCTION public.respond_event_rsvp')
+    expect(guestMigration).toContain('CREATE OR REPLACE FUNCTION public.unlock_event_guest_capacity')
+    expect(guestMigration).toContain('IF proposed_used > 100')
+    expect(guestMigration).toContain('pass_unlimited_12m')
+    expect(guestMigration).toContain('pass_committee_12m')
+    expect(guestMigration).toContain('CREATE POLICY event_guests_update_manager')
+    expect(guestMigration).toContain('CREATE POLICY event_guests_delete_manager')
+    expect(guestMigration).toContain('REVOKE ALL ON FUNCTION public.respond_event_rsvp')
   })
 
   it('removes direct Supabase data access from every migrated event screen', () => {
@@ -85,21 +111,43 @@ describe('event API slice', () => {
   })
 
   it('keeps the website event flow behind the typed API boundary', () => {
+    const homeSummaryCache = read('admin/lib/home-summary-cache.ts')
     const websiteFiles = [
       'admin/components/account-events/event-list.tsx',
       'admin/components/account-events/create-event-form.tsx',
-      'admin/components/account-events/join-event-form.tsx',
+      'admin/components/account-events/join-event-dialog.tsx',
       'admin/components/account-events/event-workspace.tsx',
+      'admin/components/account-events/event-guests.tsx',
     ]
 
     for (const file of websiteFiles) {
       const source = read(file)
-      expect({ file, importsBrowserApi: source.includes("from '@/lib/api-client'") })
-        .toEqual({ file, importsBrowserApi: true })
+      const importsTypedBoundary = source.includes("from '@/lib/api-client'")
+        || source.includes("from '@/lib/home-summary-cache'")
+      expect({ file, importsTypedBoundary }).toEqual({ file, importsTypedBoundary: true })
       expect({ file, importsSupabase: /from\s+['"][^'"]*supabase['"]/.test(source) })
         .toEqual({ file, importsSupabase: false })
       expect({ file, directData: /\bsupabase\s*\.\s*(?:from|rpc|functions|storage)\b/.test(source) })
         .toEqual({ file, directData: false })
     }
+    expect(homeSummaryCache).toContain("from '@/lib/api-client'")
+  })
+
+  it('provides organiser guest management and attendee RSVP views on the website', () => {
+    const guestView = read('admin/components/account-events/event-guests.tsx')
+
+    for (const operation of [
+      'events.listGuests(', 'events.inviteGuests(', 'events.updateGuest(',
+      'events.removeGuest(', 'events.myRsvp(', 'events.respondRsvp(',
+      'events.unlockGuestCapacity(',
+    ]) expect(guestView).toContain(operation)
+
+    expect(guestView).toContain("linked_fund_permissions.includes('manage_event_guests')")
+    expect(guestView).toContain('Invite guests and track every RSVP')
+    expect(guestView).toContain('Your RSVP')
+    expect(guestView).toContain('Copy invite link')
+    expect(guestView).toContain('Search guests')
+    expect(guestView).toContain('Filter by RSVP status')
+    expect(guestView).toContain('Allowed plus-ones')
   })
 })

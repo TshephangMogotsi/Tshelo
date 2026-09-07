@@ -12,12 +12,18 @@ import type {
   CreateSponsorshipAllocationRequest,
   CreateEventRequest,
   CreateEventAnnouncementRequest,
+  CreateEventAnnouncementUploadSessionRequest,
   CreateEventFundRequest,
   CreatedEventFund,
   CreateFundRequest,
   Event,
   EventGuest,
+  EventGuestCapacity,
+  EventGuestDirectory,
   EventAnnouncement,
+  EventAnnouncementAttachmentAccess,
+  EventAnnouncementAttachmentAccessRequest,
+  EventAnnouncementUploadSession,
   EventBudget,
   EventInvitePreview,
   EventSummary,
@@ -44,12 +50,14 @@ import type {
   JoinFundRequest,
   JoinFundResult,
   JoinedEvent,
+  InviteEventGuestsRequest,
   LeftEvent,
   LeaveFundResult,
   ListFundActivityRequest,
   ListAdminAuditRequest,
   ListContributionsRequest,
   ListEventsRequest,
+  ListEventGuestsRequest,
   ListExpensesRequest,
   ListFundsRequest,
   ListNotificationsRequest,
@@ -73,6 +81,7 @@ import type {
   RichAuntieRecipientHistory,
   RespondOrganiserInviteRequest,
   RespondOrganiserInviteResult,
+  RespondEventRsvpRequest,
   RewardProgressOverview,
   RewardSnackbarItem,
   SearchConnectionsRequest,
@@ -87,9 +96,13 @@ import type {
   UpdateContributionRequest,
   UpdateExpenseRequest,
   UpdateEventBudgetRequest,
+  UpdateEventAnnouncementRequest,
+  UpdateEventGuestRequest,
   UpdateEventRequest,
   CompleteEventRequest,
   InviteEventOrganiserRequest,
+  RemoveEventGuestResult,
+  UnlockEventGuestCapacityResult,
   CreateFundSponsorshipRequest,
   ConfigureFundAdminRequest,
   UpsertPlatformAdminRequest,
@@ -430,6 +443,33 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       workspace(eventId: string, call?: ApiCallOptions) {
         return request<EventWorkspace>(`/api/v1/events/${encodeURIComponent(eventId)}/workspace`, call)
       },
+      listGuests(eventId: string, input: ListEventGuestsRequest = {}, call?: ApiCallOptions) {
+        return request<EventGuestDirectory>(`/api/v1/events/${encodeURIComponent(eventId)}/guests${toQueryString(input)}`, call)
+      },
+      getGuest(eventId: string, guestId: string, call?: ApiCallOptions) {
+        return request<EventGuest>(`/api/v1/events/${encodeURIComponent(eventId)}/guests/${encodeURIComponent(guestId)}`, call)
+      },
+      inviteGuests(eventId: string, input: InviteEventGuestsRequest, call?: ApiCallOptions) {
+        return request<EventGuest[]>(`/api/v1/events/${encodeURIComponent(eventId)}/guests`, { ...call, method: 'POST', body: input })
+      },
+      updateGuest(eventId: string, guestId: string, input: UpdateEventGuestRequest, call?: ApiCallOptions) {
+        return request<EventGuest>(`/api/v1/events/${encodeURIComponent(eventId)}/guests/${encodeURIComponent(guestId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      removeGuest(eventId: string, guestId: string, call?: ApiCallOptions) {
+        return request<RemoveEventGuestResult>(`/api/v1/events/${encodeURIComponent(eventId)}/guests/${encodeURIComponent(guestId)}`, { ...call, method: 'DELETE' })
+      },
+      myRsvp(eventId: string, call?: ApiCallOptions) {
+        return request<EventGuest | null>(`/api/v1/events/${encodeURIComponent(eventId)}/rsvp`, call)
+      },
+      respondRsvp(eventId: string, input: RespondEventRsvpRequest, call?: ApiCallOptions) {
+        return request<EventGuest>(`/api/v1/events/${encodeURIComponent(eventId)}/rsvp`, { ...call, method: 'PUT', body: input })
+      },
+      guestCapacity(eventId: string, call?: ApiCallOptions) {
+        return request<EventGuestCapacity>(`/api/v1/events/${encodeURIComponent(eventId)}/guest-capacity`, call)
+      },
+      unlockGuestCapacity(eventId: string, call?: ApiCallOptions) {
+        return request<UnlockEventGuestCapacityResult>(`/api/v1/events/${encodeURIComponent(eventId)}/guest-capacity`, { ...call, method: 'POST' })
+      },
       previewInvite(code: string, call?: ApiCallOptions) {
         return request<EventInvitePreview>(`/api/v1/events/invite-preview${toQueryString({ code })}`, call)
       },
@@ -450,6 +490,18 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       },
       createAnnouncement(eventId: string, input: CreateEventAnnouncementRequest, call?: ApiCallOptions) {
         return request<EventAnnouncement>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements`, { ...call, method: 'POST', body: input })
+      },
+      updateAnnouncement(eventId: string, announcementId: string, input: UpdateEventAnnouncementRequest, call?: ApiCallOptions) {
+        return request<EventAnnouncement>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/${encodeURIComponent(announcementId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      createAnnouncementUploadSession(eventId: string, input: CreateEventAnnouncementUploadSessionRequest, call?: ApiCallOptions) {
+        return request<EventAnnouncementUploadSession>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/upload-session`, { ...call, method: 'POST', body: input })
+      },
+      createAnnouncementAttachmentAccess(eventId: string, input: EventAnnouncementAttachmentAccessRequest, call?: ApiCallOptions) {
+        return request<EventAnnouncementAttachmentAccess>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/attachments`, { ...call, method: 'POST', body: input })
+      },
+      deleteAnnouncementUpload(eventId: string, input: EventAnnouncementAttachmentAccessRequest, call?: ApiCallOptions) {
+        return request<Record<string, never>>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/attachments`, { ...call, method: 'DELETE', body: input })
       },
       inviteOrganiser(eventId: string, input: InviteEventOrganiserRequest, call?: ApiCallOptions) {
         return request<Record<string, never>>(`/api/v1/events/${encodeURIComponent(eventId)}/organiser-invites`, { ...call, method: 'POST', body: input })

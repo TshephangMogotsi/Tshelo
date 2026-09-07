@@ -428,6 +428,72 @@ export const tsheloOpenApiDocument = {
         responses: { '200': response('Event workspace returned.', success({ $ref: '#/components/schemas/EventWorkspace' })), ...standardErrors },
       },
     },
+    '/events/{eventId}/guests': {
+      get: {
+        tags: ['Events'], operationId: 'listEventGuests', summary: 'List and summarise an event guest directory',
+        description: 'Available to the event creator, active event organisers, and linked-fund members with manage_event_guests permission.',
+        parameters: [
+          uuidPathParameter('eventId', 'Event UUID.'),
+          ...listParameters,
+          { name: 'q', in: 'query', schema: { type: 'string', maxLength: 100 }, description: 'Search by guest name, phone, or email.' },
+          { name: 'status', in: 'query', schema: { type: 'array', items: { type: 'string', enum: ['pending', 'yes', 'no', 'maybe'] } }, style: 'form', explode: true },
+          { name: 'sort_by', in: 'query', schema: { type: 'string', enum: ['invited_at', 'guest_name', 'rsvp_status'] } },
+        ],
+        responses: { '200': response('Guest directory returned.', success({ $ref: '#/components/schemas/EventGuestDirectory' })), ...standardErrors },
+      },
+      post: {
+        tags: ['Events'], operationId: 'inviteEventGuests', summary: 'Add guests to an event',
+        description: 'Adds up to 100 invitations atomically and enforces the event capacity entitlement in the database.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ $ref: '#/components/schemas/InviteEventGuestsRequest' }),
+        responses: { '201': response('Guests invited.', success({ type: 'array', items: { $ref: '#/components/schemas/EventGuest' } })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/guests/{guestId}': {
+      get: {
+        tags: ['Events'], operationId: 'getEventGuest', summary: 'Get an event guest',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('guestId', 'Guest invitation UUID.')],
+        responses: { '200': response('Guest returned.', success({ $ref: '#/components/schemas/EventGuest' })), ...standardErrors },
+      },
+      patch: {
+        tags: ['Events'], operationId: 'updateEventGuest', summary: 'Update an event guest',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('guestId', 'Guest invitation UUID.')],
+        requestBody: jsonBody({ $ref: '#/components/schemas/UpdateEventGuestRequest' }),
+        responses: { '200': response('Guest updated.', success({ $ref: '#/components/schemas/EventGuest' })), ...standardErrors },
+      },
+      delete: {
+        tags: ['Events'], operationId: 'removeEventGuest', summary: 'Remove an event guest',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('guestId', 'Guest invitation UUID.')],
+        responses: { '200': response('Guest removed.', success({ $ref: '#/components/schemas/RemoveEventGuestResult' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/rsvp': {
+      get: {
+        tags: ['Events'], operationId: 'getMyEventRsvp', summary: 'Get the current user RSVP',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('RSVP returned.', success({ oneOf: [{ $ref: '#/components/schemas/EventGuest' }, { type: 'null' }] })), ...standardErrors },
+      },
+      put: {
+        tags: ['Events'], operationId: 'respondEventRsvp', summary: 'Respond to an event invitation',
+        description: 'Updates a linked invitation, or uses a valid event invite code when no linked invitation exists.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ $ref: '#/components/schemas/RespondEventRsvpRequest' }),
+        responses: { '200': response('RSVP recorded.', success({ $ref: '#/components/schemas/EventGuest' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/guest-capacity': {
+      get: {
+        tags: ['Events'], operationId: 'getEventGuestCapacity', summary: 'Get event guest capacity',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('Guest capacity returned.', success({ $ref: '#/components/schemas/EventGuestCapacity' })), ...standardErrors },
+      },
+      post: {
+        tags: ['Events'], operationId: 'unlockEventGuestCapacity', summary: 'Unlock unlimited guests for an event',
+        description: 'Atomically spends the configured event guest token price unless the owner already has an active qualifying pass.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        responses: { '200': response('Guest capacity unlocked.', success({ $ref: '#/components/schemas/UnlockEventGuestCapacityResult' })), ...standardErrors },
+      },
+    },
     '/events/{eventId}/leave': {
       post: {
         tags: ['Events'], operationId: 'leaveEvent', summary: 'Leave an event',
@@ -460,8 +526,38 @@ export const tsheloOpenApiDocument = {
       post: {
         tags: ['Events'], operationId: 'createEventAnnouncement', summary: 'Publish an event announcement',
         parameters: [uuidPathParameter('eventId', 'Event UUID.')],
-        requestBody: jsonBody({ type: 'object', required: ['title', 'body'], properties: { title: { type: 'string' }, body: { type: 'string' } } }),
+        requestBody: jsonBody({ type: 'object', required: ['title', 'body'], properties: { title: { type: 'string' }, body: { type: 'string' }, attachments: { type: 'array', maxItems: 5, items: { $ref: '#/components/schemas/EventAnnouncementAttachment' } } } }),
         responses: { '201': response('Announcement published.', success({ $ref: '#/components/schemas/EventAnnouncement' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/announcements/{announcementId}': {
+      patch: {
+        tags: ['Events'], operationId: 'updateEventAnnouncement', summary: 'Edit an event announcement',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('announcementId', 'Announcement UUID.')],
+        requestBody: jsonBody({ type: 'object', minProperties: 1, properties: { title: { type: 'string', minLength: 3, maxLength: 120 }, body: { type: 'string', minLength: 3, maxLength: 4000 }, attachments: { type: 'array', maxItems: 5, items: { $ref: '#/components/schemas/EventAnnouncementAttachment' } } } }),
+        responses: { '200': response('Announcement updated.', success({ $ref: '#/components/schemas/EventAnnouncement' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/announcements/upload-session': {
+      post: {
+        tags: ['Events'], operationId: 'createEventAnnouncementUploadSession', summary: 'Authorise a private announcement attachment upload',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['file_name', 'content_type', 'size_bytes'], properties: { file_name: { type: 'string' }, content_type: { type: 'string', enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] }, size_bytes: { type: 'integer', minimum: 1, maximum: 10485760 } } }),
+        responses: { '201': response('Signed upload session returned.', success({ $ref: '#/components/schemas/EventAnnouncementUploadSession' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/announcements/attachments': {
+      post: {
+        tags: ['Events'], operationId: 'createEventAnnouncementAttachmentAccess', summary: 'Create a short-lived private attachment URL',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['object_path'], properties: { object_path: { type: 'string' } } }),
+        responses: { '201': response('Signed attachment URL returned.', success({ $ref: '#/components/schemas/EventAnnouncementAttachmentAccess' })), ...standardErrors },
+      },
+      delete: {
+        tags: ['Events'], operationId: 'deletePendingEventAnnouncementUpload', summary: 'Delete an unpublished attachment upload',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['object_path'], properties: { object_path: { type: 'string' } } }),
+        responses: { '200': response('Pending upload removed.', success({ type: 'object', maxProperties: 0 })), ...standardErrors },
       },
     },
     '/events/{eventId}/organiser-invites': {
@@ -1003,12 +1099,77 @@ export const tsheloOpenApiDocument = {
       },
       EventGuest: {
         type: 'object',
+        required: ['id', 'event_id', 'user_id', 'guest_name', 'guest_phone', 'guest_email', 'rsvp_status', 'rsvp_responded_at', 'plus_ones', 'allowed_plus_ones', 'plus_ones_names', 'rsvp_note', 'dietary_requirements', 'accessibility_needs', 'invited_by', 'invited_at', 'invitation_sent_at', 'invitation_channel', 'created_at', 'updated_at'],
         properties: {
           id: { type: 'string', format: 'uuid' }, event_id: { type: 'string', format: 'uuid' },
           user_id: { type: ['string', 'null'], format: 'uuid' }, guest_name: { type: ['string', 'null'] },
-          guest_phone: { type: ['string', 'null'] }, rsvp_status: { type: 'string', enum: ['pending', 'yes', 'no', 'maybe'] },
-          plus_ones: { type: 'integer' }, created_at: { type: 'string', format: 'date-time' },
+          guest_phone: { type: ['string', 'null'] }, guest_email: { type: ['string', 'null'], format: 'email' },
+          rsvp_status: { type: 'string', enum: ['pending', 'yes', 'no', 'maybe'] }, rsvp_responded_at: { type: ['string', 'null'], format: 'date-time' },
+          plus_ones: { type: 'integer', minimum: 0, maximum: 20 }, allowed_plus_ones: { type: 'integer', minimum: 0, maximum: 20 }, plus_ones_names: { type: 'array', items: { type: 'string' } },
+          rsvp_note: { type: ['string', 'null'] }, dietary_requirements: { type: ['string', 'null'] }, accessibility_needs: { type: ['string', 'null'] },
+          invited_by: { type: ['string', 'null'], format: 'uuid' }, invited_at: { type: 'string', format: 'date-time' }, invitation_sent_at: { type: ['string', 'null'], format: 'date-time' },
+          invitation_channel: { type: ['string', 'null'], enum: ['manual', 'link', 'code', 'whatsapp', 'sms', 'email', null] },
+          created_at: { type: 'string', format: 'date-time' }, updated_at: { type: 'string', format: 'date-time' },
         },
+      },
+      EventGuestSummary: {
+        type: 'object',
+        required: ['invitation_count', 'invited_people', 'confirmed_people', 'maybe_people', 'pending_people', 'declined_people'],
+        properties: {
+          invitation_count: { type: 'integer', minimum: 0 }, invited_people: { type: 'integer', minimum: 0 }, confirmed_people: { type: 'integer', minimum: 0 },
+          maybe_people: { type: 'integer', minimum: 0 }, pending_people: { type: 'integer', minimum: 0 }, declined_people: { type: 'integer', minimum: 0 },
+        },
+      },
+      EventGuestCapacity: {
+        type: 'object',
+        required: ['event_id', 'used', 'free_limit', 'is_unlimited', 'unlimited_source', 'unlock_cost_tokens'],
+        properties: {
+          event_id: { type: 'string', format: 'uuid' }, used: { type: 'integer', minimum: 0 }, free_limit: { type: 'integer', minimum: 0 }, is_unlimited: { type: 'boolean' },
+          unlimited_source: { type: ['string', 'null'], enum: ['event_unlock', 'pass', null] }, unlock_cost_tokens: { type: 'integer', minimum: 0 },
+        },
+      },
+      EventGuestDirectory: {
+        type: 'object',
+        required: ['items', 'page', 'summary', 'capacity'],
+        properties: {
+          items: { type: 'array', items: { $ref: '#/components/schemas/EventGuest' } }, page: { $ref: '#/components/schemas/Pagination' },
+          summary: { $ref: '#/components/schemas/EventGuestSummary' }, capacity: { $ref: '#/components/schemas/EventGuestCapacity' },
+        },
+      },
+      InviteEventGuestInput: {
+        type: 'object', required: ['guest_name', 'guest_phone'], additionalProperties: false,
+        properties: {
+          guest_name: { type: 'string', minLength: 1, maxLength: 100 }, guest_phone: { type: 'string', pattern: '^\\+[1-9]\\d{6,14}$' }, guest_email: { type: ['string', 'null'], format: 'email' },
+          allowed_plus_ones: { type: 'integer', minimum: 0, maximum: 20 }, invitation_channel: { type: 'string', enum: ['manual', 'link', 'code', 'whatsapp', 'sms', 'email'] },
+        },
+      },
+      InviteEventGuestsRequest: {
+        type: 'object', required: ['guests'], additionalProperties: false,
+        properties: { guests: { type: 'array', minItems: 1, maxItems: 100, items: { $ref: '#/components/schemas/InviteEventGuestInput' } } },
+      },
+      UpdateEventGuestRequest: {
+        type: 'object', minProperties: 1, additionalProperties: false,
+        properties: {
+          guest_name: { type: 'string', minLength: 1, maxLength: 100 }, guest_phone: { type: 'string', pattern: '^\\+[1-9]\\d{6,14}$' }, guest_email: { type: ['string', 'null'], format: 'email' },
+          rsvp_status: { type: 'string', enum: ['pending', 'yes', 'no', 'maybe'] }, plus_ones: { type: 'integer', minimum: 0, maximum: 20 }, allowed_plus_ones: { type: 'integer', minimum: 0, maximum: 20 },
+          plus_ones_names: { type: 'array', maxItems: 20, items: { type: 'string', minLength: 1, maxLength: 100 } }, rsvp_note: { type: ['string', 'null'], maxLength: 2000 },
+          dietary_requirements: { type: ['string', 'null'], maxLength: 1000 }, accessibility_needs: { type: ['string', 'null'], maxLength: 1000 },
+        },
+      },
+      RespondEventRsvpRequest: {
+        type: 'object', required: ['status'], additionalProperties: false,
+        properties: {
+          code: { type: 'string', minLength: 8, maxLength: 32 }, status: { type: 'string', enum: ['yes', 'no', 'maybe'] }, plus_ones: { type: 'integer', minimum: 0, maximum: 20 },
+          plus_ones_names: { type: 'array', maxItems: 20, items: { type: 'string', minLength: 1, maxLength: 100 } }, rsvp_note: { type: ['string', 'null'], maxLength: 2000 },
+          dietary_requirements: { type: ['string', 'null'], maxLength: 1000 }, accessibility_needs: { type: ['string', 'null'], maxLength: 1000 },
+        },
+      },
+      RemoveEventGuestResult: {
+        type: 'object', required: ['guest_id'], properties: { guest_id: { type: 'string', format: 'uuid' } },
+      },
+      UnlockEventGuestCapacityResult: {
+        type: 'object', required: ['event_id', 'is_unlimited', 'tokens_spent', 'remaining_tokens'],
+        properties: { event_id: { type: 'string', format: 'uuid' }, is_unlimited: { type: 'boolean' }, tokens_spent: { type: 'integer', minimum: 0 }, remaining_tokens: { type: 'integer', minimum: 0 } },
       },
       EventBudget: {
         type: 'object', required: ['event_id', 'total_budget', 'currency_code'],
@@ -1018,11 +1179,24 @@ export const tsheloOpenApiDocument = {
         },
       },
       EventAnnouncement: {
-        type: 'object', required: ['id', 'event_id', 'author_id', 'author_name', 'title', 'body', 'created_at'],
+        type: 'object', required: ['id', 'event_id', 'author_id', 'author_name', 'title', 'body', 'attachments', 'created_at'],
         properties: {
           id: { type: 'string', format: 'uuid' }, event_id: { type: 'string', format: 'uuid' }, author_id: { type: 'string', format: 'uuid' },
-          author_name: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, created_at: { type: 'string', format: 'date-time' },
+          author_name: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, attachments: { type: 'array', items: { $ref: '#/components/schemas/EventAnnouncementAttachment' } }, created_at: { type: 'string', format: 'date-time' },
         },
+      },
+      EventAnnouncementAttachment: {
+        type: 'object', required: ['object_path', 'file_name', 'content_type', 'size_bytes'],
+        properties: {
+          object_path: { type: 'string' }, file_name: { type: 'string' }, content_type: { type: 'string', enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] }, size_bytes: { type: 'integer' },
+        },
+      },
+      EventAnnouncementUploadSession: {
+        allOf: [{ $ref: '#/components/schemas/EventAnnouncementAttachment' }, { type: 'object', required: ['upload_url', 'expires_at'], properties: { upload_url: { type: 'string', format: 'uri' }, expires_at: { type: 'string', format: 'date-time' } } }],
+      },
+      EventAnnouncementAttachmentAccess: {
+        type: 'object', required: ['object_path', 'download_url', 'expires_at'],
+        properties: { object_path: { type: 'string' }, download_url: { type: 'string', format: 'uri' }, expires_at: { type: 'string', format: 'date-time' } },
       },
       EventInvitePreview: {
         type: 'object',

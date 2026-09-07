@@ -191,6 +191,46 @@ describe('shared Tshelo API client', () => {
     )
   })
 
+  it('uses the guest directory, RSVP, and capacity routes', async () => {
+    const calls: Array<{ url: string; options?: RequestInit }> = []
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      calls.push({ url: String(input), options })
+      return success({})
+    })
+    const client = createTsheloApiClient({
+      baseUrl: 'https://api.tshelo.example',
+      getAccessToken: async () => 'access-token',
+      fetch: fetchMock as typeof fetch,
+    })
+    const eventId = '00000000-0000-4000-8000-000000000001'
+    const guestId = '00000000-0000-4000-8000-000000000002'
+
+    await client.events.listGuests(eventId, { status: ['pending', 'yes'], q: 'Naledi' })
+    await client.events.getGuest(eventId, guestId)
+    await client.events.inviteGuests(eventId, { guests: [{ guest_name: 'Naledi', guest_phone: '+26771000000' }] })
+    await client.events.updateGuest(eventId, guestId, { allowed_plus_ones: 1 })
+    await client.events.removeGuest(eventId, guestId)
+    await client.events.myRsvp(eventId)
+    await client.events.respondRsvp(eventId, { status: 'yes', plus_ones: 1, plus_ones_names: ['Kago'] })
+    await client.events.guestCapacity(eventId)
+    await client.events.unlockGuestCapacity(eventId)
+
+    expect(calls.map(call => [new URL(call.url).pathname, call.options?.method])).toEqual([
+      [`/api/v1/events/${eventId}/guests`, 'GET'],
+      [`/api/v1/events/${eventId}/guests/${guestId}`, 'GET'],
+      [`/api/v1/events/${eventId}/guests`, 'POST'],
+      [`/api/v1/events/${eventId}/guests/${guestId}`, 'PATCH'],
+      [`/api/v1/events/${eventId}/guests/${guestId}`, 'DELETE'],
+      [`/api/v1/events/${eventId}/rsvp`, 'GET'],
+      [`/api/v1/events/${eventId}/rsvp`, 'PUT'],
+      [`/api/v1/events/${eventId}/guest-capacity`, 'GET'],
+      [`/api/v1/events/${eventId}/guest-capacity`, 'POST'],
+    ])
+    expect(new URL(calls[0].url).searchParams.getAll('status')).toEqual(['pending', 'yes'])
+    expect(calls[2].options?.body).toBe(JSON.stringify({ guests: [{ guest_name: 'Naledi', guest_phone: '+26771000000' }] }))
+    expect(calls[6].options?.body).toBe(JSON.stringify({ status: 'yes', plus_ones: 1, plus_ones_names: ['Kago'] }))
+  })
+
   it('exposes profile, notification, invite, connection, and reward operations', async () => {
     const calls: Array<{ url: string; options?: RequestInit }> = []
     const fetchMock = jest.fn(async (input: RequestInfo | URL, options?: RequestInit) => {

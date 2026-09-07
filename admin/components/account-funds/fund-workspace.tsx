@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Award, BadgeDollarSign, Check, CircleCheck, Copy, RefreshCw, Settings, Share2, UsersRound } from 'lucide-react'
 import { isExpenseCategory, type FundMemberStatus, type FundSponsorshipItem, type FundWorkspace, type RichAuntieAward, type UpdateFundRequest, type User } from '@shared/contracts'
+import { invitationUrl } from '@shared/invitations'
 import { StatusPill } from '@/components/status-pill'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage, runApiRead } from '@/lib/api-ui'
@@ -41,7 +42,7 @@ function Summary({ data, onViewActivity }: { data: WorkspaceData; onViewActivity
   const { workspace, user } = data
   const { fund } = workspace
   const canInvite = fund.status === 'active' && (fund.owner_id === user.id || workspace.permissions.includes('manage_members'))
-  const relativeInviteUrl = `/account/funds?joinCode=${encodeURIComponent(fund.fund_code)}`
+  const inviteUrl = invitationUrl('fund', fund.fund_code)
   const [copied, setCopied] = useState<'code' | 'invite' | null>(null)
   const goal = Number(fund.goal_amount ?? 0)
   const raised = Number(fund.totals.raised)
@@ -103,8 +104,8 @@ function Summary({ data, onViewActivity }: { data: WorkspaceData; onViewActivity
               </button>
             </div>
             {canInvite && <div className="member-workspace-invite-detail invite-link">
-              <div><span>Invite link</span><code>{relativeInviteUrl}</code></div>
-              <button type="button" onClick={() => copy(new URL(relativeInviteUrl, window.location.origin).toString(), 'invite')} aria-label={copied === 'invite' ? 'Invite link copied' : 'Copy invite link'} title={copied === 'invite' ? 'Copied' : 'Copy invite link'}>
+              <div><span>Invite link</span><code>{inviteUrl}</code></div>
+              <button type="button" onClick={() => copy(inviteUrl, 'invite')} aria-label={copied === 'invite' ? 'Invite link copied' : 'Copy invite link'} title={copied === 'invite' ? 'Copied' : 'Copy invite link'}>
                 {copied === 'invite' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
               </button>
             </div>}

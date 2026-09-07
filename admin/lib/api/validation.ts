@@ -25,13 +25,26 @@ import { PAYMENT_METHODS } from '@shared/contracts/contributions'
 import type {
   CompleteEventRequest,
   CreateEventAnnouncementRequest,
+  CreateEventAnnouncementUploadSessionRequest,
   CreateEventFundRequest,
   CreateEventRequest,
+  EventAnnouncementAttachmentAccessRequest,
+  InviteEventGuestsRequest,
   InviteEventOrganiserRequest,
   JoinEventRequest,
+  RespondEventRsvpRequest,
   RespondOrganiserInviteRequest,
+  UpdateEventGuestRequest,
   UpdateEventBudgetRequest,
+  UpdateEventAnnouncementRequest,
   UpdateEventRequest,
+} from '@shared/contracts/events'
+import {
+  EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES,
+  EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES,
+  EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS,
+  EVENT_GUEST_INVITATION_CHANNELS,
+  RSVP_STATUSES,
 } from '@shared/contracts/events'
 import type {
   ConfigureFundAdminRequest,
@@ -117,6 +130,52 @@ function optionalString(
   if (typeof candidate !== 'string' || candidate.length > max) {
     errors.push(issue(field, 'invalid_string', `Must be a string of at most ${max} characters or null.`))
   }
+}
+
+function optionalEmail(
+  value: JsonObject,
+  field: string,
+  errors: ApiFieldError[],
+  prefix = '',
+) {
+  const candidate = value[field]
+  if (candidate === undefined || candidate === null) return
+  const path = prefix ? `${prefix}.${field}` : field
+  if (typeof candidate !== 'string' || candidate.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate)) {
+    errors.push(issue(path, 'invalid_email', 'Must be a valid email address or null.'))
+  }
+}
+
+function optionalGuestCount(
+  value: JsonObject,
+  field: string,
+  errors: ApiFieldError[],
+  prefix = '',
+) {
+  const candidate = value[field]
+  if (candidate === undefined) return
+  const path = prefix ? `${prefix}.${field}` : field
+  if (!Number.isSafeInteger(candidate) || Number(candidate) < 0 || Number(candidate) > 20) {
+    errors.push(issue(path, 'invalid_guest_count', 'Must be an integer between 0 and 20.'))
+  }
+}
+
+function optionalGuestNames(
+  value: JsonObject,
+  field: string,
+  errors: ApiFieldError[],
+) {
+  const candidate = value[field]
+  if (candidate === undefined) return
+  if (!Array.isArray(candidate) || candidate.length > 20) {
+    errors.push(issue(field, 'invalid_array', 'Must contain at most 20 guest names.'))
+    return
+  }
+  candidate.forEach((name, index) => {
+    if (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 100) {
+      errors.push(issue(`${field}.${index}`, 'invalid_string', 'Must contain between 1 and 100 characters.'))
+    }
+  })
 }
 
 function requireUuid(value: JsonObject, field: string, errors: ApiFieldError[]) {
@@ -260,6 +319,105 @@ function validateEventCodeBody(input: unknown): ValidationResult<JoinEventReques
 
 export const validateJoinEventRequest = validateEventCodeBody
 
+export function validateInviteEventGuestsRequest(input: unknown): ValidationResult<InviteEventGuestsRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['guests'], errors)
+  if (!Array.isArray(value.guests) || value.guests.length < 1 || value.guests.length > 100) {
+    errors.push(issue('guests', 'invalid_array', 'Invite between 1 and 100 guests at a time.'))
+  } else {
+    const phones = new Set<string>()
+    value.guests.forEach((guest, index) => {
+      const item = objectValue(guest)
+      const prefix = `guests.${index}`
+      if (!item) {
+        errors.push(issue(prefix, 'invalid_type', 'Must be an object.'))
+        return
+      }
+      rejectUnknownFields(item, ['guest_name', 'guest_phone', 'guest_email', 'allowed_plus_ones', 'invitation_channel'], errors, prefix)
+      if (typeof item.guest_name !== 'string' || item.guest_name.trim().length < 1 || item.guest_name.trim().length > 100) {
+        errors.push(issue(`${prefix}.guest_name`, 'invalid_string', 'Must contain between 1 and 100 characters.'))
+      }
+      if (typeof item.guest_phone !== 'string' || !PHONE_PATTERN.test(item.guest_phone)) {
+        errors.push(issue(`${prefix}.guest_phone`, 'invalid_phone', 'Must be an E.164 phone number.'))
+      } else {
+        const normalized = item.guest_phone.replace(/\D/g, '')
+        if (phones.has(normalized)) errors.push(issue(`${prefix}.guest_phone`, 'duplicate_value', 'Guest phone numbers must be unique within an invitation batch.'))
+        phones.add(normalized)
+      }
+      optionalEmail(item, 'guest_email', errors, prefix)
+      optionalGuestCount(item, 'allowed_plus_ones', errors, prefix)
+      if (item.invitation_channel !== undefined && !EVENT_GUEST_INVITATION_CHANNELS.includes(item.invitation_channel as never)) {
+        errors.push(issue(`${prefix}.invitation_channel`, 'invalid_channel', 'Unsupported invitation channel.'))
+      }
+    })
+  }
+  return finish<InviteEventGuestsRequest>(value, errors)
+}
+
+export function validateUpdateEventGuestRequest(input: unknown): ValidationResult<UpdateEventGuestRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const allowed = [
+    'guest_name', 'guest_phone', 'guest_email', 'rsvp_status', 'plus_ones',
+    'allowed_plus_ones', 'plus_ones_names', 'rsvp_note', 'dietary_requirements',
+    'accessibility_needs',
+  ] as const
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, allowed, errors)
+  if (value.guest_name !== undefined) requireString(value, 'guest_name', errors, 1, 100)
+  if (value.guest_phone !== undefined && (typeof value.guest_phone !== 'string' || !PHONE_PATTERN.test(value.guest_phone))) {
+    errors.push(issue('guest_phone', 'invalid_phone', 'Must be an E.164 phone number.'))
+  }
+  optionalEmail(value, 'guest_email', errors)
+  if (value.rsvp_status !== undefined && !RSVP_STATUSES.includes(value.rsvp_status as never)) {
+    errors.push(issue('rsvp_status', 'invalid_status', 'Status must be pending, yes, maybe, or no.'))
+  }
+  optionalGuestCount(value, 'plus_ones', errors)
+  optionalGuestCount(value, 'allowed_plus_ones', errors)
+  optionalGuestNames(value, 'plus_ones_names', errors)
+  optionalString(value, 'rsvp_note', errors, 2000)
+  optionalString(value, 'dietary_requirements', errors, 1000)
+  optionalString(value, 'accessibility_needs', errors, 1000)
+  if (Number.isInteger(value.plus_ones) && Number.isInteger(value.allowed_plus_ones) && Number(value.plus_ones) > Number(value.allowed_plus_ones)) {
+    errors.push(issue('plus_ones', 'exceeds_allowance', 'Selected plus-ones cannot exceed the invitation allowance.'))
+  }
+  if (Array.isArray(value.plus_ones_names) && Number.isInteger(value.plus_ones) && value.plus_ones_names.length > Number(value.plus_ones)) {
+    errors.push(issue('plus_ones_names', 'too_many_names', 'Plus-one names cannot exceed the selected plus-one count.'))
+  }
+  if (value.rsvp_status === 'no' && Number(value.plus_ones ?? 0) > 0) {
+    errors.push(issue('plus_ones', 'invalid_for_declined', 'A declined RSVP cannot include plus-ones.'))
+  }
+  if (allowed.every(field => value[field] === undefined)) errors.push(issue('body', 'empty_patch', 'At least one guest field must be supplied.'))
+  return finish<UpdateEventGuestRequest>(value, errors)
+}
+
+export function validateRespondEventRsvpRequest(input: unknown): ValidationResult<RespondEventRsvpRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['code', 'status', 'plus_ones', 'plus_ones_names', 'rsvp_note', 'dietary_requirements', 'accessibility_needs'], errors)
+  if (value.code !== undefined && (typeof value.code !== 'string' || value.code.trim().length < 8 || value.code.trim().length > 32)) {
+    errors.push(issue('code', 'invalid_code', 'Invitation code must contain between 8 and 32 characters.'))
+  }
+  if (!['yes', 'maybe', 'no'].includes(String(value.status))) {
+    errors.push(issue('status', 'invalid_status', 'Status must be yes, maybe, or no.'))
+  }
+  optionalGuestCount(value, 'plus_ones', errors)
+  optionalGuestNames(value, 'plus_ones_names', errors)
+  optionalString(value, 'rsvp_note', errors, 2000)
+  optionalString(value, 'dietary_requirements', errors, 1000)
+  optionalString(value, 'accessibility_needs', errors, 1000)
+  if (Array.isArray(value.plus_ones_names) && value.plus_ones_names.length > Number(value.plus_ones ?? 0)) {
+    errors.push(issue('plus_ones_names', 'too_many_names', 'Plus-one names cannot exceed the selected plus-one count.'))
+  }
+  if (value.status === 'no' && Number(value.plus_ones ?? 0) > 0) {
+    errors.push(issue('plus_ones', 'invalid_for_declined', 'A declined RSVP cannot include plus-ones.'))
+  }
+  return finish<RespondEventRsvpRequest>(value, errors)
+}
+
 export function validateCreateEventFundRequest(input: unknown): ValidationResult<CreateEventFundRequest> {
   const value = objectValue(input)
   if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
@@ -367,10 +525,93 @@ export function validateCreateEventAnnouncementRequest(input: unknown): Validati
   const value = objectValue(input)
   if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
   const errors: ApiFieldError[] = []
-  rejectUnknownFields(value, ['title', 'body'], errors)
+  rejectUnknownFields(value, ['title', 'body', 'attachments'], errors)
   requireString(value, 'title', errors, 3, 120)
   requireString(value, 'body', errors, 3, 4000)
+  const attachments = value.attachments
+  if (attachments !== undefined) {
+    if (!Array.isArray(attachments) || attachments.length > EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS) {
+      errors.push(issue('attachments', 'invalid_attachments', `Attach up to ${EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS} files.`))
+    } else {
+      attachments.forEach((attachment, index) => {
+        const item = objectValue(attachment)
+        const prefix = `attachments.${index}`
+        if (!item) {
+          errors.push(issue(prefix, 'invalid_attachment', 'Each attachment must be an object.'))
+          return
+        }
+        rejectUnknownFields(item, ['object_path', 'file_name', 'content_type', 'size_bytes'], errors, prefix)
+        requireString(item, 'object_path', errors, 1, 500)
+        requireString(item, 'file_name', errors, 1, 255)
+        if (typeof item.content_type !== 'string' || !EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES.includes(item.content_type as typeof EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES[number])) {
+          errors.push(issue(`${prefix}.content_type`, 'invalid_attachment_type', 'Only PDF and image attachments are supported.'))
+        }
+        if (typeof item.size_bytes !== 'number' || !Number.isSafeInteger(item.size_bytes) || item.size_bytes < 1 || item.size_bytes > EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES) {
+          errors.push(issue(`${prefix}.size_bytes`, 'invalid_attachment_size', 'Attachment size is invalid.'))
+        }
+      })
+    }
+  }
   return finish<CreateEventAnnouncementRequest>(value, errors)
+}
+
+export function validateUpdateEventAnnouncementRequest(input: unknown): ValidationResult<UpdateEventAnnouncementRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['title', 'body', 'attachments'], errors)
+  if (value.title !== undefined) requireString(value, 'title', errors, 3, 120)
+  if (value.body !== undefined) requireString(value, 'body', errors, 3, 4000)
+  const attachments = value.attachments
+  if (attachments !== undefined) {
+    if (!Array.isArray(attachments) || attachments.length > EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS) {
+      errors.push(issue('attachments', 'invalid_attachments', `Attach up to ${EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS} files.`))
+    } else {
+      attachments.forEach((attachment, index) => {
+        const item = objectValue(attachment)
+        const prefix = `attachments.${index}`
+        if (!item) {
+          errors.push(issue(prefix, 'invalid_attachment', 'Each attachment must be an object.'))
+          return
+        }
+        rejectUnknownFields(item, ['object_path', 'file_name', 'content_type', 'size_bytes'], errors, prefix)
+        requireString(item, 'object_path', errors, 1, 500)
+        requireString(item, 'file_name', errors, 1, 255)
+        if (typeof item.content_type !== 'string' || !EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES.includes(item.content_type as typeof EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES[number])) {
+          errors.push(issue(`${prefix}.content_type`, 'invalid_attachment_type', 'Only PDF and image attachments are supported.'))
+        }
+        if (typeof item.size_bytes !== 'number' || !Number.isSafeInteger(item.size_bytes) || item.size_bytes < 1 || item.size_bytes > EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES) {
+          errors.push(issue(`${prefix}.size_bytes`, 'invalid_attachment_size', 'Attachment size is invalid.'))
+        }
+      })
+    }
+  }
+  if (value.title === undefined && value.body === undefined && value.attachments === undefined) errors.push(issue('body', 'empty_patch', 'A title, message, or attachment change is required.'))
+  return finish<UpdateEventAnnouncementRequest>(value, errors)
+}
+
+export function validateCreateEventAnnouncementUploadSessionRequest(input: unknown): ValidationResult<CreateEventAnnouncementUploadSessionRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['file_name', 'content_type', 'size_bytes'], errors)
+  requireString(value, 'file_name', errors, 1, 255)
+  if (typeof value.content_type !== 'string' || !EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES.includes(value.content_type as typeof EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES[number])) {
+    errors.push(issue('content_type', 'invalid_attachment_type', 'Only PDF and image attachments are supported.'))
+  }
+  if (typeof value.size_bytes !== 'number' || !Number.isSafeInteger(value.size_bytes) || value.size_bytes < 1 || value.size_bytes > EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES) {
+    errors.push(issue('size_bytes', 'invalid_attachment_size', `Attachments must be no larger than ${EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB.`))
+  }
+  return finish<CreateEventAnnouncementUploadSessionRequest>(value, errors)
+}
+
+export function validateEventAnnouncementAttachmentAccessRequest(input: unknown): ValidationResult<EventAnnouncementAttachmentAccessRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['object_path'], errors)
+  requireString(value, 'object_path', errors, 1, 500)
+  return finish<EventAnnouncementAttachmentAccessRequest>(value, errors)
 }
 
 export function validateInviteEventOrganiserRequest(input: unknown): ValidationResult<InviteEventOrganiserRequest> {

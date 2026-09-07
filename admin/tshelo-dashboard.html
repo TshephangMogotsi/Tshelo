@@ -624,20 +624,35 @@ footer .in{max-width:1340px;margin:0 auto;border-top:1px solid var(--rule);paddi
           </ul>
         </div>
         <div class="price">
-          <div class="big">P150</div>
-          <small>twelve months, P12.50 a month</small>
+          <div class="big">P300</div>
+          <small>twelve months, P25 a month</small>
           <button class="btn" data-act="buyPass">Get Unlimited</button>
+        </div>
+      </div>
+
+      <div class="passcard">
+        <div>
+          <div class="eyebrow">For shared fund administration</div>
+          <h3>Tshelo Committee</h3>
+          <ul>
+            <li>Everything in Unlimited for twelve months</li>
+            <li>Up to five co-administrators with individual audit trails</li>
+            <li>Unlimited members on every fund</li>
+            <li>Monthly committee statements and an annual meeting pack</li>
+          </ul>
+        </div>
+        <div class="price">
+          <div class="big">P750</div>
+          <small>twelve months, P62.50 a month</small>
+          <button class="btn" data-act="buyCommittee">Get Committee</button>
         </div>
       </div>
 
       <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M14.6 9.6a2.8 2.8 0 00-2.6-1.4c-1.5 0-2.6.9-2.6 2.1 0 2.9 5.2 1.4 5.2 4.2 0 1.2-1.1 2.1-2.6 2.1a2.8 2.8 0 01-2.6-1.4"/></svg></span>Token packs</span></h2><div class="body">
         <div class="packs">
-          <div class="pack" data-tok="10"><div class="nm">Starter</div><div class="tk">10<small>tokens</small></div><div class="pr">P5</div><div class="per">P0.50 per token</div><div class="buys">One extra fund</div></div>
-          <div class="pack" data-tok="30"><div class="nm">Value</div><div class="tk">30<small>tokens</small></div><div class="pr">P13</div><div class="per">P0.43 per token</div><div class="buys">Three extra funds</div></div>
-          <div class="pack best" data-tok="60"><div class="ribbon">Most popular</div><div class="nm">Popular</div><div class="tk">60<small>tokens</small></div><div class="pr">P24</div><div class="per">P0.40 per token</div><div class="buys">Six funds, or bigger member limits</div></div>
-          <div class="pack" data-tok="120"><div class="nm">Power</div><div class="tk">120<small>tokens</small></div><div class="pr">P45</div><div class="per">P0.375 per token</div><div class="buys">Twelve funds and spare tokens</div></div>
+          <div class="pack best" data-tok="60"><div class="nm">Token top-up</div><div class="tk">60<small>tokens</small></div><div class="pr">P50</div><div class="per">P0.83 per token</div><div class="buys">Extra funds and events, member limits, reports and planning tools</div></div>
         </div>
-        <div class="note"><b>Payment happens here on tshelo.com, never inside the app.</b> Cards are processed by Stripe. Orange Money, MyZaka and Smega are processed by our local mobile money partner. Tokens appear in your app the moment payment clears.</div>
+        <div class="note"><b>Payment happens here on tshelo.com, never inside the app.</b> Tokens or a dated pass appear only after the payment provider confirms the order.</div>
       </div></div>
 
       <div class="card"><h2><span class="h2left"><span class="itile sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.85-4.45 4.3 1.06 6.05L12 17.15 6.59 20l1.06-6.05L3.2 9.65l6.1-.85z"/></svg></span>What tokens buy</span></h2><div class="body"><table>
@@ -1142,10 +1157,11 @@ const ACT={
        bal-=cost;setBal();closeModal();toast(name+' unlocked.');}});},
 
  buyPack:(btn)=>{const tok=parseInt(btn.dataset.tok,10);
-   const price={10:'P5',30:'P13',60:'P24',120:'P45'}[tok];
+   const price={60:'P50'}[tok];
    checkout('Buy '+tok+' tokens',price,()=>{bal+=tok;setBal();toast(tok+' tokens added to your balance.');});},
 
- buyPass:()=>checkout('Tshelo Unlimited, 12 months','P150',()=>toast('Unlimited is active until 12 August 2027.')),
+ buyPass:()=>checkout('Tshelo Unlimited, 12 months','P300',()=>toast('Unlimited is active until 12 August 2027.')),
+ buyCommittee:()=>checkout('Tshelo Committee, 12 months','P750',()=>toast('Committee is active until 12 August 2027.')),
 
  exportGuests:()=>{
    const rows=[['Guest','Reply','Bringing','Head count']];

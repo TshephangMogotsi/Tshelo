@@ -9,11 +9,12 @@ import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 import { buildTokenPortalUrl, TOKEN_PORTAL_URL } from '../../lib/tokenPortal'
 import {
+  CHECKOUT_OFFERS,
   TOKEN_FEATURE_PRICES,
-  TOKEN_PACKS,
+  isTokenPack,
   tokenPriceLabel,
-  type TokenPack,
-  type TokenPackId,
+  type CheckoutOffer,
+  type CheckoutOfferId,
 } from '../../lib/tokenPricing'
 
 type Props = {
@@ -32,33 +33,31 @@ const TOKEN_USES = [
 
 type Styles = ReturnType<typeof makeStyles>
 
-function PackCard({
-  pack,
+function OfferCard({
+  offer,
   selected,
   onSelect,
   styles,
 }: {
-  pack: TokenPack
+  offer: CheckoutOffer
   selected: boolean
   onSelect: () => void
   styles: Styles
 }) {
+  const isTopUp = isTokenPack(offer)
+
   return (
     <TouchableOpacity
       style={[styles.packCard, selected && styles.packCardSelected]}
       onPress={onSelect}
       activeOpacity={0.85}
     >
-      {pack.popular && (
-        <View style={styles.popularBadge}>
-          <Text style={styles.popularBadgeText}>Most Popular</Text>
-        </View>
-      )}
-
       <View style={styles.packTop}>
         <View>
-          <Text style={styles.packLabel}>{pack.label}</Text>
-          <Text style={styles.packPerToken}>{tokenPriceLabel(pack.priceBWP, pack.tokens)}</Text>
+          <Text style={styles.packLabel}>{offer.label}</Text>
+          <Text style={styles.packPerToken}>
+            {isTopUp ? tokenPriceLabel(offer.priceBWP, offer.tokens) : offer.termLabel}
+          </Text>
         </View>
         <View style={styles.radioOuter}>
           {selected && <View style={styles.radioInner} />}
@@ -66,13 +65,22 @@ function PackCard({
       </View>
 
       <View style={styles.packMiddle}>
-        <Text style={styles.packTokenCount}>
-          🪙 <Text style={styles.packTokenNumber}>{pack.tokens}</Text> tokens
-        </Text>
-        <Text style={styles.packPrice}>P{pack.priceBWP}</Text>
+        {isTopUp ? (
+          <Text style={styles.packTokenCount}>
+            🪙 <Text style={styles.packTokenNumber}>{offer.tokens}</Text> tokens
+          </Text>
+        ) : (
+          <Text style={styles.packTokenCount}>Annual pass</Text>
+        )}
+        <Text style={styles.packPrice}>P{offer.priceBWP}</Text>
       </View>
 
-      <Text style={styles.packDescription}>{pack.description}</Text>
+      <Text style={styles.packDescription}>{offer.description}</Text>
+      {!isTopUp && (
+        <View style={styles.passIncludes}>
+          {offer.includes.map((item) => <Text key={item} style={styles.passInclude}>• {item}</Text>)}
+        </View>
+      )}
     </TouchableOpacity>
   )
 }
@@ -82,18 +90,19 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
   const { tokenBalance, refreshProfile } = useAuth()
   const styles = makeStyles(colors)
 
-  const [selectedPack, setSelectedPack] = useState<TokenPackId>('popular')
+  const [selectedOfferId, setSelectedOfferId] = useState<CheckoutOfferId>('top_up_60')
   const currentBalance = tokenBalance
   const isTab = route?.name === 'Tokens'
 
-  const pack = TOKEN_PACKS.find(p => p.id === selectedPack)!
+  const selectedOffer = CHECKOUT_OFFERS.find((offer) => offer.id === selectedOfferId) ?? CHECKOUT_OFFERS[0]
+  const selectedIsTopUp = isTokenPack(selectedOffer)
 
   useFocusEffect(useCallback(() => {
     void refreshProfile()
   }, [refreshProfile]))
 
   async function handlePurchase() {
-    const checkoutUrl = buildTokenPortalUrl(TOKEN_PORTAL_URL, pack.id)
+    const checkoutUrl = buildTokenPortalUrl(TOKEN_PORTAL_URL, selectedOffer.id)
     if (!checkoutUrl) {
       Alert.alert(
         'Web checkout coming soon',
@@ -131,9 +140,9 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.header}>
-          <Text style={styles.heading}>Buy Tokens</Text>
+          <Text style={styles.heading}>Tshelo Pricing</Text>
           <Text style={styles.subheading}>
-            Tokens are purchased credit for paid Tshelo features. They are separate from trust points.
+            Choose a token top-up or a dated annual pass. Tokens are separate from trust points.
           </Text>
         </View>
 
@@ -152,14 +161,14 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         </View>
 
         {/* ── Pack selector ────────────────────────── */}
-        <Text style={styles.sectionLabel}>Choose a Pack</Text>
+        <Text style={styles.sectionLabel}>Choose an option</Text>
         <View style={styles.packGrid}>
-          {TOKEN_PACKS.map(p => (
-            <PackCard
-              key={p.id}
-              pack={p}
-              selected={selectedPack === p.id}
-              onSelect={() => setSelectedPack(p.id)}
+          {CHECKOUT_OFFERS.map((offer) => (
+            <OfferCard
+              key={offer.id}
+              offer={offer}
+              selected={selectedOfferId === offer.id}
+              onSelect={() => setSelectedOfferId(offer.id)}
               styles={styles}
             />
           ))}
@@ -169,20 +178,30 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Order Summary</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{pack.label} Pack</Text>
-            <Text style={styles.summaryValue}>🪙 {pack.tokens} tokens</Text>
+            <Text style={styles.summaryLabel}>{selectedOffer.label}</Text>
+            <Text style={styles.summaryValue}>
+              {selectedIsTopUp ? `🪙 ${selectedOffer.tokens} tokens` : '12-month pass'}
+            </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Price</Text>
-            <Text style={styles.summaryValue}>P{pack.priceBWP}.00</Text>
+            <Text style={styles.summaryValue}>P{selectedOffer.priceBWP.toFixed(2)}</Text>
           </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabelBold}>New Balance</Text>
-            <Text style={styles.summaryValueBold}>
-              🪙 {currentBalance + pack.tokens} tokens
+          {selectedIsTopUp ? (
+            <>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabelBold}>New Balance</Text>
+                <Text style={styles.summaryValueBold}>
+                  🪙 {currentBalance + selectedOffer.tokens} tokens
+                </Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.passSummaryNote}>
+              Starts when payment is confirmed and ends after 12 months. It does not renew automatically.
             </Text>
-          </View>
+          )}
         </View>
 
         {/* ── Payment notice ───────────────────────── */}
@@ -199,7 +218,7 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
           activeOpacity={0.85}
         >
           <Text style={styles.primaryButtonText}>
-            Continue on web — P{pack.priceBWP}
+            Continue on web — P{selectedOffer.priceBWP}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -333,19 +352,6 @@ function makeStyles(colors: AppColors) {
       borderColor: colors.primary,
       backgroundColor: colors.primaryLight,
     },
-    popularBadge: {
-      alignSelf: 'flex-start',
-      backgroundColor: colors.accent,
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      marginBottom: 10,
-    },
-    popularBadgeText: {
-      fontSize: 11,
-      fontWeight: '800',
-      color: colors.surface,
-    },
     packTop: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -402,6 +408,15 @@ function makeStyles(colors: AppColors) {
       fontSize: 12,
       color: colors.textMuted,
     },
+    passIncludes: {
+      gap: 4,
+      marginTop: 10,
+    },
+    passInclude: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+    },
 
     // ── Summary ────────────────────────────────────
     summaryCard: {
@@ -447,6 +462,11 @@ function makeStyles(colors: AppColors) {
       fontSize: 15,
       fontWeight: '800',
       color: colors.primary,
+    },
+    passSummaryNote: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
     },
 
     // ── Payment notice ─────────────────────────────

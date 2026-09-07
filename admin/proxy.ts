@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseConfig } from './lib/config'
+import { loginPathFor } from './lib/post-login'
 
 const APP_HOST = 'app.tshelo.com'
 const ADMIN_HOST = 'admin.tshelo.com'
@@ -62,7 +63,15 @@ export async function proxy(request: NextRequest) {
     },
   })
 
-  await supabase.auth.getClaims()
+  const { data: authentication } = await supabase.auth.getClaims()
+  if (isPathWithin(pathname, '/account') && !authentication?.claims.sub) {
+    const nextPath = `${pathname}${request.nextUrl.search}`
+    const url = request.nextUrl.clone()
+    const loginUrl = new URL(loginPathFor(nextPath), request.url)
+    url.pathname = loginUrl.pathname
+    url.search = loginUrl.search
+    return NextResponse.redirect(url)
+  }
   return response
 }
 

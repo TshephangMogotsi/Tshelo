@@ -1,10 +1,11 @@
 import 'server-only'
 
 import type { ServerClient } from './client'
+import { invitationContinuation, onboardingPathFor } from '@/lib/post-login'
 
-export type SignedInDestination = '/' | '/account/overview' | null
+export type SignedInDestination = '/' | '/account/overview' | `/account${string}` | `/onboarding${string}` | null
 
-export async function getSignedInDestination(client: ServerClient): Promise<SignedInDestination> {
+export async function getSignedInDestination(client: ServerClient, requestedPath?: `/account${string}` | null): Promise<SignedInDestination> {
   const {
     data: { user },
   } = await client.auth.getUser()
@@ -20,13 +21,19 @@ export async function getSignedInDestination(client: ServerClient): Promise<Sign
       .maybeSingle(),
     client
       .from('users')
-      .select('id')
+      .select('id, profile_completed')
       .eq('id', user.id)
       .eq('is_banned', false)
       .is('deleted_at', null)
       .maybeSingle(),
   ])
 
+  if (appUser && requestedPath) {
+    if (invitationContinuation(requestedPath) && !appUser.profile_completed) {
+      return onboardingPathFor(requestedPath)
+    }
+    return requestedPath
+  }
   if (admin) return '/'
   if (appUser) return '/account/overview'
   return null

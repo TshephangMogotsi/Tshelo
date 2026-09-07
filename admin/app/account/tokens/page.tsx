@@ -5,8 +5,8 @@ import { getAppUserContext } from '@/lib/app-user'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Buy tokens',
-  description: 'Purchase prepaid Tshelo feature tokens.',
+  title: 'Tshelo pricing',
+  description: 'Purchase Tshelo token credit or a dated annual pass.',
 }
 
 export default async function TokenPurchasePage() {

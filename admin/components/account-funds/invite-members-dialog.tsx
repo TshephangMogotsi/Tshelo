@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { invitationUrl } from '@shared/invitations'
 
 type InviteMembersDialogProps = {
   code: string
@@ -12,7 +13,7 @@ type InviteMembersDialogProps = {
 export function InviteMembersDialog({ code, fundTitle, memberCount, onClose }: InviteMembersDialogProps) {
   const closeButton = useRef<HTMLButtonElement>(null)
   const [copied, setCopied] = useState(false)
-  const relativeInviteUrl = useMemo(() => `/account/funds?joinCode=${encodeURIComponent(code)}`, [code])
+  const inviteUrl = useMemo(() => invitationUrl('fund', code), [code])
   const shareText = `Join ${fundTitle} on Tshelo with invite code ${code}.`
 
   useEffect(() => {
@@ -30,14 +31,12 @@ export function InviteMembersDialog({ code, fundTitle, memberCount, onClose }: I
   }, [onClose])
 
   async function copyInvite() {
-    const inviteUrl = new URL(relativeInviteUrl, window.location.origin).toString()
     await navigator.clipboard.writeText(inviteUrl)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1800)
   }
 
   function share(channel: 'whatsapp' | 'sms') {
-    const inviteUrl = new URL(relativeInviteUrl, window.location.origin).toString()
     const message = encodeURIComponent(`${shareText} ${inviteUrl}`)
     if (channel === 'whatsapp') window.open(`https://wa.me/?text=${message}`, '_blank', 'noopener,noreferrer')
     else window.location.href = `sms:?&body=${message}`
@@ -55,7 +54,7 @@ export function InviteMembersDialog({ code, fundTitle, memberCount, onClose }: I
           <div className="mbody">
             <div className="invite-copy">Members can see every contribution and every expense on this fund. Only invite people who should.</div>
             <div className="linkbox">
-              <code>{relativeInviteUrl}</code>
+              <code>{inviteUrl}</code>
               <button className="copybtn" type="button" onClick={copyInvite}>{copied ? 'Copied' : 'Copy'}</button>
             </div>
             <div className="sharegrid">

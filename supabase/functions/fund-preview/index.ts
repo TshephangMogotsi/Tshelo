@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
   ].filter(Boolean).join(' · ')
 
   const pageUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/fund-preview?code=${encodeURIComponent(code)}`
+  const invitationUrl = `https://app.tshelo.com/invite/fund/${encodeURIComponent(code)}`
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -196,7 +197,7 @@ Deno.serve(async (req) => {
       <div class="code-value">${h(code)}</div>
     </div>
 
-    <a class="open-btn" href="tshelo://join/${h(code)}">Open in Tshelo app</a>
+    <a class="open-btn" href="${h(invitationUrl)}">Open in Tshelo</a>
 
     <div class="cta">
       Don't have the app? Download Tshelo and enter code <strong>${h(code)}</strong> to join.

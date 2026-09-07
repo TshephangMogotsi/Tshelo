@@ -6,6 +6,7 @@ import { StatusPill } from '@/components/status-pill'
 import { getAppUserContext } from '@/lib/app-user'
 import { getAccountOverviewData } from '@/lib/data/account'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
+import { invitationUrl } from '@shared/invitations'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,7 +96,7 @@ export default async function OverviewPage() {
           {memberships.map(membership => {
             const fund = membership.fund
             if (!fund) return null
-            const inviteHref = `/account/funds?joinCode=${encodeURIComponent(fund.fund_code)}`
+            const inviteHref = invitationUrl('fund', fund.fund_code)
             return (
               <article className="member-fund" key={membership.id}>
                 <Link className="member-fund-content" href={`/account/funds/${fund.id}` as Route}>
@@ -121,7 +122,7 @@ export default async function OverviewPage() {
         </div>
         <div className="member-card-body member-fund-grid member-overview-resource-grid">
           {eventOnly.map(event => {
-            const inviteHref = `/account/events?joinCode=${encodeURIComponent(event.share_code || event.event_code)}`
+            const inviteHref = invitationUrl('event', event.share_code || event.event_code)
             return <article className="member-fund" key={event.id}>
               <Link className="member-fund-content" href={`/account/events/${event.id}` as Route}>
                 <div className="member-fund-head"><div><h3>{event.name}</h3><p>{event.event_code} · {formatDate(event.created_at)}</p></div><span>{titleCase(event.event_type)}</span></div>
@@ -138,7 +139,7 @@ export default async function OverviewPage() {
         <header><div className="member-section-title"><span><CalendarDays size={18} /></span><h2>Event + Funds</h2></div><Link href={'/account/events?tab=eventFund' as Route}>View Event + Funds <ArrowRight size={14} /></Link></header>
         <div className="member-card-body member-fund-grid">
           {eventFunds.map(event => {
-            const inviteHref = `/account/events?joinCode=${encodeURIComponent(event.share_code || event.event_code)}`
+            const inviteHref = invitationUrl('event', event.share_code || event.event_code)
             return <article className="member-fund" key={event.id}>
               <Link className="member-fund-content" href={`/account/events/${event.id}` as Route}>
                 <div className="member-fund-head"><div><h3>{event.name}</h3><p>{event.event_code} · {formatDate(event.created_at)}</p></div><span>Event + Fund</span></div>

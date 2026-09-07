@@ -22,10 +22,19 @@ Authenticated calls require `Authorization: Bearer <supabase-access-token>`. The
 | `PATCH` | `/api/v1/events/:eventId` | `UpdateEventRequest` | `Event` | Caller-scoped event update; RLS decides authorization. |
 | `DELETE` | `/api/v1/events/:eventId` | UUID path parameter | `{}` | `delete_event_only(...)` |
 | `GET` | `/api/v1/events/:eventId/workspace` | UUID path parameter | `EventWorkspace` | Caller-scoped event, guest, budget, announcement, organiser, permission, and optional fund-workspace reads. |
+| `GET` | `/api/v1/events/:eventId/guests` | `ListEventGuestsRequest` query | `EventGuestDirectory` | Manager-only guest directory with paginated rows, RSVP totals, and capacity state. |
+| `POST` | `/api/v1/events/:eventId/guests` | `InviteEventGuestsRequest` | `EventGuest[]` | `invite_event_guests(...)` atomically inserts a batch and enforces permissions and capacity. |
+| `GET/PATCH/DELETE` | `/api/v1/events/:eventId/guests/:guestId` | UUID path parameters / `UpdateEventGuestRequest` | `EventGuest` / `RemoveEventGuestResult` | Manager-only guest detail, update, and removal through caller-scoped reads and guest RPCs. |
+| `GET/PUT` | `/api/v1/events/:eventId/rsvp` | UUID path parameter / `RespondEventRsvpRequest` | `EventGuest \| null` / `EventGuest` | Returns the caller's RSVP and records a constrained response through `respond_event_rsvp(...)`. |
+| `GET/POST` | `/api/v1/events/:eventId/guest-capacity` | UUID path parameter | `EventGuestCapacity` / `UnlockEventGuestCapacityResult` | Manager-only capacity read; unlock atomically spends the configured token price unless a qualifying pass is active. |
 | `POST` | `/api/v1/events/:eventId/leave` | UUID path parameter | `LeftEvent` | `leave_event(...)` |
 | `POST` | `/api/v1/events/:eventId/complete` | `CompleteEventRequest` | `Event` | Caller-scoped standalone-event completion; RLS decides authorization. |
 | `GET/PUT` | `/api/v1/events/:eventId/budget` | UUID path parameter / `UpdateEventBudgetRequest` | `EventBudget \| null` / `EventBudget` | Caller-scoped budget read/upsert; RLS decides authorization. |
 | `POST` | `/api/v1/events/:eventId/announcements` | `CreateEventAnnouncementRequest` | `EventAnnouncement` | Caller-scoped announcement insert; RLS decides authorization. |
+| `PATCH` | `/api/v1/events/:eventId/announcements/:announcementId` | `UpdateEventAnnouncementRequest` | `EventAnnouncement` | Caller-scoped announcement update; RLS limits editing to event announcement managers. |
+| `POST` | `/api/v1/events/:eventId/announcements/upload-session` | `CreateEventAnnouncementUploadSessionRequest` | `EventAnnouncementUploadSession` | Authorises a private direct PDF or image upload for an event announcement. |
+| `POST` | `/api/v1/events/:eventId/announcements/attachments` | `EventAnnouncementAttachmentAccessRequest` | `EventAnnouncementAttachmentAccess` | Creates a short-lived private preview/download URL for an event participant. |
+| `DELETE` | `/api/v1/events/:eventId/announcements/attachments` | `EventAnnouncementAttachmentAccessRequest` | `{}` | Removes an unpublished attachment owned by the caller; published files must be removed through announcement editing. |
 | `POST` | `/api/v1/events/:eventId/organiser-invites` | `InviteEventOrganiserRequest` | `{}` | `invite_event_fund_organiser(...)` |
 | `GET` | `/api/v1/events/invite-preview` | `code` query | `EventInvitePreview` | `find_event_by_code(...)` |
 | `POST` | `/api/v1/events/join` | `JoinEventRequest` | `JoinedEvent` | `join_event_by_code(...)` |
@@ -61,6 +70,12 @@ These services:
 - preserve RLS for all list, detail, membership, and aggregate reads.
 
 The stable server-side export is `admin/lib/data/api.ts`. Route handlers are thin adapters around these services and do not rebuild filtering, mapping, aggregation, or pagination rules.
+
+## Event guest and RSVP behavior
+
+Event creators, active event organisers, and linked-fund members with `manage_event_guests` can list, add, edit, and remove guests. Guests do not receive that management access: they can read their own RSVP and respond only through `respond_event_rsvp(...)`. A response can claim an existing phone-matched invitation; otherwise, a valid event code is required. RSVP responses never create linked-fund membership.
+
+Capacity is enforced by a database trigger for every write path, including direct caller-scoped table inserts. The free limit is 100 reserved people per event, counting each invite plus its selected or allowed plus-ones. Active `pass_unlimited_12m` and `pass_committee_12m` entitlements remove the limit. Otherwise, the event creator can atomically spend the configured 10-token `event_guests_above_100` price once for that event. Existing events already above the limit receive a migration-time legacy unlock.
 
 ## Read query behavior
 

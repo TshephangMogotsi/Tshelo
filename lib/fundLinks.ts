@@ -1,10 +1,9 @@
-import { requirePublicConfig } from './runtimeConfig'
-
-const supabaseUrl = requirePublicConfig(
-  'EXPO_PUBLIC_SUPABASE_URL',
-  process.env.EXPO_PUBLIC_SUPABASE_URL,
-)
+import { invitationUrl } from '@shared/invitations'
 
 export function fundPreviewUrl(fundCode: string): string {
-  return `${supabaseUrl}/functions/v1/fund-preview?code=${encodeURIComponent(fundCode)}`
+  return invitationUrl('fund', fundCode)
+}
+
+export function eventInvitationUrl(eventCode: string): string {
+  return invitationUrl('event', eventCode)
 }

@@ -29,6 +29,12 @@ type ManualExpenseRow = {
   amount: string
 }
 
+type ExpenseLedgerEntry = {
+  key: string
+  receiptPath: string | null
+  items: FundWorkspaceExpense[]
+}
+
 type CategorySuggestion = {
   category: string
   customCategory: string
@@ -51,6 +57,30 @@ function expenseCategoryLabel(category: string | null | undefined, customCategor
   if (!category) return 'Uncategorised'
   if (category === 'other' && customCategory) return customCategory
   return category === 'other' ? 'Other' : titleCase(category)
+}
+
+function groupExpenseLedger(expenses: FundWorkspaceExpense[]): ExpenseLedgerEntry[] {
+  const entries: ExpenseLedgerEntry[] = []
+  const receipts = new Map<string, ExpenseLedgerEntry>()
+
+  for (const expense of expenses) {
+    if (!expense.receipt_path) {
+      entries.push({ key: expense.id, receiptPath: null, items: [expense] })
+      continue
+    }
+
+    const existing = receipts.get(expense.receipt_path)
+    if (existing) {
+      existing.items.push(expense)
+      continue
+    }
+
+    const entry = { key: `receipt:${expense.receipt_path}`, receiptPath: expense.receipt_path, items: [expense] }
+    receipts.set(expense.receipt_path, entry)
+    entries.push(entry)
+  }
+
+  return entries
 }
 
 function categoryMatchScore(label: string, query: string) {
@@ -474,6 +504,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
   const sponsorships = can(data, 'manage_sponsorships') ? workspace.sponsorship_items.filter(item => ['claimed', 'funded'].includes(item.status)) : []
   const payers = workspace.members.filter(member => member.user_id && member.status === 'joined')
   const customCategories = useMemo(() => Array.from(new Set(workspace.expenses.map(item => item.custom_category?.trim()).filter((item): item is string => Boolean(item)))).sort((left, right) => left.localeCompare(right)), [workspace.expenses])
+  const ledgerEntries = useMemo(() => groupExpenseLedger(workspace.expenses), [workspace.expenses])
 
   async function selectReceipt(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -585,7 +616,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
       <header>
         <div className="member-section-title"><span><WalletCards size={18} /></span><h2>Expenses & receipts</h2></div>
         <div className="member-card-header-actions">
-          <small>{workspace.expenses.length} records</small>
+          <small>{ledgerEntries.length} {ledgerEntries.length === 1 ? 'purchase' : 'purchases'}</small>
           {allowed && <button type="button" className="member-header-action" onClick={() => { setError(''); setRecording(true) }}><Plus size={14} /> Record expense</button>}
         </div>
       </header>
@@ -593,13 +624,39 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
         {!allowed && workspace.fund.status === 'active' && <p className="member-form-note">You can view expenses, but you do not have permission to record them.</p>}
         <div className="member-ledger-heading"><div><h3>Expense ledger</h3><p>All expenses and receipt-backed purchases recorded for this fund.</p></div></div>
         <div className="member-record-list">
-          {workspace.expenses.map(item => <article key={item.id}>
-            <div className="member-record-main"><strong>{item.description}</strong><span>{item.vendor_name || expenseCategoryLabel(item.category, item.custom_category)} · {formatDate(item.created_at)}</span>{item.sponsored_by_name && <small>Sponsored by {item.sponsored_by_name}</small>}</div>
-            <div className="member-record-amount"><b>{formatMoney(item.amount, workspace.fund.currency_code)}</b>{item.has_open_query && <small>Open query</small>}</div>
-            <StatusPill value={item.is_sponsored ? 'sponsored' : 'recorded'} />
-            {canEdit && <div className="member-record-buttons"><button type="button" className="member-icon-button" onClick={() => setEditing(editing === item.id ? '' : item.id)} aria-label={`Edit ${item.description}`}><Pencil size={14} /></button><button type="button" className="member-icon-button danger" onClick={() => removeExpense(item)} aria-label={`Remove ${item.description}`}><Trash2 size={14} /></button></div>}
-            {editing === item.id && <ExpenseEdit item={item} currencyCode={workspace.fund.currency_code} customCategories={customCategories} onDone={() => { setEditing(''); reload() }} />}
-          </article>)}
+          {ledgerEntries.map(entry => {
+            const firstItem = entry.items[0]
+            if (!entry.receiptPath) return <article key={entry.key}>
+              <div className="member-record-main"><strong>{firstItem.description}</strong><span>{firstItem.vendor_name || expenseCategoryLabel(firstItem.category, firstItem.custom_category)} · {formatDate(firstItem.created_at)}</span>{firstItem.sponsored_by_name && <small>Sponsored by {firstItem.sponsored_by_name}</small>}</div>
+              <div className="member-record-amount"><b>{formatMoney(firstItem.amount, workspace.fund.currency_code)}</b>{firstItem.has_open_query && <small>Open query</small>}</div>
+              <StatusPill value={firstItem.is_sponsored ? 'sponsored' : 'recorded'} />
+              {canEdit && <div className="member-record-buttons"><button type="button" className="member-icon-button" onClick={() => setEditing(editing === firstItem.id ? '' : firstItem.id)} aria-label={`Edit ${firstItem.description}`}><Pencil size={14} /></button><button type="button" className="member-icon-button danger" onClick={() => removeExpense(firstItem)} aria-label={`Remove ${firstItem.description}`}><Trash2 size={14} /></button></div>}
+              {editing === firstItem.id && <ExpenseEdit item={firstItem} currencyCode={workspace.fund.currency_code} customCategories={customCategories} onDone={() => { setEditing(''); reload() }} />}
+            </article>
+
+            const total = entry.items.reduce((sum, item) => sum + Number(item.amount), 0)
+            const vendor = entry.items.find(item => item.vendor_name)?.vendor_name || 'Receipt purchase'
+            const hasOpenQuery = entry.items.some(item => item.has_open_query)
+            const isSponsored = entry.items.every(item => item.is_sponsored)
+
+            return <details className="member-expense-purchase" key={entry.key}>
+              <summary>
+                <span className="member-expense-purchase-icon"><ReceiptText size={16} /></span>
+                <span className="member-record-main"><strong>{vendor}</strong><span>{formatDate(firstItem.created_at)} · {entry.items.length} {entry.items.length === 1 ? 'item' : 'items'}</span></span>
+                <span className="member-record-amount"><b>{formatMoney(total, workspace.fund.currency_code)}</b>{hasOpenQuery && <small>Open query</small>}</span>
+                <StatusPill value={isSponsored ? 'sponsored' : 'recorded'} />
+                <ChevronDown className="member-expense-purchase-chevron" size={16} aria-hidden="true" />
+              </summary>
+              <div className="member-expense-purchase-items">
+                {entry.items.map(item => <article key={item.id}>
+                  <div className="member-record-main"><strong>{item.description}</strong><span>{expenseCategoryLabel(item.category, item.custom_category)}</span>{item.sponsored_by_name && <small>Sponsored by {item.sponsored_by_name}</small>}</div>
+                  <div className="member-record-amount"><b>{formatMoney(item.amount, workspace.fund.currency_code)}</b>{item.has_open_query && <small>Open query</small>}</div>
+                  {canEdit && <div className="member-record-buttons"><button type="button" className="member-icon-button" onClick={() => setEditing(editing === item.id ? '' : item.id)} aria-label={`Edit ${item.description}`}><Pencil size={14} /></button><button type="button" className="member-icon-button danger" onClick={() => removeExpense(item)} aria-label={`Remove ${item.description}`}><Trash2 size={14} /></button></div>}
+                  {editing === item.id && <ExpenseEdit item={item} currencyCode={workspace.fund.currency_code} customCategories={customCategories} onDone={() => { setEditing(''); reload() }} />}
+                </article>)}
+              </div>
+            </details>
+          })}
           {!workspace.expenses.length && <div className="member-empty">No expenses have been recorded.</div>}
         </div>
       </div>
@@ -607,7 +664,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
         <form className="member-form member-finance-dialog-form" onSubmit={submit}>
           <div className="mbody">
             <div className="member-receipt-actions">
-              <input ref={libraryInput} className="member-visually-hidden" type="file" accept="image/jpeg,image/png" onChange={selectReceipt} />
+              <input ref={libraryInput} className="member-visually-hidden" type="file" accept="image/jpeg,image/png" capture="environment" onChange={selectReceipt} />
               <button type="button" onClick={() => libraryInput.current?.click()}><FileImage size={15} /> Choose receipt image</button>
               {receiptRows.length === 0 && manualRows.length === 0 && <button type="button" onClick={startManualItems}><Plus size={15} /> Add multiple items manually</button>}
             </div>

@@ -64,7 +64,7 @@ describe('fund and membership API slice', () => {
     const websiteFiles = [
       'admin/components/account-funds/fund-list.tsx',
       'admin/components/account-funds/create-fund-form.tsx',
-      'admin/components/account-funds/join-fund-form.tsx',
+      'admin/components/account-funds/join-fund-dialog.tsx',
       'admin/components/account-funds/fund-workspace.tsx',
     ]
 

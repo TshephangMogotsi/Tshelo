@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -43,6 +43,7 @@ export default function JoinFundScreen({ navigation, route }: Props) {
   const [phase, setPhase]     = useState<Phase>('input')
   const [preview, setPreview] = useState<FundPreview | null>(null)
   const [error, setError]     = useState<string | null>(null)
+  const openedFromInvitation = useRef(false)
 
   const cleanedCode = code.trim().toUpperCase()
   const isValid     = cleanedCode.length >= 8
@@ -103,6 +104,12 @@ export default function JoinFundScreen({ navigation, route }: Props) {
     })
     setPhase('preview')
   }
+
+  useEffect(() => {
+    if (openedFromInvitation.current || !initialCode || !userId) return
+    openedFromInvitation.current = true
+    void handleFind()
+  }, [initialCode, userId])
 
   async function handleJoin() {
     if (!preview || !userId) return

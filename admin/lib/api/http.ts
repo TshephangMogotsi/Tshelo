@@ -163,5 +163,15 @@ export function dataServiceErrorResponse(error: ApiDataError, requestId: string)
     )
   }
 
+  if (error.kind === 'business') {
+    const businessFailure = error
+    return failureResponse(
+      businessFailure.code,
+      businessFailure.message,
+      requestId,
+      { retryable: false },
+    )
+  }
+
   return databaseErrorResponse(error.error, requestId)
 }

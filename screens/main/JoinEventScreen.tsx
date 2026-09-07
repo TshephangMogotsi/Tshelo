@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -86,6 +86,7 @@ export default function JoinEventScreen({ navigation, route }: Props) {
   const [phase, setPhase] = useState<Phase>('input')
   const [preview, setPreview] = useState<EventPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const openedFromInvitation = useRef(false)
 
   const cleanedCode = cleanEventCode(code.trim())
   const isValid = cleanedCode.length >= 8
@@ -147,6 +148,12 @@ export default function JoinEventScreen({ navigation, route }: Props) {
     })
     setPhase('preview')
   }
+
+  useEffect(() => {
+    if (openedFromInvitation.current || !initialCode || !userId) return
+    openedFromInvitation.current = true
+    void findEvent()
+  }, [initialCode, userId])
 
   async function joinEvent() {
     if (!preview || !userId || !requireOnline()) return

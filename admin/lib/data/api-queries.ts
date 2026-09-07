@@ -23,12 +23,14 @@ import type { ListUsersRequest, User, UserSummary } from '@shared/contracts/user
 import type { Paginated } from '@shared/contracts/common'
 import {
   type ContributionRow,
+  type EventGuestRow,
   type EventRow,
   type FundRow,
   type UserRow,
   toContributionSummary,
   toContribution,
   toEvent,
+  toEventGuest,
   toEventSummary,
   toFund,
   toFundSummary,
@@ -166,7 +168,7 @@ export async function getApiEvent(
       .maybeSingle(),
     client
       .from('event_guests')
-      .select('id, event_id, user_id, guest_name, guest_phone, guest_email, rsvp_status, plus_ones, rsvp_note, created_at')
+      .select('id, event_id, user_id, guest_name, guest_phone, guest_email, rsvp_status, rsvp_responded_at, plus_ones, allowed_plus_ones, plus_ones_names, rsvp_note, dietary_requirements, accessibility_needs, invited_by, invited_at, invitation_sent_at, invitation_channel, created_at, updated_at')
       .eq('event_id', eventId)
       .order('created_at', { ascending: true }),
   ])
@@ -177,18 +179,7 @@ export async function getApiEvent(
 
   return dataSuccess({
     event: toEvent(eventResult.data as EventRow),
-    guests: (guestResult.data ?? []).map(row => ({
-      id: row.id as string,
-      event_id: row.event_id as string,
-      user_id: row.user_id as string | null,
-      guest_name: row.guest_name as string | null,
-      guest_phone: row.guest_phone as string | null,
-      guest_email: row.guest_email as string | null,
-      rsvp_status: row.rsvp_status as EventGuest['rsvp_status'],
-      plus_ones: Number(row.plus_ones ?? 0),
-      rsvp_note: row.rsvp_note as string | null,
-      created_at: row.created_at as string,
-    })),
+    guests: (guestResult.data ?? []).map(row => toEventGuest(row as EventGuestRow)),
   })
 }
 

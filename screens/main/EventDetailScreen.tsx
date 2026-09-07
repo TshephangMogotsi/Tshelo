@@ -1,9 +1,11 @@
 import { useCallback, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Clipboard,
   Easing,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -20,6 +22,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Calendar from 'expo-calendar'
 import * as Contacts from 'expo-contacts'
+import * as DocumentPicker from 'expo-document-picker'
+import * as FileSystem from 'expo-file-system/legacy'
+import * as Sharing from 'expo-sharing'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp, useFocusEffect } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
@@ -37,8 +42,19 @@ import { buildCalendarEventDetails } from './eventDetail/calendar'
 import { parseEstimatedSpend, summarizeEventGuests } from './eventDetail/eventOnly'
 import type { FundPermission } from '../../lib/fundPermissions'
 import { linkedEventCapabilities } from '../../lib/fundPermissionPolicy'
+import { eventInvitationUrl } from '../../lib/fundLinks'
 import FundDetailScreen from './FundDetailScreen'
 import InviteDetailsModal from '../../components/InviteDetailsModal'
+import {
+  EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES,
+  EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES,
+  EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS,
+} from '@shared/contracts'
+import type {
+  EventAnnouncement as ApiEventAnnouncement,
+  EventAnnouncementAttachment,
+  EventAnnouncementAttachmentMediaType,
+} from '@shared/contracts'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'EventDetail'>
@@ -62,6 +78,7 @@ type EventAnnouncement = {
   authorName: string
   title: string
   body: string
+  attachments: EventAnnouncementAttachment[]
   createdAt: string
 }
 
@@ -108,6 +125,45 @@ const EVENT_HEADER_PURPLE = '#E8DDFF'
 const INK = '#0D0D0D'
 const MUTED = '#A1A1AA'
 const BORDER = '#E4E4E7'
+const MIN_ATTACHMENT_ZOOM = 1
+const MAX_ATTACHMENT_ZOOM = 3
+const ATTACHMENT_ZOOM_STEP = 0.25
+
+function mapEventAnnouncement(item: ApiEventAnnouncement): EventAnnouncement {
+  return {
+    id: item.id,
+    authorId: item.author_id,
+    authorName: item.author_name,
+    title: item.title,
+    body: item.body,
+    attachments: item.attachments,
+    createdAt: item.created_at,
+  }
+}
+
+function formatAttachmentSize(sizeBytes: number) {
+  return sizeBytes >= 1024 * 1024
+    ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(sizeBytes / 1024))} KB`
+}
+
+function attachmentMediaType(asset: DocumentPicker.DocumentPickerAsset): EventAnnouncementAttachmentMediaType | null {
+  const mimeType = asset.mimeType?.toLowerCase()
+  if (mimeType && EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES.includes(mimeType as EventAnnouncementAttachmentMediaType)) {
+    return mimeType as EventAnnouncementAttachmentMediaType
+  }
+
+  const fileName = asset.name.toLowerCase()
+  if (fileName.endsWith('.pdf')) return 'application/pdf'
+  if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) return 'image/jpeg'
+  if (fileName.endsWith('.png')) return 'image/png'
+  if (fileName.endsWith('.webp')) return 'image/webp'
+  return null
+}
+
+function safeAttachmentFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '-')
+}
 function displayEventDate(value?: string | null) {
   if (!value) return 'Date to be confirmed'
   const [year, month, day] = value.split('-').map(Number)
@@ -163,9 +219,18 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const eventExpandProgress = useRef(new Animated.Value(0)).current
   const [isEventAdmin, setIsEventAdmin] = useState(false)
   const [showAnnouncementComposer, setShowAnnouncementComposer] = useState(false)
+  const [editingAnnouncement, setEditingAnnouncement] = useState<EventAnnouncement | null>(null)
   const [announcementTitle, setAnnouncementTitle] = useState('')
   const [announcementBody, setAnnouncementBody] = useState('')
+  const [announcementAttachments, setAnnouncementAttachments] = useState<EventAnnouncementAttachment[]>([])
   const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false)
+  const [isUploadingAnnouncementFiles, setIsUploadingAnnouncementFiles] = useState(false)
+  const [attachmentActionPath, setAttachmentActionPath] = useState<string | null>(null)
+  const [attachmentPreview, setAttachmentPreview] = useState<{ attachment: EventAnnouncementAttachment; url: string } | null>(null)
+  const [attachmentPreviewItems, setAttachmentPreviewItems] = useState<EventAnnouncementAttachment[]>([])
+  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({})
+  const [attachmentZoom, setAttachmentZoom] = useState(MIN_ATTACHMENT_ZOOM)
+  const unsavedAttachmentPaths = useRef(new Set<string>())
   const [isLoading, setIsLoading] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
   const [fund, setFund] = useState<EmbeddedFund | null>(null)
@@ -223,14 +288,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           : venueName || (venueAddressMapLink ? 'Map location' : venueAddress) || 'Venue to be confirmed'
 
         setEventGuests(guests)
-        setAnnouncements(eventWorkspace.announcements.map(item => ({
-          id: item.id,
-          authorId: item.author_id,
-          authorName: item.author_name,
-          title: item.title,
-          body: item.body,
-          createdAt: item.created_at,
-        })))
+        setAnnouncements(eventWorkspace.announcements.map(mapEventAnnouncement))
         setIsEventAdmin(eventWorkspace.capabilities.is_creator || eventWorkspace.capabilities.is_organiser)
         setCanLeaveEvent(eventWorkspace.capabilities.can_leave_event)
         setLinkedFundPermissions(new Set(eventWorkspace.capabilities.linked_fund_permissions))
@@ -253,7 +311,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           pending: count('pending'),
           declined: count('declined'),
           shareCode,
-          rsvpLink: shareCode ? `RSVP code: ${shareCode}` : 'RSVP link unavailable',
+          rsvpLink: shareCode ? eventInvitationUrl(shareCode) : 'RSVP link unavailable',
           budgetAmount: budgetAmount !== null && Number.isFinite(budgetAmount) ? budgetAmount : null,
           budgetCurrency: eventWorkspace.budget?.currency_code ?? row.currency_code ?? 'BWP',
           linkedFundId: row.linked_fund_id ?? null,
@@ -307,8 +365,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
   function copyEventInvite() {
     if (!event) return
-    Clipboard.setString(event.shareCode ?? event.rsvpLink)
-    Alert.alert('Copied', event.shareCode ? 'Event invite code copied.' : 'Event invite copied.')
+    Clipboard.setString(event.rsvpLink)
+    Alert.alert('Copied', event.shareCode ? 'Event invite link copied.' : 'Event invite copied.')
   }
 
   async function addToCalendar() {
@@ -391,10 +449,136 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     )
   }
 
-  async function publishAnnouncement() {
+  function openAnnouncementComposer(announcement?: EventAnnouncement) {
+    unsavedAttachmentPaths.current.clear()
+    setEditingAnnouncement(announcement ?? null)
+    setAnnouncementTitle(announcement?.title ?? '')
+    setAnnouncementBody(announcement?.body ?? '')
+    setAnnouncementAttachments(announcement?.attachments ?? [])
+    setShowAnnouncementComposer(true)
+  }
+
+  async function closeAnnouncementComposer() {
+    if (isPostingAnnouncement || isUploadingAnnouncementFiles) return
+    const paths = [...unsavedAttachmentPaths.current]
+    if (paths.length > 0) {
+      await Promise.all(paths.map(objectPath => (
+        api.events.deleteAnnouncementUpload(eventId, { object_path: objectPath }).catch(() => null)
+      )))
+    }
+    unsavedAttachmentPaths.current.clear()
+    setShowAnnouncementComposer(false)
+    setEditingAnnouncement(null)
+    setAnnouncementTitle('')
+    setAnnouncementBody('')
+    setAnnouncementAttachments([])
+  }
+
+  async function selectAnnouncementAttachments() {
+    if (isUploadingAnnouncementFiles || isPostingAnnouncement) return
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [...EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES],
+        copyToCacheDirectory: true,
+        multiple: true,
+      })
+      if (result.canceled) return
+      if (announcementAttachments.length + result.assets.length > EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS) {
+        Alert.alert('Too many files', `You can attach up to ${EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS} files to an announcement.`)
+        return
+      }
+
+      const selected = await Promise.all(result.assets.map(async asset => {
+        const contentType = attachmentMediaType(asset)
+        const info = asset.size == null ? await FileSystem.getInfoAsync(asset.uri) : null
+        const size = asset.size ?? (info?.exists && 'size' in info ? info.size : 0)
+        if (!contentType || !size || size > EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES) {
+          throw new Error(`${asset.name} must be a PDF, JPG, PNG, or WEBP image no larger than 10 MB.`)
+        }
+        return { asset, contentType, size }
+      }))
+
+      setIsUploadingAnnouncementFiles(true)
+      const uploaded: EventAnnouncementAttachment[] = []
+      try {
+        for (const { asset, contentType, size } of selected) {
+          const session = await api.events.createAnnouncementUploadSession(eventId, {
+            file_name: asset.name,
+            content_type: contentType,
+            size_bytes: size,
+          })
+          let status: number
+          if (Platform.OS === 'web') {
+            const body = asset.file ?? await fetch(asset.uri).then(response => response.blob())
+            const response = await fetch(session.upload_url, {
+              method: 'PUT',
+              headers: {
+                'cache-control': 'max-age=3600',
+                'content-type': session.content_type,
+                'x-upsert': 'false',
+              },
+              body,
+            })
+            status = response.status
+          } else {
+            const response = await FileSystem.uploadAsync(session.upload_url, asset.uri, {
+              httpMethod: 'PUT',
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+              headers: {
+                'cache-control': 'max-age=3600',
+                'content-type': session.content_type,
+                'x-upsert': 'false',
+              },
+            })
+            status = response.status
+          }
+          if (status < 200 || status >= 300) throw new Error(`Could not upload ${asset.name}.`)
+          uploaded.push({
+            object_path: session.object_path,
+            file_name: session.file_name,
+            content_type: session.content_type,
+            size_bytes: session.size_bytes,
+          })
+        }
+      } catch (error) {
+        if (uploaded.length > 0) {
+          await Promise.all(uploaded.map(item => (
+            api.events.deleteAnnouncementUpload(eventId, { object_path: item.object_path }).catch(() => null)
+          )))
+        }
+        throw error
+      }
+
+      uploaded.forEach(attachment => unsavedAttachmentPaths.current.add(attachment.object_path))
+      setAnnouncementAttachments(current => [...current, ...uploaded])
+    } catch (error) {
+      Alert.alert('Could not add files', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setIsUploadingAnnouncementFiles(false)
+    }
+  }
+
+  async function removeAnnouncementAttachment(attachment: EventAnnouncementAttachment) {
+    if (isUploadingAnnouncementFiles || isPostingAnnouncement) return
+    if (unsavedAttachmentPaths.current.has(attachment.object_path)) {
+      setAttachmentActionPath(attachment.object_path)
+      try {
+        await api.events.deleteAnnouncementUpload(eventId, { object_path: attachment.object_path })
+      } catch {
+        setAttachmentActionPath(null)
+        Alert.alert('Could not remove file', 'Please try again.')
+        return
+      }
+      setAttachmentActionPath(null)
+      unsavedAttachmentPaths.current.delete(attachment.object_path)
+    }
+    setAnnouncementAttachments(current => current.filter(item => item.object_path !== attachment.object_path))
+  }
+
+  async function saveAnnouncement() {
     const cleanTitle = announcementTitle.trim()
     const cleanBody = announcementBody.trim()
-    if (!userId || !canPostAnnouncements || isPostingAnnouncement) return
+    if (!userId || !canPostAnnouncements || isPostingAnnouncement || isUploadingAnnouncementFiles) return
     if (cleanTitle.length < 3) {
       Alert.alert('Add a title', 'Use a short title such as “Venue changed”.')
       return
@@ -406,26 +590,99 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
     setIsPostingAnnouncement(true)
     try {
-      const data = await api.events.createAnnouncement(eventId, {
+      const input = {
         title: cleanTitle,
         body: cleanBody,
-      })
-      setAnnouncements(previous => [{
-        id: data.id,
-        authorId: data.author_id,
-        authorName: data.author_name,
-        title: data.title,
-        body: data.body,
-        createdAt: data.created_at,
-      }, ...previous])
+        attachments: announcementAttachments,
+      }
+      const data = editingAnnouncement
+        ? await api.events.updateAnnouncement(eventId, editingAnnouncement.id, input)
+        : await api.events.createAnnouncement(eventId, input)
+      const saved = mapEventAnnouncement(data)
+      setAnnouncements(previous => editingAnnouncement
+        ? previous.map(item => item.id === saved.id ? saved : item)
+        : [saved, ...previous])
+      unsavedAttachmentPaths.current.clear()
+      setShowAnnouncementComposer(false)
+      setEditingAnnouncement(null)
       setAnnouncementTitle('')
       setAnnouncementBody('')
-      setShowAnnouncementComposer(false)
+      setAnnouncementAttachments([])
       setActiveTab('announcements')
     } catch (error) {
-      Alert.alert('Could not publish announcement', toApiUiError(error).message)
+      Alert.alert(editingAnnouncement ? 'Could not update announcement' : 'Could not publish announcement', toApiUiError(error).message)
     } finally {
       setIsPostingAnnouncement(false)
+    }
+  }
+
+  async function signedAttachmentUrl(attachment: EventAnnouncementAttachment) {
+    const access = await api.events.createAnnouncementAttachmentAccess(eventId, {
+      object_path: attachment.object_path,
+    })
+    return access.download_url
+  }
+
+  async function previewAnnouncementAttachment(items: EventAnnouncementAttachment[], attachment: EventAnnouncementAttachment) {
+    setAttachmentActionPath(attachment.object_path)
+    try {
+      const urls = Object.fromEntries(await Promise.all(items.map(async item => [item.object_path, await signedAttachmentUrl(item)] as const)))
+      setAttachmentPreviewItems(items)
+      setAttachmentPreviewUrls(urls)
+      setAttachmentPreview({ attachment, url: urls[attachment.object_path] })
+      setAttachmentZoom(MIN_ATTACHMENT_ZOOM)
+    } catch (error) {
+      Alert.alert('Could not preview file', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setAttachmentActionPath(null)
+    }
+  }
+
+  function closeAttachmentPreview() {
+    setAttachmentPreview(null)
+    setAttachmentPreviewItems([])
+    setAttachmentPreviewUrls({})
+    setAttachmentZoom(MIN_ATTACHMENT_ZOOM)
+  }
+
+  function stepAttachmentPreview(direction: -1 | 1) {
+    if (!attachmentPreview || attachmentPreviewItems.length < 2) return
+    const currentIndex = attachmentPreviewItems.findIndex(item => item.object_path === attachmentPreview.attachment.object_path)
+    const next = attachmentPreviewItems[(currentIndex + direction + attachmentPreviewItems.length) % attachmentPreviewItems.length]
+    const url = attachmentPreviewUrls[next.object_path]
+    if (url) {
+      setAttachmentPreview({ attachment: next, url })
+      setAttachmentZoom(MIN_ATTACHMENT_ZOOM)
+    }
+  }
+
+  async function downloadAnnouncementAttachment(attachment: EventAnnouncementAttachment, knownUrl?: string) {
+    setAttachmentActionPath(attachment.object_path)
+    try {
+      const url = knownUrl ?? await signedAttachmentUrl(attachment)
+      if (Platform.OS === 'web') {
+        await Linking.openURL(url)
+        return
+      }
+      const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory
+      if (!directory) throw new Error('No download folder is available on this device.')
+      const result = await FileSystem.downloadAsync(
+        url,
+        `${directory}${Date.now()}-${safeAttachmentFileName(attachment.file_name)}`,
+      )
+      if (result.status < 200 || result.status >= 300) throw new Error('This attachment could not be downloaded.')
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: attachment.content_type,
+          dialogTitle: `Save ${attachment.file_name}`,
+        })
+      } else {
+        Alert.alert('File downloaded', result.uri)
+      }
+    } catch (error) {
+      Alert.alert('Could not download file', error instanceof Error ? error.message : 'Please try again.')
+    } finally {
+      setAttachmentActionPath(null)
     }
   }
 
@@ -838,8 +1095,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           <>
             <View style={styles.tabBar}>
               {(isEventOnly
-                ? ([['guests', 'Guests'], ['announcements', 'Announcements']] as const)
-                : ([['guests', 'Guests'], ['announcements', 'Announcements'], ['budget', 'Budget']] as const)
+                ? ([['guests', 'Guests'], ['announcements', 'Updates']] as const)
+                : ([['guests', 'Guests'], ['announcements', 'Updates'], ['budget', 'Budget']] as const)
               ).map(([id, label]) => (
                 <TouchableOpacity key={id} style={[styles.tab, activeTab === id && styles.tabActive]} onPress={() => setActiveTab(id)}>
                   <Text style={[styles.tabText, activeTab === id && styles.tabTextActive]}>{label}</Text>
@@ -926,9 +1183,9 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           ) : activeTab === 'announcements' ? (
             <View style={styles.announcementList}>
               {canPostAnnouncements && event.status !== 'completed' && (
-                <TouchableOpacity style={styles.newAnnouncementButton} onPress={() => setShowAnnouncementComposer(true)} activeOpacity={0.84}>
+                <TouchableOpacity style={styles.newAnnouncementButton} onPress={() => openAnnouncementComposer()} activeOpacity={0.84}>
                   <Ionicons name="add" size={17} color="#FFFFFF" />
-                  <Text style={styles.newAnnouncementButtonText}>New announcement</Text>
+                  <Text style={styles.newAnnouncementButtonText}>Create announcement</Text>
                 </TouchableOpacity>
               )}
 
@@ -952,8 +1209,58 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                       <Text style={styles.announcementEyebrow}>ANNOUNCEMENT</Text>
                       <Text style={styles.announcementTitle}>{announcement.title}</Text>
                     </View>
+                    {canPostAnnouncements && event.status !== 'completed' ? (
+                      <TouchableOpacity
+                        style={styles.announcementEditButton}
+                        onPress={() => openAnnouncementComposer(announcement)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${announcement.title}`}
+                      >
+                        <Ionicons name="pencil-outline" size={16} color={INK} />
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                   <Text style={styles.announcementBody}>{announcement.body}</Text>
+                  {announcement.attachments.length > 0 ? (
+                    <View style={styles.announcementFiles}>
+                      {announcement.attachments.map(attachment => {
+                        const busy = attachmentActionPath === attachment.object_path
+                        return (
+                          <View key={attachment.object_path} style={styles.announcementFile}>
+                            <View style={styles.announcementFileIcon}>
+                              <Ionicons
+                                name={attachment.content_type === 'application/pdf' ? 'document-text-outline' : 'image-outline'}
+                                size={17}
+                                color={colors.primary}
+                              />
+                            </View>
+                            <View style={styles.announcementFileCopy}>
+                              <Text style={styles.announcementFileName} numberOfLines={1}>{attachment.file_name}</Text>
+                              <Text style={styles.announcementFileSize}>{formatAttachmentSize(attachment.size_bytes)}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={styles.announcementFileAction}
+                              onPress={() => { void previewAnnouncementAttachment(announcement.attachments, attachment) }}
+                              disabled={busy}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Preview ${attachment.file_name}`}
+                            >
+                              {busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="eye-outline" size={18} color={INK} />}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.announcementFileAction}
+                              onPress={() => { void downloadAnnouncementAttachment(attachment) }}
+                              disabled={busy}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Download ${attachment.file_name}`}
+                            >
+                              <Ionicons name="download-outline" size={18} color={INK} />
+                            </TouchableOpacity>
+                          </View>
+                        )
+                      })}
+                    </View>
+                  ) : null}
                   <View style={styles.announcementFooter}>
                     <Text style={styles.announcementAuthor}>{announcement.authorName}</Text>
                     <View style={styles.announcementDot} />
@@ -1003,64 +1310,252 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         visible={showAnnouncementComposer}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowAnnouncementComposer(false)}
+        onRequestClose={() => { void closeAnnouncementComposer() }}
       >
         <KeyboardAvoidingView
           style={styles.composerBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <TouchableOpacity style={styles.composerDismissArea} activeOpacity={1} onPress={() => setShowAnnouncementComposer(false)} />
+          <TouchableOpacity style={styles.composerDismissArea} activeOpacity={1} onPress={() => { void closeAnnouncementComposer() }} />
           <View style={styles.composerCard}>
             <View style={styles.composerHeader}>
               <View style={styles.composerHeaderCopy}>
-                <Text style={styles.composerTitle}>New announcement</Text>
-                <Text style={styles.composerSubtitle}>Everyone connected to this event will be notified.</Text>
+                <Text style={styles.composerTitle}>{editingAnnouncement ? 'Edit announcement' : 'Create announcement'}</Text>
+                <Text style={styles.composerSubtitle}>
+                  {editingAnnouncement ? 'Update the message or its attachments.' : 'Everyone connected to this event will be notified.'}
+                </Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setShowAnnouncementComposer(false)}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => { void closeAnnouncementComposer() }}
+                disabled={isPostingAnnouncement || isUploadingAnnouncementFiles}
+                accessibilityLabel="Close announcement editor"
+              >
                 <Ionicons name="close" size={19} color={INK} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.composerLabel}>TITLE</Text>
-            <TextInput
-              value={announcementTitle}
-              onChangeText={setAnnouncementTitle}
-              placeholder="Venue changed"
-              placeholderTextColor={MUTED}
-              maxLength={120}
-              style={styles.composerTitleInput}
-              autoCapitalize="sentences"
-            />
-
-            <View style={styles.composerBodyLabelRow}>
-              <Text style={styles.composerLabel}>DETAILS</Text>
-              <Text style={styles.composerCount}>{announcementBody.length}/2000</Text>
-            </View>
-            <TextInput
-              value={announcementBody}
-              onChangeText={setAnnouncementBody}
-              placeholder="Share what changed and what guests need to know."
-              placeholderTextColor={MUTED}
-              maxLength={2000}
-              multiline
-              textAlignVertical="top"
-              style={styles.composerBodyInput}
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.publishButton,
-                (announcementTitle.trim().length < 3 || announcementBody.trim().length < 3 || isPostingAnnouncement) && styles.publishButtonDisabled,
-              ]}
-              onPress={publishAnnouncement}
-              disabled={announcementTitle.trim().length < 3 || announcementBody.trim().length < 3 || isPostingAnnouncement}
-              activeOpacity={0.84}
+            <ScrollView
+              style={styles.composerFormScroll}
+              contentContainerStyle={styles.composerFormContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Ionicons name="megaphone-outline" size={17} color="#FFFFFF" />
-              <Text style={styles.publishButtonText}>{isPostingAnnouncement ? 'Publishing…' : 'Publish announcement'}</Text>
-            </TouchableOpacity>
+              <Text style={styles.composerLabel}>TITLE</Text>
+              <TextInput
+                value={announcementTitle}
+                onChangeText={setAnnouncementTitle}
+                placeholder="Venue changed"
+                placeholderTextColor={MUTED}
+                maxLength={120}
+                style={styles.composerTitleInput}
+                autoCapitalize="sentences"
+              />
+
+              <View style={styles.composerBodyLabelRow}>
+                <Text style={styles.composerLabel}>DETAILS</Text>
+                <Text style={styles.composerCount}>{announcementBody.length}/4000</Text>
+              </View>
+              <TextInput
+                value={announcementBody}
+                onChangeText={setAnnouncementBody}
+                placeholder="Share what changed and what guests need to know."
+                placeholderTextColor={MUTED}
+                maxLength={4000}
+                multiline
+                textAlignVertical="top"
+                style={styles.composerBodyInput}
+              />
+
+              <View style={styles.composerAttachmentHeader}>
+                <View>
+                  <Text style={styles.composerLabel}>ATTACHMENTS</Text>
+                  <Text style={styles.composerAttachmentHelp}>PDF, JPG, PNG or WEBP · up to 10 MB each</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.composerAddFileButton}
+                  onPress={() => { void selectAnnouncementAttachments() }}
+                  disabled={isUploadingAnnouncementFiles || isPostingAnnouncement || announcementAttachments.length >= EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add announcement files"
+                >
+                  {isUploadingAnnouncementFiles
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Ionicons name="attach-outline" size={17} color={colors.primary} />}
+                  <Text style={styles.composerAddFileText}>{isUploadingAnnouncementFiles ? 'Uploading…' : 'Add files'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {announcementAttachments.length > 0 ? (
+                <View style={styles.composerAttachmentList}>
+                  {announcementAttachments.map(attachment => (
+                    <View key={attachment.object_path} style={styles.composerAttachmentRow}>
+                      <Ionicons
+                        name={attachment.content_type === 'application/pdf' ? 'document-text-outline' : 'image-outline'}
+                        size={17}
+                        color={colors.primary}
+                      />
+                      <View style={styles.composerAttachmentCopy}>
+                        <Text style={styles.composerAttachmentName} numberOfLines={1}>{attachment.file_name}</Text>
+                        <Text style={styles.composerAttachmentSize}>{formatAttachmentSize(attachment.size_bytes)}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.composerAttachmentRemove}
+                        onPress={() => { void removeAnnouncementAttachment(attachment) }}
+                        disabled={attachmentActionPath === attachment.object_path || isPostingAnnouncement || isUploadingAnnouncementFiles}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${attachment.file_name}`}
+                      >
+                        {attachmentActionPath === attachment.object_path
+                          ? <ActivityIndicator size="small" color={MUTED} />
+                          : <Ionicons name="close" size={17} color={INK} />}
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={[
+                  styles.publishButton,
+                  (announcementTitle.trim().length < 3 || announcementBody.trim().length < 3 || isPostingAnnouncement || isUploadingAnnouncementFiles) && styles.publishButtonDisabled,
+                ]}
+                onPress={() => { void saveAnnouncement() }}
+                disabled={announcementTitle.trim().length < 3 || announcementBody.trim().length < 3 || isPostingAnnouncement || isUploadingAnnouncementFiles}
+                activeOpacity={0.84}
+              >
+                <Ionicons name={editingAnnouncement ? 'checkmark' : 'megaphone-outline'} size={17} color="#FFFFFF" />
+                <Text style={styles.publishButtonText}>
+                  {isPostingAnnouncement
+                    ? (editingAnnouncement ? 'Saving…' : 'Publishing…')
+                    : (editingAnnouncement ? 'Save changes' : 'Publish announcement')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={Boolean(attachmentPreview)}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={closeAttachmentPreview}
+      >
+        <SafeAreaView style={styles.attachmentViewer} edges={['top', 'bottom']}>
+          {attachmentPreview ? (
+            <>
+              <View style={styles.attachmentViewerHeader}>
+                <View style={styles.attachmentViewerHeading}>
+                  <Text style={styles.attachmentViewerTitle} numberOfLines={1}>{attachmentPreview.attachment.file_name}</Text>
+                  {attachmentPreviewItems.length > 1 ? (
+                    <Text style={styles.attachmentViewerCount}>
+                      {attachmentPreviewItems.findIndex(item => item.object_path === attachmentPreview.attachment.object_path) + 1} of {attachmentPreviewItems.length}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.attachmentViewerActions}>
+                  {attachmentPreview.attachment.content_type !== 'application/pdf' ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.attachmentViewerButton, attachmentZoom <= MIN_ATTACHMENT_ZOOM && styles.attachmentViewerButtonDisabled]}
+                        onPress={() => setAttachmentZoom(current => Math.max(MIN_ATTACHMENT_ZOOM, current - ATTACHMENT_ZOOM_STEP))}
+                        disabled={attachmentZoom <= MIN_ATTACHMENT_ZOOM}
+                        accessibilityRole="button"
+                        accessibilityLabel="Zoom out"
+                      >
+                        <Ionicons name="remove" size={21} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.attachmentViewerButton, attachmentZoom >= MAX_ATTACHMENT_ZOOM && styles.attachmentViewerButtonDisabled]}
+                        onPress={() => setAttachmentZoom(current => Math.min(MAX_ATTACHMENT_ZOOM, current + ATTACHMENT_ZOOM_STEP))}
+                        disabled={attachmentZoom >= MAX_ATTACHMENT_ZOOM}
+                        accessibilityRole="button"
+                        accessibilityLabel="Zoom in"
+                      >
+                        <Ionicons name="add" size={21} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </>
+                  ) : null}
+                  <TouchableOpacity
+                    style={styles.attachmentViewerButton}
+                    onPress={() => { void downloadAnnouncementAttachment(attachmentPreview.attachment, attachmentPreview.url) }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Download ${attachmentPreview.attachment.file_name}`}
+                  >
+                    <Ionicons name="download-outline" size={21} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.attachmentViewerCloseButton}
+                    onPress={closeAttachmentPreview}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close attachment preview"
+                  >
+                    <Ionicons name="close" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.attachmentViewerStage}>
+                {attachmentPreviewItems.length > 1 ? (
+                  <TouchableOpacity
+                    style={[styles.attachmentViewerNav, styles.attachmentViewerNavPrevious]}
+                    onPress={() => stepAttachmentPreview(-1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Previous attachment"
+                  >
+                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : null}
+
+                {attachmentPreview.attachment.content_type === 'application/pdf' ? (
+                  <View style={styles.attachmentPdfPreview}>
+                    <Ionicons name="document-text-outline" size={64} color="#FFFFFF" />
+                    <Text style={styles.attachmentPdfTitle} numberOfLines={2}>{attachmentPreview.attachment.file_name}</Text>
+                    <Text style={styles.attachmentPdfMeta}>{formatAttachmentSize(attachmentPreview.attachment.size_bytes)} · PDF</Text>
+                    <TouchableOpacity
+                      style={styles.attachmentPdfButton}
+                      onPress={() => { void Linking.openURL(attachmentPreview.url) }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${attachmentPreview.attachment.file_name}`}
+                    >
+                      <Ionicons name="open-outline" size={18} color={INK} />
+                      <Text style={styles.attachmentPdfButtonText}>Open PDF preview</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <ScrollView
+                    style={styles.attachmentImageViewport}
+                    contentContainerStyle={styles.attachmentImageViewportContent}
+                    horizontal={attachmentZoom > MIN_ATTACHMENT_ZOOM}
+                    maximumZoomScale={MAX_ATTACHMENT_ZOOM}
+                    minimumZoomScale={MIN_ATTACHMENT_ZOOM}
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <Image
+                      source={{ uri: attachmentPreview.url }}
+                      style={[styles.attachmentPreviewImage, { transform: [{ scale: attachmentZoom }] }]}
+                      resizeMode="contain"
+                      accessibilityLabel={`Preview of ${attachmentPreview.attachment.file_name}`}
+                    />
+                  </ScrollView>
+                )}
+
+                {attachmentPreviewItems.length > 1 ? (
+                  <TouchableOpacity
+                    style={[styles.attachmentViewerNav, styles.attachmentViewerNavNext]}
+                    onPress={() => stepAttachmentPreview(1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Next attachment"
+                  >
+                    <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+        </SafeAreaView>
       </Modal>
 
       <Modal visible={showCloseEvent} transparent animationType="slide" onRequestClose={() => setShowCloseEvent(false)}>
@@ -1115,7 +1610,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         visible={showShareModal}
         inviteType="Event"
         title={event.title}
-        inviteValue={event.shareCode ?? event.rsvpLink}
+        inviteValue={event.shareCode ?? 'Invite unavailable'}
+        inviteLink={event.shareCode ? event.rsvpLink : undefined}
         helpText="This invite joins the event only. It does not give access to the contribution fund or fund management."
         shareMessage={shareMessage}
         onClose={() => setShowShareModal(false)}
@@ -1436,7 +1932,53 @@ function makeStyles(colors: AppColors) {
     announcementHeading: { flex: 1, minWidth: 0 },
     announcementEyebrow: { fontSize: 8, fontFamily: fonts.inter.bold, letterSpacing: 0.45, color: colors.primary },
     announcementTitle: { marginTop: 2, fontSize: 13, lineHeight: 17, fontFamily: fonts.inter.extraBold, color: INK },
+    announcementEditButton: {
+      width: 34,
+      height: 34,
+      marginLeft: 8,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: BORDER,
+    },
     announcementBody: { marginTop: 10, fontSize: 11, lineHeight: 17, fontFamily: fonts.inter.regular, color: '#52525B' },
+    announcementFiles: { gap: 7, marginTop: 12 },
+    announcementFile: {
+      minHeight: 50,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 9,
+      paddingVertical: 7,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: BORDER,
+    },
+    announcementFileIcon: {
+      width: 34,
+      height: 34,
+      marginRight: 9,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: EVENT_HEADER_PURPLE,
+    },
+    announcementFileCopy: { flex: 1, minWidth: 0 },
+    announcementFileName: { fontSize: 10, lineHeight: 14, fontFamily: fonts.inter.bold, color: INK },
+    announcementFileSize: { marginTop: 2, fontSize: 8, fontFamily: fonts.inter.regular, color: MUTED },
+    announcementFileAction: {
+      width: 34,
+      height: 34,
+      marginLeft: 5,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#F4F4F5',
+      borderWidth: 1,
+      borderColor: BORDER,
+    },
     announcementFooter: { flexDirection: 'row', alignItems: 'center', marginTop: 11 },
     announcementAuthor: { fontSize: 9, fontFamily: fonts.inter.bold, color: '#71717A' },
     announcementDot: { width: 3, height: 3, marginHorizontal: 6, borderRadius: 2, backgroundColor: '#C4C4CA' },
@@ -1455,6 +1997,7 @@ function makeStyles(colors: AppColors) {
     composerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.42)' },
     composerDismissArea: { flex: 1 },
     composerCard: {
+      maxHeight: '90%',
       paddingHorizontal: 20,
       paddingTop: 18,
       paddingBottom: 30,
@@ -1466,6 +2009,8 @@ function makeStyles(colors: AppColors) {
     composerHeaderCopy: { flex: 1, minWidth: 0, paddingRight: 12 },
     composerTitle: { fontSize: 16, fontFamily: fonts.inter.extraBold, color: INK },
     composerSubtitle: { marginTop: 3, fontSize: 10, lineHeight: 15, fontFamily: fonts.inter.regular, color: MUTED },
+    composerFormScroll: { flexGrow: 0 },
+    composerFormContent: { paddingBottom: 2 },
     composerLabel: { marginBottom: 6, fontSize: 8, fontFamily: fonts.inter.bold, letterSpacing: 0.5, color: '#71717A' },
     composerTitleInput: {
       minHeight: 44,
@@ -1493,6 +2038,115 @@ function makeStyles(colors: AppColors) {
       fontFamily: fonts.inter.regular,
       color: INK,
     },
+    composerAttachmentHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginTop: 15,
+    },
+    composerAttachmentHelp: { marginTop: -3, fontSize: 8, lineHeight: 12, fontFamily: fonts.inter.regular, color: MUTED },
+    composerAddFileButton: {
+      minHeight: 36,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      borderRadius: 11,
+      backgroundColor: EVENT_HEADER_PURPLE,
+    },
+    composerAddFileText: { fontSize: 9, fontFamily: fonts.inter.bold, color: colors.primary },
+    composerAttachmentList: { gap: 7, marginTop: 10 },
+    composerAttachmentRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 12,
+      backgroundColor: '#F7F7F8',
+      borderWidth: 1,
+      borderColor: BORDER,
+    },
+    composerAttachmentCopy: { flex: 1, minWidth: 0 },
+    composerAttachmentName: { fontSize: 10, lineHeight: 14, fontFamily: fonts.inter.bold, color: INK },
+    composerAttachmentSize: { marginTop: 2, fontSize: 8, fontFamily: fonts.inter.regular, color: MUTED },
+    composerAttachmentRemove: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: BORDER,
+    },
+    attachmentViewer: { flex: 1, backgroundColor: '#101014' },
+    attachmentViewerHeader: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.12)',
+    },
+    attachmentViewerHeading: { flex: 1, minWidth: 0, paddingRight: 10 },
+    attachmentViewerTitle: { fontSize: 12, fontFamily: fonts.inter.bold, color: '#FFFFFF' },
+    attachmentViewerCount: { marginTop: 3, fontSize: 9, fontFamily: fonts.inter.regular, color: '#A1A1AA' },
+    attachmentViewerActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    attachmentViewerButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    attachmentViewerButtonDisabled: { opacity: 0.35 },
+    attachmentViewerCloseButton: {
+      width: 42,
+      height: 42,
+      marginLeft: 3,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    attachmentViewerStage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    attachmentImageViewport: { flex: 1, width: '100%' },
+    attachmentImageViewportContent: { flexGrow: 1, minWidth: '100%', alignItems: 'center', justifyContent: 'center' },
+    attachmentPreviewImage: { width: '100%', height: '100%' },
+    attachmentViewerNav: {
+      position: 'absolute',
+      top: '50%',
+      zIndex: 2,
+      width: 42,
+      height: 42,
+      marginTop: -21,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    attachmentViewerNavPrevious: { left: 12 },
+    attachmentViewerNavNext: { right: 12 },
+    attachmentPdfPreview: { alignItems: 'center', paddingHorizontal: 36 },
+    attachmentPdfTitle: { marginTop: 18, fontSize: 15, lineHeight: 21, fontFamily: fonts.inter.bold, color: '#FFFFFF', textAlign: 'center' },
+    attachmentPdfMeta: { marginTop: 6, fontSize: 10, fontFamily: fonts.inter.regular, color: '#A1A1AA' },
+    attachmentPdfButton: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      marginTop: 22,
+      paddingHorizontal: 18,
+      borderRadius: 22,
+      backgroundColor: '#FFFFFF',
+    },
+    attachmentPdfButtonText: { fontSize: 11, fontFamily: fonts.inter.bold, color: INK },
     estimateInputRow: {
       minHeight: 52,
       flexDirection: 'row',

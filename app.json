@@ -18,6 +18,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.datasentinels.tshelo",
       "buildNumber": "1",
+      "associatedDomains": ["applinks:app.tshelo.com"],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCalendarsUsageDescription": "Allow Tshelo to open your calendar so you can review and add event dates.",
@@ -35,7 +36,21 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.digitalnatives.tshelo",
-      "permissions": ["android.permission.RECEIVE_SMS"]
+      "permissions": ["android.permission.RECEIVE_SMS"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.tshelo.com",
+              "pathPrefix": "/invite"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -13,6 +13,8 @@ import {
 } from '@shared/contracts/contributions'
 import {
   EVENT_STATUSES,
+  RSVP_STATUSES,
+  type ListEventGuestsRequest,
   type ListEventsRequest,
 } from '@shared/contracts/events'
 import {
@@ -286,6 +288,16 @@ export function parseListEventsQuery(params: URLSearchParams): ValidationResult<
     type: parseExtensibleValues(params, 'type', errors),
     status: parseClosedValues(params, 'status', EVENT_STATUSES, errors),
   } as ListEventsRequest
+  return finish(value, errors)
+}
+
+export function parseListEventGuestsQuery(params: URLSearchParams): ValidationResult<ListEventGuestsRequest> {
+  const errors: ApiFieldError[] = []
+  rejectUnknownQuery(params, ['cursor', 'limit', 'q', 'sort_by', 'sort_direction', 'status'], errors)
+  const value = {
+    ...parseCommon(params, ['invited_at', 'guest_name', 'rsvp_status'], errors),
+    status: parseClosedValues(params, 'status', RSVP_STATUSES, errors),
+  } as ListEventGuestsRequest
   return finish(value, errors)
 }
 

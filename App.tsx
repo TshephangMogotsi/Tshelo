@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native'
+import { Linking } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFonts } from 'expo-font'
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
@@ -25,8 +26,9 @@ import { registerForPushNotificationsAsync } from './lib/pushNotifications'
 import { startSmsWatcher } from './lib/smsWatcher'
 import { api } from './lib/api'
 import { runApiRead } from './lib/apiScreen'
-import { appLinking } from './navigation/linking'
 import type { MainStackParamList } from './navigation/types'
+import { parseInvitationUrl, type Invitation } from '@shared/invitations'
+import { clearPendingInvitation, readPendingInvitation, rememberPendingInvitation } from './navigation/pendingInvitation'
 
 const ONBOARDING_KEY = 'tshelo_onboarded_v1'
 
@@ -77,8 +79,45 @@ async function navigateFromNotificationData(data: Record<string, any> | undefine
   }
 }
 
-function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'CountrySelect' | 'Login' }) {
+function RootNavigator({ initialAuthRoute, navigationReady }: { initialAuthRoute: 'Welcome' | 'CountrySelect' | 'Login'; navigationReady: boolean }) {
   const { isAuthenticated, profileCompleted, userId } = useAuth()
+  const [pendingInvitation, setPendingInvitation] = useState<Invitation | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    function receiveInvitation(url: string | null) {
+      if (!url) return false
+      const invitation = parseInvitationUrl(url)
+      if (!invitation) return false
+      if (active) setPendingInvitation(invitation)
+      void rememberPendingInvitation(invitation)
+      return true
+    }
+
+    async function restoreInvitation() {
+      const initialUrl = await Linking.getInitialURL()
+      if (receiveInvitation(initialUrl)) return
+      const stored = await readPendingInvitation()
+      if (active && stored) setPendingInvitation(stored)
+    }
+
+    void restoreInvitation()
+    const subscription = Linking.addEventListener('url', event => { receiveInvitation(event.url) })
+    return () => {
+      active = false
+      subscription.remove()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!navigationReady || !isAuthenticated || !profileCompleted || !pendingInvitation || !navigationRef.isReady()) return
+    const invitation = pendingInvitation
+    setPendingInvitation(null)
+    if (invitation.kind === 'event') navigationRef.navigate('JoinEvent', { code: invitation.code })
+    else navigationRef.navigate('JoinFund', { code: invitation.code })
+    void clearPendingInvitation()
+  }, [isAuthenticated, navigationReady, pendingInvitation, profileCompleted])
 
   useEffect(() => {
     if (isAuthenticated && profileCompleted && userId) {
@@ -106,7 +145,9 @@ function RootNavigator({ initialAuthRoute }: { initialAuthRoute: 'Welcome' | 'Co
     return () => subscription.remove()
   }, [])
 
-  if (!isAuthenticated || !profileCompleted) return <AuthNavigator initialRouteName={initialAuthRoute} />
+  if (!isAuthenticated || !profileCompleted) {
+    return <AuthNavigator key={pendingInvitation ? 'invitation' : 'default'} initialRouteName={pendingInvitation ? 'Login' : initialAuthRoute} />
+  }
   return <MainNavigator />
 }
 
@@ -126,6 +167,7 @@ export default function App() {
 
   const [hasOnboarded,    setHasOnboarded]    = useState<boolean | null>(null)
   const [initialAuthRoute, setInitialAuthRoute] = useState<'Welcome' | 'CountrySelect' | 'Login'>('Welcome')
+  const [navigationReady, setNavigationReady] = useState(false)
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
@@ -166,9 +208,9 @@ export default function App() {
         <SafeAreaProvider>
           <ConnectivityProvider>
             <AuthProvider>
-              <NavigationContainer ref={navigationRef} linking={appLinking}>
+              <NavigationContainer ref={navigationRef} onReady={() => setNavigationReady(true)}>
                 <RewardsProvider onOpenRewards={openRewards}>
-                  <RootNavigator initialAuthRoute={initialAuthRoute} />
+                  <RootNavigator initialAuthRoute={initialAuthRoute} navigationReady={navigationReady} />
                 </RewardsProvider>
               </NavigationContainer>
               <OfflineBanner />

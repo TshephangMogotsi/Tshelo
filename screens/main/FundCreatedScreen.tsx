@@ -46,7 +46,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
   const currencyPrefix = currencySymbol ?? (currencyCode === 'BWP' ? 'P' : currencyCode) ?? 'P'
 
   const fundCode   = shareCode ?? '—'
-  const inviteLink = shareCode ? fundPreviewUrl(shareCode) : 'https://tshelo.app'
+  const inviteLink = shareCode ? fundPreviewUrl(shareCode) : 'https://app.tshelo.com'
   const message    = `Dumelang! 🙏 I've created a fund for *${fundName}* on Tshelo. Join here to contribute and see all payments transparently:\n\n${inviteLink}`
 
   async function handleWhatsApp() {

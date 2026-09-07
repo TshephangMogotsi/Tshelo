@@ -1,11 +1,16 @@
 import type { SupportTicketSummary } from '@shared/contracts/admin'
 import type { Contribution, ContributionSummary } from '@shared/contracts/contributions'
-import type { Event, EventSummary } from '@shared/contracts/events'
+import type { Event, EventGuest, EventSummary } from '@shared/contracts/events'
 import type { Fund, FundSummary } from '@shared/contracts/funds'
 import type { User, UserSummary } from '@shared/contracts/users'
 
 export type EventRow = Omit<Event, 'estimated_spend_amount'> & {
   estimated_spend_amount: number | string | null
+}
+
+export type EventGuestRow = Omit<EventGuest, 'plus_ones' | 'allowed_plus_ones'> & {
+  plus_ones: number | null
+  allowed_plus_ones: number | null
 }
 
 export type FundRow = Omit<Fund, 'goal_amount'> & {
@@ -57,6 +62,31 @@ export function toEvent(row: EventRow): Event {
       : String(row.estimated_spend_amount),
     completed_at: row.completed_at,
     cancelled_at: row.cancelled_at,
+    updated_at: row.updated_at,
+  }
+}
+
+export function toEventGuest(row: EventGuestRow): EventGuest {
+  return {
+    id: row.id,
+    event_id: row.event_id,
+    user_id: row.user_id,
+    guest_name: row.guest_name,
+    guest_phone: row.guest_phone,
+    guest_email: row.guest_email,
+    rsvp_status: row.rsvp_status,
+    rsvp_responded_at: row.rsvp_responded_at,
+    plus_ones: Math.max(0, Number(row.plus_ones ?? 0)),
+    allowed_plus_ones: Math.max(0, Number(row.allowed_plus_ones ?? 0)),
+    plus_ones_names: row.plus_ones_names ?? [],
+    rsvp_note: row.rsvp_note,
+    dietary_requirements: row.dietary_requirements,
+    accessibility_needs: row.accessibility_needs,
+    invited_by: row.invited_by,
+    invited_at: row.invited_at,
+    invitation_sent_at: row.invitation_sent_at,
+    invitation_channel: row.invitation_channel,
+    created_at: row.created_at,
     updated_at: row.updated_at,
   }
 }

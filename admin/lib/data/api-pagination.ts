@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
+  type ApiErrorCode,
   type Paginated,
   type PaginationRequest,
 } from '@shared/contracts/common'
@@ -16,6 +17,7 @@ type CursorPayload = {
 
 export type ApiDataError =
   | { kind: 'validation'; message: string }
+  | { kind: 'business'; code: ApiErrorCode; message: string }
   | { kind: 'database'; error: { code?: string; message?: string } }
 
 export type ApiDataResult<T> =

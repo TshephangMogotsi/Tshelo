@@ -13,6 +13,7 @@ import { api } from '../../lib/api'
 import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { normalizeMapsUrl } from '../../lib/maps'
 import { TOKEN_FEATURE_PRICES } from '../../lib/tokenPricing'
+import { eventInvitationUrl } from '../../lib/fundLinks'
 import { HomeItem } from './home/helpers'
 import { loadHomeItems } from './home/loadHomeItems'
 import {
@@ -633,7 +634,7 @@ export default function CreateFundScreen({ navigation }: Props) {
               return
             }
             await Share.share({
-              message: `You're invited to ${eventName.trim() || `${selectedEventLabel} Event`}. RSVP with code ${createdEvent.share_code}.`,
+              message: `You're invited to ${eventName.trim() || `${selectedEventLabel} Event`}. RSVP here: ${eventInvitationUrl(createdEvent.share_code)}`,
             })
           }}
           onDone={() => navigation.popToTop()}

@@ -9,6 +9,7 @@ import type {
   ListRequest,
   MoneyAmount,
   OneOrMany,
+  Paginated,
   PaginatedResponse,
   PhoneNumber,
   SearchFilter,
@@ -24,6 +25,9 @@ export type EventStatus = (typeof EVENT_STATUSES)[number]
 
 export const RSVP_STATUSES = ['pending', 'yes', 'no', 'maybe'] as const
 export type RsvpStatus = (typeof RSVP_STATUSES)[number]
+
+export const EVENT_GUEST_INVITATION_CHANNELS = ['manual', 'link', 'code', 'whatsapp', 'sms', 'email'] as const
+export type EventGuestInvitationChannel = (typeof EVENT_GUEST_INVITATION_CHANNELS)[number]
 
 export type EventSummary = {
   id: Uuid
@@ -64,9 +68,97 @@ export type EventGuest = {
   guest_phone: PhoneNumber | null
   guest_email: string | null
   rsvp_status: RsvpStatus
+  rsvp_responded_at: IsoDateTime | null
   plus_ones: number
+  allowed_plus_ones: number
+  plus_ones_names: string[]
   rsvp_note: string | null
+  dietary_requirements: string | null
+  accessibility_needs: string | null
+  invited_by: Uuid | null
+  invited_at: IsoDateTime
+  invitation_sent_at: IsoDateTime | null
+  invitation_channel: EventGuestInvitationChannel | null
   created_at: IsoDateTime
+  updated_at: IsoDateTime
+}
+
+export type EventGuestFilters = SearchFilter & {
+  status?: OneOrMany<RsvpStatus>
+}
+
+export type EventGuestSortField = 'invited_at' | 'guest_name' | 'rsvp_status'
+export type ListEventGuestsRequest = ListRequest<EventGuestFilters, EventGuestSortField>
+
+export type EventGuestSummary = {
+  invitation_count: number
+  invited_people: number
+  confirmed_people: number
+  maybe_people: number
+  pending_people: number
+  declined_people: number
+}
+
+export type EventGuestCapacitySource = 'event_unlock' | 'pass' | null
+
+export type EventGuestCapacity = {
+  event_id: Uuid
+  used: number
+  free_limit: number
+  is_unlimited: boolean
+  unlimited_source: EventGuestCapacitySource
+  unlock_cost_tokens: number
+}
+
+export type EventGuestDirectory = Paginated<EventGuest> & {
+  summary: EventGuestSummary
+  capacity: EventGuestCapacity
+}
+
+export type InviteEventGuestInput = {
+  guest_name: string
+  guest_phone: PhoneNumber
+  guest_email?: string | null
+  allowed_plus_ones?: number
+  invitation_channel?: EventGuestInvitationChannel
+}
+
+export type InviteEventGuestsRequest = {
+  guests: InviteEventGuestInput[]
+}
+
+export type UpdateEventGuestRequest = {
+  guest_name?: string
+  guest_phone?: PhoneNumber
+  guest_email?: string | null
+  rsvp_status?: RsvpStatus
+  plus_ones?: number
+  allowed_plus_ones?: number
+  plus_ones_names?: string[]
+  rsvp_note?: string | null
+  dietary_requirements?: string | null
+  accessibility_needs?: string | null
+}
+
+export type RespondEventRsvpRequest = {
+  code?: string
+  status: Exclude<RsvpStatus, 'pending'>
+  plus_ones?: number
+  plus_ones_names?: string[]
+  rsvp_note?: string | null
+  dietary_requirements?: string | null
+  accessibility_needs?: string | null
+}
+
+export type RemoveEventGuestResult = {
+  guest_id: Uuid
+}
+
+export type UnlockEventGuestCapacityResult = {
+  event_id: Uuid
+  is_unlimited: boolean
+  tokens_spent: number
+  remaining_tokens: number
 }
 
 export type EventFilters = SearchFilter & {
@@ -128,7 +220,47 @@ export type EventAnnouncement = {
   author_name: string
   title: string
   body: string
+  attachments: EventAnnouncementAttachment[]
   created_at: IsoDateTime
+}
+
+export const EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const
+export type EventAnnouncementAttachmentMediaType = (typeof EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES)[number]
+
+export const EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS = 5
+export const EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+export type EventAnnouncementAttachment = {
+  object_path: string
+  file_name: string
+  content_type: EventAnnouncementAttachmentMediaType
+  size_bytes: number
+}
+
+export type CreateEventAnnouncementUploadSessionRequest = {
+  file_name: string
+  content_type: EventAnnouncementAttachmentMediaType
+  size_bytes: number
+}
+
+export type EventAnnouncementUploadSession = EventAnnouncementAttachment & {
+  upload_url: string
+  expires_at: IsoDateTime
+}
+
+export type EventAnnouncementAttachmentAccessRequest = {
+  object_path: string
+}
+
+export type EventAnnouncementAttachmentAccess = {
+  object_path: string
+  download_url: string
+  expires_at: IsoDateTime
 }
 
 export type EventCapabilities = {
@@ -207,6 +339,13 @@ export type UpdateEventBudgetRequest = {
 export type CreateEventAnnouncementRequest = {
   title: string
   body: string
+  attachments?: EventAnnouncementAttachment[]
+}
+
+export type UpdateEventAnnouncementRequest = {
+  title?: string
+  body?: string
+  attachments?: EventAnnouncementAttachment[]
 }
 
 export type InviteEventOrganiserRequest = EventOrganiserInput
@@ -245,3 +384,12 @@ export type LeaveEventResultResponse = ApiResponse<LeftEvent>
 export type CreateEventFundResponse = ApiResponse<CreatedEventFund>
 export type UpdateEventBudgetResponse = ApiResponse<EventBudget>
 export type CreateEventAnnouncementResponse = ApiResponse<EventAnnouncement>
+export type UpdateEventAnnouncementResponse = ApiResponse<EventAnnouncement>
+export type ListEventGuestsResponse = ApiResponse<EventGuestDirectory>
+export type InviteEventGuestsResponse = ApiResponse<EventGuest[]>
+export type UpdateEventGuestResponse = ApiResponse<EventGuest>
+export type RemoveEventGuestResponse = ApiResponse<RemoveEventGuestResult>
+export type GetEventRsvpResponse = ApiResponse<EventGuest | null>
+export type RespondEventRsvpResponse = ApiResponse<EventGuest>
+export type GetEventGuestCapacityResponse = ApiResponse<EventGuestCapacity>
+export type UnlockEventGuestCapacityResponse = ApiResponse<UnlockEventGuestCapacityResult>

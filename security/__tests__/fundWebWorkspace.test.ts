@@ -55,10 +55,12 @@ describe('member web fund workspace', () => {
   })
 
   it('uses the dashboard fund-card layout, restrained card treatment, typography, and invite dialog', () => {
-    expect(styles).toContain('.tshelo-dashboard .fundgrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(330px,1fr)); gap: 18px; }')
+    expect(styles).toContain('.tshelo-dashboard .fundgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }')
+    expect(styles).toContain('.tshelo-dashboard .fundgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }')
+    expect(styles).toContain('.tshelo-dashboard .fundgrid { grid-template-columns: 1fr; }')
     expect(styles).not.toContain('.tshelo-dashboard .fund:hover { box-shadow: var(--sh-lift); transform: translateY(-2px); }')
     expect(styles).toContain('font-size: 19px; font-weight: 600;')
-    expect(styles).toContain('.tshelo-dashboard .track { height: 8px;')
+    expect(styles).toContain('.tshelo-dashboard .track { height: 7px;')
     expect(styles).toContain('.tshelo-dashboard .overlay { position: fixed; inset: 0;')
     expect(styles).toContain('animation: pop .22s cubic-bezier(.2,.9,.3,1)')
     expect(fundList).toContain("'Invite members'")
