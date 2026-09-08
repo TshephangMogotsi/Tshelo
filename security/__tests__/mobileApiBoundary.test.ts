@@ -128,6 +128,8 @@ describe('mobile API migration boundaries', () => {
     const boundaryFiles = [
       ...mobileFiles,
       ...sourceFiles('shared/api-client'),
+      ...sourceFiles('shared/event-files.ts'),
+      ...sourceFiles('admin/components/account-events'),
       ...sourceFiles('admin/lib/api'),
       ...sourceFiles('admin/lib/data').filter((file) => path.basename(file).startsWith('api')),
       ...routeFiles('admin/app/api/v1'),
@@ -136,5 +138,33 @@ describe('mobile API migration boundaries', () => {
 
     expect(boundary).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
     expect(boundary).not.toContain('SUPABASE_SECRET_KEY')
+  })
+
+  it('keeps both event Files clients behind typed API calls, with only signed binary storage transfers', () => {
+    const callers = [
+      'screens/main/eventDetail/useEventFiles.ts',
+      'screens/main/eventDetail/attachmentAccess.ts',
+      'screens/main/eventDetail/EventFilesPanel.tsx',
+      'admin/components/account-events/use-event-files.ts',
+      'admin/components/account-events/event-attachment-access.ts',
+      'admin/components/account-events/event-files-panel.tsx',
+      'admin/components/account-events/event-attachments.tsx',
+      'shared/event-files.ts',
+    ]
+    for (const file of callers) {
+      const source = read(file)
+      expect({ file, bypass: /supabase-client|from\s+['"][^'"]*supabase|\.storage\s*\.|\.rpc\s*\(|\.from\(['"]event_files/.test(source) }).toEqual({ file, bypass: false })
+      expect(source).not.toMatch(/getPublicUrl|\/storage\/v1\/object\/public|\/rest\/v1\/event_files/)
+    }
+    for (const file of [callers[0], callers[3]]) {
+      const source = read(file)
+      for (const operation of ['createFileUploadSession', 'finalizeFile', 'removeFile']) expect(source).toContain(`.events.${operation}(`)
+      expect(source).toContain('session.upload_url')
+      expect(source).toContain("'x-upsert'")
+      expect(source).not.toMatch(/Authorization|Bearer|access_token/)
+    }
+    for (const file of [callers[1], callers[4]]) expect(read(file)).toContain('.events.createFileAccess(eventId, attachment.id, call)')
+    expect(read('screens/main/eventDetail/eventFiles.ts')).toContain("export * from '@shared/event-files'")
+    expect(read(callers[3])).toContain("from '@shared/event-files'")
   })
 })

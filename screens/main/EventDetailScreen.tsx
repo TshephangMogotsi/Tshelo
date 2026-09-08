@@ -26,7 +26,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { RouteProp, useFocusEffect } from '@react-navigation/native'
+import { RouteProp, useFocusEffect, usePreventRemove } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
@@ -40,6 +40,9 @@ import type { Contribution, Expense } from './fundDetail/types'
 import { isFundReadOnly } from './fundDetail/finance'
 import { buildCalendarEventDetails } from './eventDetail/calendar'
 import { parseEstimatedSpend, summarizeEventGuests } from './eventDetail/eventOnly'
+import EventFilesPanel from './eventDetail/EventFilesPanel'
+import { useEventFiles } from './eventDetail/useEventFiles'
+import { eventAttachmentUrl, type EventAttachment } from './eventDetail/attachmentAccess'
 import type { FundPermission } from '../../lib/fundPermissions'
 import { linkedEventCapabilities } from '../../lib/fundPermissionPolicy'
 import { eventInvitationUrl } from '../../lib/fundLinks'
@@ -61,7 +64,7 @@ type Props = {
   route: RouteProp<MainStackParamList, 'EventDetail'>
 }
 
-type EventTab = 'guests' | 'announcements' | 'budget'
+type EventTab = 'guests' | 'announcements' | 'files' | 'budget'
 type EventFundWorkspace = 'event' | 'fund'
 type GuestStatus = 'confirmed' | 'pending' | 'declined'
 
@@ -226,9 +229,10 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false)
   const [isUploadingAnnouncementFiles, setIsUploadingAnnouncementFiles] = useState(false)
   const [attachmentActionPath, setAttachmentActionPath] = useState<string | null>(null)
-  const [attachmentPreview, setAttachmentPreview] = useState<{ attachment: EventAnnouncementAttachment; url: string } | null>(null)
-  const [attachmentPreviewItems, setAttachmentPreviewItems] = useState<EventAnnouncementAttachment[]>([])
-  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({})
+  const [attachmentPreview, setAttachmentPreview] = useState<{ attachment: EventAttachment; url: string } | null>(null)
+  const [attachmentPreviewItems, setAttachmentPreviewItems] = useState<EventAttachment[]>([])
+  const [attachmentPreviewFailed, setAttachmentPreviewFailed] = useState(false)
+  const attachmentPreviewRequest = useRef(0)
   const [attachmentZoom, setAttachmentZoom] = useState(MIN_ATTACHMENT_ZOOM)
   const unsavedAttachmentPaths = useRef(new Set<string>())
   const [isLoading, setIsLoading] = useState(true)
@@ -248,6 +252,12 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const canManageGuests = eventCapabilities.manageGuests
   const canPostAnnouncements = eventCapabilities.postAnnouncements
   const canManageEventBudget = eventCapabilities.manageBudget
+  const canManageFiles = canPostAnnouncements && event?.status === 'active' && !isLoading
+  const eventFiles = useEventFiles(eventId, canManageFiles)
+  const { replaceFiles } = eventFiles
+  usePreventRemove(eventFiles.busy, () => {
+    Alert.alert('File operation in progress', 'Please wait for the file operation to finish before leaving this event. You can switch event tabs while files upload.')
+  })
 
   useFocusEffect(useCallback(() => {
     let active = true
@@ -289,6 +299,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
         setEventGuests(guests)
         setAnnouncements(eventWorkspace.announcements.map(mapEventAnnouncement))
+        replaceFiles(eventWorkspace.files)
         setIsEventAdmin(eventWorkspace.capabilities.is_creator || eventWorkspace.capabilities.is_organiser)
         setCanLeaveEvent(eventWorkspace.capabilities.can_leave_event)
         setLinkedFundPermissions(new Set(eventWorkspace.capabilities.linked_fund_permissions))
@@ -359,7 +370,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
     void loadEvent()
     return () => { active = false; controller.abort() }
-  }, [eventId, navigation]))
+  }, [eventId, navigation, replaceFiles]))
 
   const shareMessage = event ? `You're invited to ${event.title}. ${event.rsvpLink}` : ''
 
@@ -616,32 +627,29 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     }
   }
 
-  async function signedAttachmentUrl(attachment: EventAnnouncementAttachment) {
-    const access = await api.events.createAnnouncementAttachmentAccess(eventId, {
-      object_path: attachment.object_path,
-    })
-    return access.download_url
-  }
-
-  async function previewAnnouncementAttachment(items: EventAnnouncementAttachment[], attachment: EventAnnouncementAttachment) {
+  async function previewAttachment(items: EventAttachment[], attachment: EventAttachment) {
+    if (attachmentActionPath) return
+    const request = ++attachmentPreviewRequest.current
     setAttachmentActionPath(attachment.object_path)
     try {
-      const urls = Object.fromEntries(await Promise.all(items.map(async item => [item.object_path, await signedAttachmentUrl(item)] as const)))
+      const url = await eventAttachmentUrl(eventId, attachment)
+      if (request !== attachmentPreviewRequest.current) return
       setAttachmentPreviewItems(items)
-      setAttachmentPreviewUrls(urls)
-      setAttachmentPreview({ attachment, url: urls[attachment.object_path] })
+      setAttachmentPreview({ attachment, url })
+      setAttachmentPreviewFailed(false)
       setAttachmentZoom(MIN_ATTACHMENT_ZOOM)
     } catch (error) {
-      Alert.alert('Could not preview file', error instanceof Error ? error.message : 'Please try again.')
+      if (request === attachmentPreviewRequest.current) Alert.alert('Could not preview file', toApiUiError(error).message)
     } finally {
       setAttachmentActionPath(null)
     }
   }
 
   function closeAttachmentPreview() {
+    attachmentPreviewRequest.current += 1
     setAttachmentPreview(null)
     setAttachmentPreviewItems([])
-    setAttachmentPreviewUrls({})
+    setAttachmentPreviewFailed(false)
     setAttachmentZoom(MIN_ATTACHMENT_ZOOM)
   }
 
@@ -649,17 +657,22 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     if (!attachmentPreview || attachmentPreviewItems.length < 2) return
     const currentIndex = attachmentPreviewItems.findIndex(item => item.object_path === attachmentPreview.attachment.object_path)
     const next = attachmentPreviewItems[(currentIndex + direction + attachmentPreviewItems.length) % attachmentPreviewItems.length]
-    const url = attachmentPreviewUrls[next.object_path]
-    if (url) {
-      setAttachmentPreview({ attachment: next, url })
-      setAttachmentZoom(MIN_ATTACHMENT_ZOOM)
-    }
+    void previewAttachment(attachmentPreviewItems, next)
   }
 
-  async function downloadAnnouncementAttachment(attachment: EventAnnouncementAttachment, knownUrl?: string) {
+  async function openPdfAttachment(attachment: EventAttachment) {
+    if (attachmentActionPath) return
+    setAttachmentActionPath(attachment.object_path)
+    try { await Linking.openURL(await eventAttachmentUrl(eventId, attachment)) }
+    catch (error) { Alert.alert('Could not open PDF', toApiUiError(error).message) }
+    finally { setAttachmentActionPath(null) }
+  }
+
+  async function downloadAttachment(attachment: EventAttachment) {
+    if (attachmentActionPath) return
     setAttachmentActionPath(attachment.object_path)
     try {
-      const url = knownUrl ?? await signedAttachmentUrl(attachment)
+      const url = await eventAttachmentUrl(eventId, attachment)
       if (Platform.OS === 'web') {
         await Linking.openURL(url)
         return
@@ -1095,10 +1108,10 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           <>
             <View style={styles.tabBar}>
               {(isEventOnly
-                ? ([['guests', 'Guests'], ['announcements', 'Updates']] as const)
-                : ([['guests', 'Guests'], ['announcements', 'Updates'], ['budget', 'Budget']] as const)
+                ? ([['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files']] as const)
+                : ([['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files'], ['budget', 'Budget']] as const)
               ).map(([id, label]) => (
-                <TouchableOpacity key={id} style={[styles.tab, activeTab === id && styles.tabActive]} onPress={() => setActiveTab(id)}>
+                <TouchableOpacity key={id} style={[styles.tab, activeTab === id && styles.tabActive]} onPress={() => setActiveTab(id)} accessibilityRole="tab" accessibilityState={{ selected: activeTab === id }}>
                   <Text style={[styles.tabText, activeTab === id && styles.tabTextActive]}>{label}</Text>
                 </TouchableOpacity>
               ))}
@@ -1240,7 +1253,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                             </View>
                             <TouchableOpacity
                               style={styles.announcementFileAction}
-                              onPress={() => { void previewAnnouncementAttachment(announcement.attachments, attachment) }}
+                              onPress={() => { void previewAttachment(announcement.attachments, attachment) }}
                               disabled={busy}
                               accessibilityRole="button"
                               accessibilityLabel={`Preview ${attachment.file_name}`}
@@ -1249,7 +1262,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.announcementFileAction}
-                              onPress={() => { void downloadAnnouncementAttachment(attachment) }}
+                              onPress={() => { void downloadAttachment(attachment) }}
                               disabled={busy}
                               accessibilityRole="button"
                               accessibilityLabel={`Download ${attachment.file_name}`}
@@ -1269,6 +1282,16 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                 </View>
               ))}
             </View>
+          ) : activeTab === 'files' ? (
+            <EventFilesPanel
+              eventId={eventId}
+              manager={eventFiles}
+              canManage={canManageFiles}
+              inactive={event.status !== 'active'}
+              actionPath={attachmentActionPath}
+              onPreview={(items, file) => { void previewAttachment(items, file) }}
+              onDownload={file => { void downloadAttachment(file) }}
+            />
           ) : !isEventOnly ? (
             <View style={styles.budgetContent}>
               <View style={styles.budgetSummaryCard}>
@@ -1479,11 +1502,12 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   ) : null}
                   <TouchableOpacity
                     style={styles.attachmentViewerButton}
-                    onPress={() => { void downloadAnnouncementAttachment(attachmentPreview.attachment, attachmentPreview.url) }}
+                    onPress={() => { void downloadAttachment(attachmentPreview.attachment) }}
+                    disabled={attachmentActionPath !== null}
                     accessibilityRole="button"
                     accessibilityLabel={`Download ${attachmentPreview.attachment.file_name}`}
                   >
-                    <Ionicons name="download-outline" size={21} color="#FFFFFF" />
+                    {attachmentActionPath ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="download-outline" size={21} color="#FFFFFF" />}
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.attachmentViewerCloseButton}
@@ -1501,6 +1525,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   <TouchableOpacity
                     style={[styles.attachmentViewerNav, styles.attachmentViewerNavPrevious]}
                     onPress={() => stepAttachmentPreview(-1)}
+                    disabled={attachmentActionPath !== null}
                     accessibilityRole="button"
                     accessibilityLabel="Previous attachment"
                   >
@@ -1515,12 +1540,20 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                     <Text style={styles.attachmentPdfMeta}>{formatAttachmentSize(attachmentPreview.attachment.size_bytes)} · PDF</Text>
                     <TouchableOpacity
                       style={styles.attachmentPdfButton}
-                      onPress={() => { void Linking.openURL(attachmentPreview.url) }}
+                      onPress={() => { void openPdfAttachment(attachmentPreview.attachment) }}
+                      disabled={attachmentActionPath !== null}
                       accessibilityRole="button"
                       accessibilityLabel={`Open ${attachmentPreview.attachment.file_name}`}
                     >
                       <Ionicons name="open-outline" size={18} color={INK} />
                       <Text style={styles.attachmentPdfButtonText}>Open PDF preview</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : attachmentPreviewFailed ? (
+                  <View style={styles.attachmentPdfPreview}>
+                    <Text style={styles.attachmentPdfTitle}>Image preview unavailable</Text>
+                    <TouchableOpacity style={styles.attachmentPdfButton} disabled={attachmentActionPath !== null} onPress={() => { void previewAttachment(attachmentPreviewItems, attachmentPreview.attachment) }} accessibilityRole="button" accessibilityLabel="Retry image preview">
+                      <Text style={styles.attachmentPdfButtonText}>Retry preview</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -1534,7 +1567,9 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                     showsVerticalScrollIndicator={false}
                   >
                     <Image
+                      key={attachmentPreview.url}
                       source={{ uri: attachmentPreview.url }}
+                      onError={() => setAttachmentPreviewFailed(true)}
                       style={[styles.attachmentPreviewImage, { transform: [{ scale: attachmentZoom }] }]}
                       resizeMode="contain"
                       accessibilityLabel={`Preview of ${attachmentPreview.attachment.file_name}`}
@@ -1546,6 +1581,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   <TouchableOpacity
                     style={[styles.attachmentViewerNav, styles.attachmentViewerNavNext]}
                     onPress={() => stepAttachmentPreview(1)}
+                    disabled={attachmentActionPath !== null}
                     accessibilityRole="button"
                     accessibilityLabel="Next attachment"
                   >

@@ -6,6 +6,7 @@ import {
   MAX_PAGE_LIMIT,
   type ApiErrorCode,
   type Paginated,
+  type JsonObject,
   type PaginationRequest,
 } from '@shared/contracts/common'
 
@@ -17,7 +18,7 @@ type CursorPayload = {
 
 export type ApiDataError =
   | { kind: 'validation'; message: string }
-  | { kind: 'business'; code: ApiErrorCode; message: string }
+  | { kind: 'business'; code: ApiErrorCode; message: string; details?: JsonObject; retryable?: boolean }
   | { kind: 'database'; error: { code?: string; message?: string } }
 
 export type ApiDataResult<T> =

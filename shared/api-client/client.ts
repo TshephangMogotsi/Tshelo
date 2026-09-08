@@ -28,6 +28,12 @@ import type {
   EventInvitePreview,
   EventSummary,
   EventWorkspace,
+  CreateEventFileUploadSessionRequest,
+  EventFileUploadSession,
+  FinalizeEventFileRequest,
+  EventFile,
+  EventFileAccess,
+  RemoveEventFileResult,
   EvaluateRewardsResult,
   Expense,
   FundContributor,
@@ -419,6 +425,18 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       },
     },
     events: {
+      createFileUploadSession(eventId: string, input: CreateEventFileUploadSessionRequest, call?: ApiCallOptions) {
+        return request<EventFileUploadSession>(`/api/v1/events/${encodeURIComponent(eventId)}/files/upload-session`, { ...call, method: 'POST', body: input })
+      },
+      finalizeFile(eventId: string, input: FinalizeEventFileRequest, call?: ApiCallOptions) {
+        return request<EventFile>(`/api/v1/events/${encodeURIComponent(eventId)}/files/finalize`, { ...call, method: 'POST', body: input })
+      },
+      createFileAccess(eventId: string, fileId: string, call?: ApiCallOptions) {
+        return request<EventFileAccess>(`/api/v1/events/${encodeURIComponent(eventId)}/files/${encodeURIComponent(fileId)}/access`, { ...call, method: 'POST' })
+      },
+      removeFile(eventId: string, fileId: string, call?: ApiCallOptions) {
+        return request<RemoveEventFileResult>(`/api/v1/events/${encodeURIComponent(eventId)}/files/${encodeURIComponent(fileId)}`, { ...call, method: 'DELETE' })
+      },
       list(input: ListEventsRequest = {}, call?: ApiCallOptions) {
         return request<Paginated<EventSummary>>(`/api/v1/events${toQueryString(input)}`, call)
       },

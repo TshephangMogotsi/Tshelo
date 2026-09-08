@@ -21,7 +21,7 @@ Use a non-production staging fund with these accounts:
 | Contributions assistant | `record_contributions` | Record received money; no edits or expenses |
 | Expense assistant | `record_expenses` | Add expenses; no edits or contributions |
 | Member coordinator | `manage_members` | Invite and action pending members only |
-| Event coordinator | Three linked-event grants | Guests, announcements, and budget only |
+| Event coordinator | Three linked-event grants | Guests, event updates/files, and budget only |
 | Ordinary member | None | View joined directory and make own pledge |
 
 Also revoke one grant while the user is on the fund screen. On refocus, the

@@ -82,7 +82,7 @@ export type MainStackParamList = {
   FundDetail:          { fundId: string; tab?: 'contributions' | 'sponsorships' | 'expenses' | 'members' }
   EventDetail:         {
     eventId: string
-    tab?: 'guests' | 'announcements' | 'budget'
+    tab?: 'guests' | 'announcements' | 'files' | 'budget'
     workspace?: 'event' | 'fund'
     fundTab?: 'contributions' | 'sponsorships' | 'expenses' | 'members'
   }

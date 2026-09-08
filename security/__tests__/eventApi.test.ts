@@ -23,6 +23,10 @@ describe('event API slice', () => {
     'admin/app/api/v1/events/[eventId]/complete/route.ts',
     'admin/app/api/v1/events/[eventId]/budget/route.ts',
     'admin/app/api/v1/events/[eventId]/announcements/route.ts',
+    'admin/app/api/v1/events/[eventId]/files/upload-session/route.ts',
+    'admin/app/api/v1/events/[eventId]/files/finalize/route.ts',
+    'admin/app/api/v1/events/[eventId]/files/[fileId]/access/route.ts',
+    'admin/app/api/v1/events/[eventId]/files/[fileId]/route.ts',
     'admin/app/api/v1/events/[eventId]/guests/route.ts',
     'admin/app/api/v1/events/[eventId]/guests/[guestId]/route.ts',
     'admin/app/api/v1/events/[eventId]/rsvp/route.ts',
@@ -36,6 +40,7 @@ describe('event API slice', () => {
     for (const contract of [
       'EventWorkspace', 'EventInvitePreview', 'CreatedEventFund', 'JoinedEvent',
       'LeftEvent', 'EventBudget', 'EventAnnouncement', 'EventCapabilities',
+      'EventFile', 'EventFileUploadSession', 'EventFileAccess', 'FinalizeEventFileRequest',
       'EventGuestDirectory', 'EventGuestSummary', 'EventGuestCapacity',
       'InviteEventGuestsRequest', 'UpdateEventGuestRequest', 'RespondEventRsvpRequest',
     ]) expect(contracts).toContain(`type ${contract}`)
@@ -47,6 +52,7 @@ describe('event API slice', () => {
       'leave(', 'complete(', 'budget(', 'updateBudget(', 'createAnnouncement(',
       'listGuests(', 'getGuest(', 'inviteGuests(', 'updateGuest(', 'removeGuest(',
       'myRsvp(', 'respondRsvp(', 'guestCapacity(', 'unlockGuestCapacity(', 'inviteOrganiser(',
+      'createFileUploadSession(', 'finalizeFile(', 'createFileAccess(', 'removeFile(',
     ]) expect(client).toContain(method)
   })
 
@@ -81,6 +87,7 @@ describe('event API slice', () => {
       'validateUpdateEventBudgetRequest', 'validateCreateEventAnnouncementRequest',
       'validateInviteEventOrganiserRequest', 'validateInviteEventGuestsRequest',
       'validateUpdateEventGuestRequest', 'validateRespondEventRsvpRequest',
+      'validateCreateEventFileUploadSessionRequest', 'validateFinalizeEventFileRequest',
     ]) expect(validation).toContain(validator)
     expect(validation).toContain('PHONE_PATTERN')
     expect(validation).toContain('MONEY_PATTERN')

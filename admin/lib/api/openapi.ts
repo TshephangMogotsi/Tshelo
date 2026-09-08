@@ -522,6 +522,40 @@ export const tsheloOpenApiDocument = {
         responses: { '200': response('Event budget updated.', success({ $ref: '#/components/schemas/EventBudget' })), ...standardErrors },
       },
     },
+    '/events/{eventId}/files/upload-session': {
+      post: {
+        tags: ['Events'], operationId: 'createEventFileUploadSession', summary: 'Reserve and authorise a private event file upload',
+        description: 'Requires event content-management permission and an active event. Pending unexpired uploads reserve a slot in the 10-file limit. PUT the binary file to upload_url without a bearer token, using the returned content_type, then finalise using upload_id. Sessions expire after two hours.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ $ref: '#/components/schemas/CreateEventFileUploadSessionRequest' }),
+        responses: { '201': response('Signed upload session returned.', success({ $ref: '#/components/schemas/EventFileUploadSession' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/files/finalize': {
+      post: {
+        tags: ['Events'], operationId: 'finalizeEventFile', summary: 'Verify and publish an uploaded event file',
+        description: 'Validates the session owner, event state, stored MIME type and byte size. Repeating a successful finalisation returns the same file. Failed pending uploads are discarded and their objects removed; errors with details.cleanup_pending include upload_id for retrying DELETE. IDs from another event or uploader cannot be finalised or cleaned up.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ type: 'object', additionalProperties: false, required: ['upload_id'], properties: { upload_id: { type: 'string', format: 'uuid' } } }),
+        responses: { '200': response('Event file finalised.', success({ $ref: '#/components/schemas/EventFile' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/files/{fileId}/access': {
+      post: {
+        tags: ['Events'], operationId: 'createEventFileAccess', summary: 'Create a five-minute event file preview/download URL',
+        description: 'Requires current event participation and a finalised file. Files remain readable on completed events. Previously issued URLs remain usable until expiry.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('fileId', 'Finalised file UUID.')],
+        responses: { '201': response('Signed file URL returned.', success({ $ref: '#/components/schemas/EventFileAccess' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/files/{fileId}': {
+      delete: {
+        tags: ['Events'], operationId: 'removeEventFile', summary: 'Remove an event file or cancel an owned pending upload',
+        description: 'Published files require content-management permission on an active event. A pending upload can be cancelled by its uploader even after the event closes. Removal first hides the metadata, then deletes the stored bytes; the caller can retry physical cleanup with the same ID after a storage failure.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('fileId', 'File UUID or pending upload_id.')],
+        responses: { '200': response('File removed.', success({ type: 'object', required: ['file_id'], properties: { file_id: { type: 'string', format: 'uuid' } } })), ...standardErrors },
+      },
+    },
     '/events/{eventId}/announcements': {
       post: {
         tags: ['Events'], operationId: 'createEventAnnouncement', summary: 'Publish an event announcement',
@@ -1207,13 +1241,42 @@ export const tsheloOpenApiDocument = {
           status: { type: 'string', enum: ['active', 'completed', 'cancelled'] }, organiser_name: { type: 'string' }, has_linked_fund: { type: 'boolean' }, already_joined: { type: 'boolean' },
         },
       },
+      CreateEventFileUploadSessionRequest: {
+        type: 'object', additionalProperties: false, required: ['file_name', 'content_type', 'size_bytes'],
+        properties: {
+          file_name: { type: 'string', minLength: 1, maxLength: 255 },
+          content_type: { type: 'string', enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] },
+          size_bytes: { type: 'integer', minimum: 1, maximum: 10485760 },
+        },
+      },
+      EventFile: {
+        type: 'object', required: ['id', 'event_id', 'uploaded_by', 'file_name', 'object_path', 'content_type', 'size_bytes', 'created_at', 'updated_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' }, event_id: { type: 'string', format: 'uuid' }, uploaded_by: { type: 'string', format: 'uuid' },
+          file_name: { type: 'string' }, object_path: { type: 'string' }, content_type: { type: 'string', enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] },
+          size_bytes: { type: 'integer', minimum: 1, maximum: 10485760 }, created_at: { type: 'string', format: 'date-time' }, updated_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      EventFileUploadSession: {
+        type: 'object', required: ['upload_id', 'object_path', 'file_name', 'content_type', 'size_bytes', 'upload_url', 'expires_at'],
+        properties: {
+          upload_id: { type: 'string', format: 'uuid' }, object_path: { type: 'string' }, file_name: { type: 'string' },
+          content_type: { type: 'string', enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] }, size_bytes: { type: 'integer', minimum: 1, maximum: 10485760 },
+          upload_url: { type: 'string', format: 'uri' }, expires_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      EventFileAccess: {
+        type: 'object', required: ['file_id', 'download_url', 'expires_at'],
+        properties: { file_id: { type: 'string', format: 'uuid' }, download_url: { type: 'string', format: 'uri' }, expires_at: { type: 'string', format: 'date-time' } },
+      },
       EventWorkspace: {
-        type: 'object', required: ['event', 'guests', 'budget', 'announcements', 'capabilities', 'linked_fund'],
+        type: 'object', required: ['event', 'guests', 'budget', 'announcements', 'files', 'capabilities', 'linked_fund'],
         properties: {
           event: { $ref: '#/components/schemas/Event' },
           guests: { type: 'array', items: { $ref: '#/components/schemas/EventGuest' } },
           budget: { oneOf: [{ $ref: '#/components/schemas/EventBudget' }, { type: 'null' }] },
           announcements: { type: 'array', items: { $ref: '#/components/schemas/EventAnnouncement' } },
+          files: { type: 'array', maxItems: 10, items: { $ref: '#/components/schemas/EventFile' } },
           capabilities: {
             type: 'object', required: ['is_creator', 'is_organiser', 'can_leave_event', 'linked_fund_permissions'],
             properties: {

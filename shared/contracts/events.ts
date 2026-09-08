@@ -270,11 +270,49 @@ export type EventCapabilities = {
   linked_fund_permissions: FundPermission[]
 }
 
+export const EVENT_FILE_MEDIA_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] as const
+export type EventFileMediaType = (typeof EVENT_FILE_MEDIA_TYPES)[number]
+export const EVENT_MAX_FILES = 10
+export const EVENT_FILE_MAX_BYTES = 10 * 1024 * 1024
+
+export type CreateEventFileUploadSessionRequest = {
+  file_name: string
+  content_type: EventFileMediaType
+  size_bytes: number
+}
+
+export type EventFile = CreateEventFileUploadSessionRequest & {
+  id: Uuid
+  event_id: Uuid
+  uploaded_by: Uuid
+  object_path: string
+  created_at: IsoDateTime
+  updated_at: IsoDateTime
+}
+
+export type EventFileUploadSession = CreateEventFileUploadSessionRequest & {
+  upload_id: Uuid
+  object_path: string
+  upload_url: string
+  expires_at: IsoDateTime
+}
+
+/** The session owns the metadata; clients cannot substitute another object's path. */
+export type FinalizeEventFileRequest = { upload_id: Uuid }
+export type EventFileAccess = {
+  file_id: Uuid
+  download_url: string
+  expires_at: IsoDateTime
+}
+/** Also accepts an upload_id to cancel an unfinished upload. */
+export type RemoveEventFileResult = { file_id: Uuid }
+
 export type EventWorkspace = {
   event: Event
   guests: EventGuest[]
   budget: EventBudget | null
   announcements: EventAnnouncement[]
+  files: EventFile[]
   capabilities: EventCapabilities
   linked_fund: FundWorkspace | null
 }
@@ -378,6 +416,10 @@ export type LeaveEventResponse = EmptyResponse
 export type RespondOrganiserInviteResponse = ApiResponse<RespondOrganiserInviteResult>
 export type SyncOrganiserInvitesResponse = ApiResponse<SyncOrganiserInvitesResult>
 export type GetEventWorkspaceResponse = ApiResponse<EventWorkspace>
+export type CreateEventFileUploadSessionResponse = ApiResponse<EventFileUploadSession>
+export type FinalizeEventFileResponse = ApiResponse<EventFile>
+export type CreateEventFileAccessResponse = ApiResponse<EventFileAccess>
+export type RemoveEventFileResponse = ApiResponse<RemoveEventFileResult>
 export type GetEventInvitePreviewResponse = ApiResponse<EventInvitePreview>
 export type JoinEventByCodeResponse = ApiResponse<JoinedEvent>
 export type LeaveEventResultResponse = ApiResponse<LeftEvent>

@@ -38,6 +38,8 @@ import type {
   UpdateEventBudgetRequest,
   UpdateEventAnnouncementRequest,
   UpdateEventRequest,
+  CreateEventFileUploadSessionRequest,
+  FinalizeEventFileRequest,
 } from '@shared/contracts/events'
 import {
   EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES,
@@ -45,6 +47,8 @@ import {
   EVENT_ANNOUNCEMENT_MAX_ATTACHMENTS,
   EVENT_GUEST_INVITATION_CHANNELS,
   RSVP_STATUSES,
+  EVENT_FILE_MEDIA_TYPES,
+  EVENT_FILE_MAX_BYTES,
 } from '@shared/contracts/events'
 import type {
   ConfigureFundAdminRequest,
@@ -603,6 +607,35 @@ export function validateCreateEventAnnouncementUploadSessionRequest(input: unkno
     errors.push(issue('size_bytes', 'invalid_attachment_size', `Attachments must be no larger than ${EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB.`))
   }
   return finish<CreateEventAnnouncementUploadSessionRequest>(value, errors)
+}
+
+export function validateCreateEventFileUploadSessionRequest(input: unknown): ValidationResult<CreateEventFileUploadSessionRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['file_name', 'content_type', 'size_bytes'], errors)
+  requireString(value, 'file_name', errors, 1, 255)
+  if (typeof value.file_name === 'string' && /[\x00-\x1f\x7f/\\]/.test(value.file_name)) {
+    errors.push(issue('file_name', 'invalid_file_name', 'Use a filename without path separators or control characters.'))
+  }
+  if (!EVENT_FILE_MEDIA_TYPES.includes(value.content_type as typeof EVENT_FILE_MEDIA_TYPES[number])) {
+    errors.push(issue('content_type', 'invalid_file_type', 'Use a PDF, JPG, PNG, or WEBP file.'))
+  }
+  if (typeof value.size_bytes !== 'number' || !Number.isSafeInteger(value.size_bytes) || value.size_bytes < 1 || value.size_bytes > EVENT_FILE_MAX_BYTES) {
+    errors.push(issue('size_bytes', 'invalid_file_size', 'Files must be between 1 byte and 10 MB.'))
+  }
+  return finish<CreateEventFileUploadSessionRequest>({ ...value, file_name: typeof value.file_name === 'string' ? value.file_name.trim() : value.file_name }, errors)
+}
+
+export function validateFinalizeEventFileRequest(input: unknown): ValidationResult<FinalizeEventFileRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['upload_id'], errors)
+  if (typeof value.upload_id !== 'string' || !UUID_PATTERN.test(value.upload_id)) {
+    errors.push(issue('upload_id', 'invalid_uuid', 'Upload ID must be a valid UUID.'))
+  }
+  return finish<FinalizeEventFileRequest>(value, errors)
 }
 
 export function validateEventAnnouncementAttachmentAccessRequest(input: unknown): ValidationResult<EventAnnouncementAttachmentAccessRequest> {

@@ -1159,6 +1159,55 @@ tbody tr:hover { background: #fcfbfd; }
 .member-announcement-viewer-filmstrip button:hover, .member-announcement-viewer-filmstrip button:focus-visible { border-color: rgba(255, 255, 255, .58); outline: 0; }
 .member-announcement-viewer-filmstrip button.selected { border-color: #8e6bff; box-shadow: 0 0 0 2px rgba(142, 107, 255, .24); }
 .member-announcement-viewer-filmstrip button small { position: absolute; right: 3px; bottom: 2px; display: grid; place-items: center; min-width: 13px; height: 13px; padding: 0 3px; color: white; background: rgba(12, 13, 18, .72); border-radius: 999px; font-size: 7px; }
+.member-announcement-viewer-filmstrip button img { width: 100%; height: 100%; object-fit: cover; }
+.member-announcement-viewer-nav:disabled, .member-announcement-viewer-filmstrip button:disabled { cursor: wait; opacity: .5; }
+.member-event-files > header { flex-wrap: wrap; gap: 12px; }
+.member-event-files > .member-card-body { display: grid; gap: 18px; }
+.member-event-files h3 { margin: 0 0 12px; color: var(--ink); font-size: 14px; }
+.member-event-files-intro strong { color: var(--ink); font-size: 13px; }
+.member-event-files-intro p, .member-event-files-hint { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.member-event-files-notice { display: flex; align-items: flex-start; gap: 9px; margin: 0; padding: 13px; color: var(--ink-soft); background: var(--soft); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; line-height: 1.6; }
+.member-event-files-notice svg { flex-shrink: 0; margin-top: 2px; }
+.member-event-files-empty { display: grid; justify-items: center; gap: 12px; padding: 42px 18px; text-align: center; }
+.member-event-files-empty > svg { box-sizing: content-box; padding: 18px; color: var(--purple); background: var(--purple-pale); border-radius: 20px; }
+.member-event-files-empty h3 { margin: 0; font-size: 17px; }
+.member-event-files-empty p { max-width: 390px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.member-event-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.member-event-file-image { min-width: 0; overflow: hidden; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; }
+.member-event-file-thumbnail { display: grid; place-items: center; aspect-ratio: 4 / 3; overflow: hidden; background: var(--line); }
+.member-event-file-thumbnail > button { width: 100%; height: 100%; padding: 0; background: none; border: 0; cursor: pointer; }
+.member-event-file-thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.member-event-file-thumbnail-failed { display: grid; justify-items: center; gap: 8px; padding: 12px; color: var(--ink-soft); font-size: 12px; }
+.member-event-file-thumbnail-failed button, .member-event-file-recovery button, .member-event-files-status button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 10px; color: var(--purple-dark); background: var(--purple-pale); border: 1px solid var(--purple-line); border-radius: 7px; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.member-event-file-thumbnail button:focus-visible { outline: 3px solid var(--purple); outline-offset: -3px; }
+.member-event-files .member-announcement-file-details { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; font-size: 12px; }
+.member-event-file-image .member-announcement-file-details span { width: 100%; }
+.member-event-files .member-announcement-file-details small { font-size: 11px; }
+.member-event-files .member-announcement-file-actions { min-height: 40px; border-left: 0; }
+.member-event-files .member-announcement-file-actions button { width: 42px; min-height: 40px; }
+.member-event-files .member-announcement-file-actions .danger { color: #c93a48; }
+.member-event-files .member-announcement-file-actions > span { display: grid; place-items: center; padding: 0 8px; color: var(--purple); }
+.member-event-file-documents .member-announcement-files > div { display: grid; gap: 10px; }
+.member-event-file-documents .member-announcement-file { display: flex; justify-content: space-between; flex-wrap: wrap; border-radius: 10px; }
+.member-event-file-documents .member-announcement-file-details { flex: 1; min-width: 180px; }
+.member-event-file-documents .member-announcement-file-details span { flex: 1; }
+.member-event-file-operations { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.member-event-file-operations li { padding: 14px; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; font-size: 13px; }
+.member-event-file-operations p { margin: 8px 0; font-size: 12px; line-height: 1.6; }
+.member-event-file-operations progress { width: min(400px, 100%); height: 6px; accent-color: var(--purple); }
+.member-event-file-recovery { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.member-event-file-recovery button:disabled { opacity: .5; cursor: wait; }
+.member-event-files-status { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 13px; }
+.member-event-file-viewer-error { position: absolute; top: 4px; left: 12px; right: 12px; z-index: 2; padding: 10px; color: #fff; background: #8a2336; border-radius: 6px; text-align: center; font-size: 13px; }
+.member-event-file-preview-failed { display: grid; justify-items: center; gap: 12px; max-width: 420px; text-align: center; font-size: 14px; }
+.member-event-file-preview-failed button { padding: 10px 16px; color: #171717; background: #fff; border: 0; border-radius: 8px; cursor: pointer; }
+@media (max-width: 480px) {
+  .member-event-file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .member-event-files .member-announcement-file-details { padding: 10px 8px; }
+  .member-event-files .member-announcement-file-actions button { width: 40px; }
+  .member-event-file-thumbnail-failed { font-size: 10px; padding: 8px; gap: 4px; }
+  .member-event-files-status { flex-wrap: wrap; }
+}
 @media (max-width: 560px) {
   .member-announcements article { grid-template-columns: 54px minmax(0, 1fr); gap: 13px; }
   .member-announcement-date { padding-right: 11px; }

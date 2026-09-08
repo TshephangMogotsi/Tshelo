@@ -35,6 +35,7 @@ import type {
 } from '@shared/contracts/events'
 import { getApiEvent } from './api-queries'
 import { getApiFundWorkspace } from './api-funds'
+import { listApiEventFiles } from './api-event-files'
 import {
   createPage,
   createQueryScope,
@@ -196,7 +197,7 @@ export async function getApiEventWorkspace(
   if (eventResult.error || !eventResult.data) return eventResult as ApiDataResult<EventWorkspace | null>
   const event = eventResult.data.event
 
-  const [budgetResult, announcementResult, organiserResult, permissionResult] = await Promise.all([
+  const [budgetResult, announcementResult, organiserResult, permissionResult, filesResult] = await Promise.all([
     client
       .from('event_budgets')
       .select('event_id, total_budget, currency_code')
@@ -217,8 +218,10 @@ export async function getApiEventWorkspace(
     event.linked_fund_id
       ? client.rpc('get_my_fund_permissions', { p_fund_id: event.linked_fund_id })
       : Promise.resolve({ data: [], error: null }),
+    listApiEventFiles(client, eventId),
   ])
 
+  if (filesResult.error) return dataFailure(filesResult.error)
   for (const result of [budgetResult, announcementResult, organiserResult, permissionResult]) {
     if (result.error) return dataFailure({ kind: 'database', error: result.error })
   }
@@ -246,6 +249,7 @@ export async function getApiEventWorkspace(
 
   return dataSuccess({
     event,
+    files: filesResult.data,
     guests: eventResult.data.guests,
     budget: budgetResult.data ? {
       event_id: budgetResult.data.event_id as string,

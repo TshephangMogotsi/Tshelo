@@ -22,7 +22,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            admin/package-lock.json
       - run: npm ci
+      - name: Install website dependencies for cross-platform API and Files tests
+        run: npm ci --prefix admin
       - run: npm run verify
       - name: Enforce Android export size budgets
         env:

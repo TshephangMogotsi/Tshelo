@@ -26,7 +26,7 @@ const PERMISSION_LABELS: Record<FundPermission, string> = {
   record_contributions: 'Record contributions', edit_contributions: 'Correct contributions',
   record_expenses: 'Record expenses', edit_expenses: 'Correct expenses', manage_members: 'Manage members',
   manage_sponsorships: 'Manage sponsorships', award_recognition: 'Award recognition', export_reports: 'Export reports',
-  manage_event_guests: 'Manage linked-event guests', post_event_announcements: 'Post event announcements',
+  manage_event_guests: 'Manage linked-event guests', post_event_announcements: 'Manage event updates and files',
   manage_event_budget: 'Manage event budget',
 }
 

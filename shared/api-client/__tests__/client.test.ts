@@ -35,6 +35,25 @@ function failure(status: number, code: string, requestId = 'request-123') {
 }
 
 describe('shared Tshelo API client', () => {
+  it('serializes the event file upload, finalise, access, and removal operations', async () => {
+    const fetchMock = jest.fn(async () => success({}))
+    const client = createTsheloApiClient({ baseUrl: 'https://api.example', getAccessToken: async () => 'token', fetch: fetchMock as typeof fetch })
+    const eventId = '11111111-1111-4111-8111-111111111111'
+    const fileId = '22222222-2222-4222-8222-222222222222'
+    const metadata = { file_name: 'Plan.pdf', content_type: 'application/pdf' as const, size_bytes: 100 }
+    await client.events.createFileUploadSession(eventId, metadata)
+    await client.events.finalizeFile(eventId, { upload_id: fileId })
+    await client.events.createFileAccess(eventId, fileId)
+    await client.events.removeFile(eventId, fileId)
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>
+    expect(calls.map(([url, options]) => [url, options.method, options.body ? JSON.parse(options.body as string) : undefined])).toEqual([
+      [`https://api.example/api/v1/events/${eventId}/files/upload-session`, 'POST', metadata],
+      [`https://api.example/api/v1/events/${eventId}/files/finalize`, 'POST', { upload_id: fileId }],
+      [`https://api.example/api/v1/events/${eventId}/files/${fileId}/access`, 'POST', undefined],
+      [`https://api.example/api/v1/events/${eventId}/files/${fileId}`, 'DELETE', undefined],
+    ])
+  })
+
   it('serializes typed filters and sends the current Supabase access token', async () => {
     let seenUrl = ''
     let seenOptions: RequestInit | undefined

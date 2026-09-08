@@ -7,5 +7,5 @@
       "@shared/*": ["shared/*"]
     }
   },
-  "exclude": ["supabase/functions", "admin"]
+  "exclude": ["supabase/functions", "admin", "security/api"]
 }

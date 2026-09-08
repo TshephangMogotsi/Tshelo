@@ -10,8 +10,11 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "test:api-verifier": "node --test scripts/__tests__/verify-api.test.mjs",
+    "test:api-services": "tsc --noEmit -p security/tsconfig.api.json && jest --config security/jest.api.config.cjs --runInBand",
+    "test:web": "jest --config security/jest.web.config.cjs --runInBand",
+    "test:event-files-db": "node scripts/test-event-files-db.mjs",
     "verify:api": "node scripts/verify-api.mjs",
-    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-verifier",
+    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "postinstall": "patch-package"
@@ -62,6 +65,7 @@
     "world-countries": "^5.1.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@types/jest": "^29.5.14",
     "@types/node": "^25.6.0",
     "@types/react": "~19.1.0",

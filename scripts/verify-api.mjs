@@ -59,6 +59,10 @@ const unauthenticatedCases = [
   ['get event budget', 'GET', `/api/v1/events/${TEST_UUID}/budget`],
   ['update event budget', 'PUT', `/api/v1/events/${TEST_UUID}/budget`],
   ['create event announcement', 'POST', `/api/v1/events/${TEST_UUID}/announcements`],
+  ['create event file upload session', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`],
+  ['finalize event file', 'POST', `/api/v1/events/${TEST_UUID}/files/finalize`],
+  ['access event file', 'POST', `/api/v1/events/${TEST_UUID}/files/${TEST_UUID}/access`],
+  ['remove event file', 'DELETE', `/api/v1/events/${TEST_UUID}/files/${TEST_UUID}`],
   ['invite event organiser', 'POST', `/api/v1/events/${TEST_UUID}/organiser-invites`],
   ['preview event invite', 'GET', '/api/v1/events/invite-preview?code=EVT-TESTCODE'],
   ['join event', 'POST', '/api/v1/events/join'],
@@ -106,6 +110,10 @@ const unauthenticatedCases = [
   body: method === 'GET' || method === 'DELETE' ? undefined : {},
 }))
 
+const invalidEventFileTokenCases = unauthenticatedCases
+  .filter(testCase => testCase.path.includes('/files/'))
+  .map(testCase => ({ ...testCase, name: testCase.name.replace('unauthenticated', 'invalid-token'), tokenKind: 'invalid' }))
+
 const authenticatedReadCases = [
   ['list funds', '/api/v1/funds?limit=1'],
   ['list events', '/api/v1/events?limit=1'],
@@ -135,6 +143,14 @@ const authenticatedValidationCases = [
   ['reject empty invite response', 'POST', '/api/v1/events/organiser-invites/respond', {}],
   ['reject short event invite code', 'GET', '/api/v1/events/invite-preview?code=x'],
   ['reject empty event join', 'POST', '/api/v1/events/join', {}],
+  ['reject invalid event file upload', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'bad.svg', content_type: 'image/svg+xml', size_bytes: 10 }],
+  ['reject invalid event file finalization', 'POST', `/api/v1/events/${TEST_UUID}/files/finalize`, { upload_id: 'invalid' }],
+  ['reject oversized event file', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'big.pdf', content_type: 'application/pdf', size_bytes: 10485761 }],
+  ['reject empty event file', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'empty.pdf', content_type: 'application/pdf', size_bytes: 0 }],
+  ['reject forged file uploader', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'file.pdf', content_type: 'application/pdf', size_bytes: 1, uploaded_by: TEST_UUID }],
+  ['reject caller-selected file path', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'file.pdf', content_type: 'application/pdf', size_bytes: 1, object_path: 'another/event/file.pdf' }],
+  ['reject cross-event finalization path', 'POST', `/api/v1/events/${TEST_UUID}/files/finalize`, { upload_id: TEST_UUID, object_path: 'another/event/file.pdf' }],
+  ['reject forged finalized content type', 'POST', `/api/v1/events/${TEST_UUID}/files/finalize`, { upload_id: TEST_UUID, content_type: 'application/pdf' }],
   ['reject empty guest invite batch', 'POST', `/api/v1/events/${TEST_UUID}/guests`, {}],
   ['reject pending as an RSVP response', 'PUT', `/api/v1/events/${TEST_UUID}/rsvp`, { status: 'pending' }],
   ['reject invalid event guest query', 'GET', `/api/v1/events/${TEST_UUID}/guests?status=unknown`],
@@ -281,7 +297,7 @@ function detailCases(environment) {
 }
 
 export function buildVerificationCases(environment = process.env) {
-  const cases = [...unauthenticatedCases]
+  const cases = [...unauthenticatedCases, ...invalidEventFileTokenCases]
   if (environment.API_ACCESS_TOKEN) {
     cases.push(...authenticatedReadCases, ...authenticatedValidationCases, ...detailCases(environment))
   }
@@ -298,7 +314,9 @@ export async function runApiVerification({
   const cases = buildVerificationCases(environment)
 
   for (const testCase of cases) {
-    const token = testCase.tokenKind === 'admin'
+    const token = testCase.tokenKind === 'invalid'
+      ? 'not-a-jwt'
+      : testCase.tokenKind === 'admin'
       ? environment.API_ADMIN_ACCESS_TOKEN
       : testCase.tokenKind === 'user'
         ? environment.API_ACCESS_TOKEN

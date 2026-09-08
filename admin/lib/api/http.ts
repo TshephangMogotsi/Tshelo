@@ -169,7 +169,7 @@ export function dataServiceErrorResponse(error: ApiDataError, requestId: string)
       businessFailure.code,
       businessFailure.message,
       requestId,
-      { retryable: false },
+      { retryable: businessFailure.retryable ?? false, details: businessFailure.details },
     )
   }
 

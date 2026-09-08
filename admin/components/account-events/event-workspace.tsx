@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BellRing, ChevronLeft, ChevronRight, CircleCheck, Clipboard, Download, Eye, FileText, HandCoins, Image as ImageIcon, MapPin, Paperclip, Pencil, Plus, RefreshCw, Settings, WalletCards, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { BellRing, CircleCheck, Clipboard, FileText, HandCoins, Image as ImageIcon, MapPin, Paperclip, Pencil, Plus, RefreshCw, Settings, WalletCards, X } from 'lucide-react'
 import {
   EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES,
   EVENT_ANNOUNCEMENT_MAX_ATTACHMENT_BYTES,
@@ -18,20 +18,20 @@ import { normalizeEventTime } from '@/lib/event-form'
 import { formatDate, formatMoney, titleCase } from '@/lib/format'
 import { invalidateHomeSummary } from '@/lib/home-summary-cache'
 import { EventGuests } from './event-guests'
+import { EventAttachments } from './event-attachments'
+import { EventFilesPanel } from './event-files-panel'
+import { useEventFiles } from './use-event-files'
 
-type EventWorkspaceTab = 'overview' | 'guests' | 'announcements' | 'budget' | 'settings'
+type EventWorkspaceTab = 'overview' | 'guests' | 'announcements' | 'files' | 'budget' | 'settings'
 
 const eventWorkspaceTabs: Array<{ id: EventWorkspaceTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'guests', label: 'Guests' },
   { id: 'announcements', label: 'Updates' },
+  { id: 'files', label: 'Files' },
   { id: 'budget', label: 'Budget' },
   { id: 'settings', label: 'Settings' },
 ]
-
-const MIN_ATTACHMENT_ZOOM = 1
-const MAX_ATTACHMENT_ZOOM = 3
-const ATTACHMENT_ZOOM_STEP = .25
 
 function formatFileSize(sizeBytes: number) {
   return sizeBytes >= 1024 * 1024
@@ -181,102 +181,6 @@ function AnnouncementComposer({ workspace, announcement, reload, onClose }: { wo
   </div>
 }
 
-function AnnouncementFiles({ eventId, attachments }: { eventId: string; attachments: EventAnnouncementAttachment[] }) {
-  const [error, setError] = useState('')
-  const [preview, setPreview] = useState<{ attachment: EventAnnouncementAttachment; url: string } | null>(null)
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
-  const [loadingPath, setLoadingPath] = useState<string | null>(null)
-  const [zoom, setZoom] = useState(MIN_ATTACHMENT_ZOOM)
-
-  async function signedUrlFor(attachment: EventAnnouncementAttachment) {
-    const access = await createApiClient().events.createAnnouncementAttachmentAccess(eventId, { object_path: attachment.object_path })
-    return access.download_url
-  }
-
-  async function previewAttachment(attachment: EventAnnouncementAttachment) {
-    setError(''); setLoadingPath(attachment.object_path)
-    try {
-      const signedUrls = Object.fromEntries(await Promise.all(attachments.map(async item => [item.object_path, await signedUrlFor(item)] as const)))
-      setPreviewUrls(signedUrls)
-      setPreview({ attachment, url: signedUrls[attachment.object_path] })
-      setZoom(MIN_ATTACHMENT_ZOOM)
-    }
-    catch (cause) { setError(apiErrorMessage(cause)) }
-    finally { setLoadingPath(null) }
-  }
-
-  function closePreview() {
-    setPreview(null)
-    setPreviewUrls({})
-    setZoom(MIN_ATTACHMENT_ZOOM)
-  }
-
-  function selectPreview(attachment: EventAnnouncementAttachment) {
-    const url = previewUrls[attachment.object_path]
-    if (url) { setPreview({ attachment, url }); setZoom(MIN_ATTACHMENT_ZOOM) }
-  }
-
-  function stepPreview(direction: -1 | 1) {
-    if (!preview || attachments.length < 2) return
-    const currentIndex = attachments.findIndex(item => item.object_path === preview.attachment.object_path)
-    selectPreview(attachments[(currentIndex + direction + attachments.length) % attachments.length])
-  }
-
-  async function downloadAttachment(attachment: EventAnnouncementAttachment) {
-    setError(''); setLoadingPath(attachment.object_path)
-    try {
-      const response = await fetch(await signedUrlFor(attachment))
-      if (!response.ok) throw new Error('This attachment could not be downloaded.')
-      const objectUrl = URL.createObjectURL(await response.blob())
-      const link = document.createElement('a')
-      link.href = objectUrl
-      link.download = attachment.file_name
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
-    } catch (cause) { setError(apiErrorMessage(cause)) }
-    finally { setLoadingPath(null) }
-  }
-
-  if (!attachments.length) return null
-  const previewIndex = preview ? attachments.findIndex(item => item.object_path === preview.attachment.object_path) : -1
-  const previewIsImage = preview?.attachment.content_type !== 'application/pdf'
-
-  return <div className="member-announcement-files">
-    <div>{attachments.map(attachment => <div className="member-announcement-file" key={attachment.object_path}>
-      <div className="member-announcement-file-details">{attachment.content_type === 'application/pdf' ? <FileText size={14} /> : <ImageIcon size={14} />}<span>{attachment.file_name}</span><small>{formatFileSize(attachment.size_bytes)}</small></div>
-      <div className="member-announcement-file-actions">
-        <button type="button" onClick={() => previewAttachment(attachment)} disabled={loadingPath === attachment.object_path} aria-label={`Preview ${attachment.file_name}`} title="Preview"><Eye size={14} /></button>
-        <button type="button" onClick={() => downloadAttachment(attachment)} disabled={loadingPath === attachment.object_path} aria-label={`Download ${attachment.file_name}`} title="Download"><Download size={14} /></button>
-      </div>
-    </div>)}</div>
-    {error && <p className="member-form-error" role="alert">{error}</p>}
-    {preview && <div className="tshelo-dashboard modal-root">
-      <div className="overlay on member-announcement-viewer-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closePreview() }}>
-        <section className="member-announcement-viewer" role="dialog" aria-modal="true" aria-labelledby="announcement-preview-title">
-          <header className="member-announcement-viewer-header">
-            <div><strong id="announcement-preview-title">{preview.attachment.file_name}</strong>{attachments.length > 1 && <span>{previewIsImage ? 'Image' : 'File'} {previewIndex + 1} of {attachments.length}</span>}</div>
-            <div className="member-announcement-viewer-actions">{previewIsImage && <><button type="button" onClick={() => setZoom(current => Math.max(MIN_ATTACHMENT_ZOOM, current - ATTACHMENT_ZOOM_STEP))} disabled={zoom <= MIN_ATTACHMENT_ZOOM} aria-label="Zoom out" title="Zoom out"><ZoomOut size={18} /></button><button type="button" onClick={() => setZoom(current => Math.min(MAX_ATTACHMENT_ZOOM, current + ATTACHMENT_ZOOM_STEP))} disabled={zoom >= MAX_ATTACHMENT_ZOOM} aria-label="Zoom in" title="Zoom in"><ZoomIn size={18} /></button></>}<button type="button" onClick={() => downloadAttachment(preview.attachment)} disabled={loadingPath === preview.attachment.object_path} aria-label={`Download ${preview.attachment.file_name}`} title="Download"><Download size={18} /></button><button type="button" onClick={closePreview} aria-label="Close attachment preview" title="Close"><X size={20} /></button></div>
-          </header>
-          <div className="member-announcement-viewer-stage">
-            {attachments.length > 1 && <button className="member-announcement-viewer-nav previous" type="button" onClick={() => stepPreview(-1)} aria-label="Previous attachment"><ChevronLeft size={22} /></button>}
-            {preview.attachment.content_type === 'application/pdf'
-              ? <iframe src={preview.url} title={`Preview of ${preview.attachment.file_name}`} />
-              : <>
-                {/* A short-lived private storage URL cannot use Next's image optimizer. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview.url} alt={`Preview of ${preview.attachment.file_name}`} style={{ transform: `scale(${zoom})` }} />
-              </>}
-            {attachments.length > 1 && <button className="member-announcement-viewer-nav next" type="button" onClick={() => stepPreview(1)} aria-label="Next attachment"><ChevronRight size={22} /></button>}
-          </div>
-          {attachments.length > 1 && <footer className="member-announcement-viewer-filmstrip">{attachments.map((attachment, index) => <button key={attachment.object_path} type="button" className={attachment.object_path === preview.attachment.object_path ? 'selected' : ''} onClick={() => selectPreview(attachment)} aria-label={`View ${attachment.file_name}`} aria-current={attachment.object_path === preview.attachment.object_path ? 'true' : undefined}>{attachment.content_type === 'application/pdf' ? <FileText size={20} /> : <span style={{ backgroundImage: `url("${previewUrls[attachment.object_path]}")` }} />}<small>{index + 1}</small></button>)}</footer>}
-        </section>
-      </div>
-    </div>}
-  </div>
-}
-
 function Announcements({ workspace, reload }: { workspace: EventWorkspace; reload: () => void }) {
   const canPost = workspace.event.status === 'active' && (workspace.capabilities.is_creator || workspace.capabilities.is_organiser || workspace.capabilities.linked_fund_permissions.includes('post_event_announcements'))
   const [composerOpen, setComposerOpen] = useState(false)
@@ -295,7 +199,7 @@ function Announcements({ workspace, reload }: { workspace: EventWorkspace; reloa
             const date = announcementTimelineDate(item.created_at)
             return <article key={item.id}>
               <time className="member-announcement-date" dateTime={item.created_at}><span>{date.label}</span><b>{date.detail}</b></time>
-              <div className="member-announcement-content"><div className="member-announcement-heading"><strong>{item.title}</strong>{canPost && <button type="button" onClick={() => { setComposerOpen(false); setEditingAnnouncement(item) }} aria-label={`Edit ${item.title}`} title="Edit announcement"><Pencil size={13} /></button>}</div><p title={item.body}>{item.body}</p><AnnouncementFiles eventId={workspace.event.id} attachments={item.attachments} /></div>
+              <div className="member-announcement-content"><div className="member-announcement-heading"><strong>{item.title}</strong>{canPost && <button type="button" onClick={() => { setComposerOpen(false); setEditingAnnouncement(item) }} aria-label={`Edit ${item.title}`} title="Edit announcement"><Pencil size={13} /></button>}</div><p title={item.body}>{item.body}</p><EventAttachments eventId={workspace.event.id} attachments={item.attachments} /></div>
             </article>
           })}</div>
           : <div className="member-announcement-empty"><strong>No announcements yet</strong><p>Updates for guests will appear here.</p>{canPost && <button className="member-announcement-create" type="button" onClick={openComposer}><Plus size={15} /> Create announcement</button>}</div>}
@@ -349,8 +253,18 @@ export function EventWorkspaceView({ eventId }: { eventId: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams(); const [workspace, setWorkspace] = useState<EventWorkspace | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [version, setVersion] = useState(0)
+  const canManageFiles = workspace?.event.status === 'active' && (workspace.capabilities.is_creator || workspace.capabilities.is_organiser || workspace.capabilities.linked_fund_permissions.includes('post_event_announcements'))
+  const eventFiles = useEventFiles(eventId, canManageFiles)
+  const { replaceFiles } = eventFiles
   const reload = useCallback(() => { invalidateHomeSummary(); setError(''); setVersion(value => value + 1) }, [])
-  useEffect(() => { const controller = new AbortController(); runApiRead(call => createApiClient().events.workspace(eventId, call), controller.signal).then(setWorkspace).catch(cause => { const message = apiErrorMessage(cause); if (message) setError(message) }).finally(() => { if (!controller.signal.aborted) setLoading(false) }); return () => controller.abort() }, [eventId, version])
+  useEffect(() => {
+    const controller = new AbortController()
+    void runApiRead(call => createApiClient().events.workspace(eventId, call), controller.signal)
+      .then(next => { if (!controller.signal.aborted) { setWorkspace(next); replaceFiles(next.files) } })
+      .catch(cause => { const message = apiErrorMessage(cause); if (message && !controller.signal.aborted) setError(message) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [eventId, version, replaceFiles])
   const notice = useMemo(() => searchParams.get('created') === '1' ? 'Event created. Share its invitation code when you are ready.' : searchParams.get('joined') === '1' ? 'You joined this event successfully.' : '', [searchParams])
   const requestedTab = searchParams.get('tab')
   const activeTab: EventWorkspaceTab = eventWorkspaceTabs.some(tab => tab.id === requestedTab) ? requestedTab as EventWorkspaceTab : 'overview'
@@ -397,6 +311,7 @@ export function EventWorkspaceView({ eventId }: { eventId: string }) {
         >{tab.id === 'guests' && !canManageGuests ? 'RSVP' : tab.label}</button>)}
       </nav>
 
+      {activeTab !== 'files' && (eventFiles.busy || eventFiles.uploads.length > 0 || eventFiles.removals.length > 0) && <p className="member-event-files-status" role="status">{eventFiles.busy ? 'File operation in progress.' : 'Some files need your attention.'} <button type="button" onClick={() => selectTab('files')}>View files</button></p>}
       <div id="event-workspace-panel" role="tabpanel" aria-labelledby={`event-workspace-tab-${activeTab}`}>
         {activeTab === 'overview' && <>
           <Summary workspace={workspace} />
@@ -404,6 +319,7 @@ export function EventWorkspaceView({ eventId }: { eventId: string }) {
         </>}
         {activeTab === 'guests' && <EventGuests workspace={workspace} reloadWorkspace={reload} />}
         {activeTab === 'announcements' && <Announcements workspace={workspace} reload={reload} />}
+        {activeTab === 'files' && <EventFilesPanel eventId={eventId} manager={eventFiles} canManage={canManageFiles} inactive={workspace.event.status !== 'active'} />}
         {activeTab === 'budget' && <EventBudgetPanel workspace={workspace} reload={reload} />}
         {activeTab === 'settings' && <EventSettings workspace={workspace} reload={reload} />}
       </div>

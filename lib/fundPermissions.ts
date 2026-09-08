@@ -43,7 +43,7 @@ export const FUND_PERMISSION_DEFINITIONS: readonly FundPermissionDefinition[] = 
   { key: 'award_recognition', category: 'operations', label: 'Award recognition', description: 'Award Rich Auntie recognition to eligible members.' },
   { key: 'export_reports', category: 'operations', label: 'Export reports', description: 'Generate detailed PDF and CSV fund reports.' },
   { key: 'manage_event_guests', category: 'event', label: 'Manage event guests', description: 'Invite and manage guests for the linked event.' },
-  { key: 'post_event_announcements', category: 'event', label: 'Post announcements', description: 'Publish announcements for the linked event.' },
+  { key: 'post_event_announcements', category: 'event', label: 'Manage event updates and files', description: 'Publish event updates and manage shared files for the linked event.' },
   { key: 'manage_event_budget', category: 'event', label: 'Manage event budget', description: 'Edit the budget for the linked event.' },
 ]
 
@@ -83,7 +83,7 @@ export const FUND_PERMISSION_PRESETS: readonly FundPermissionPreset[] = [
   {
     id: 'event_coordinator',
     label: 'Event coordinator',
-    description: 'Can manage linked-event guests, announcements, and budget.',
+    description: 'Can manage linked-event guests, updates, files, and budget.',
     permissions: ['manage_event_guests', 'post_event_announcements', 'manage_event_budget'],
   },
   {

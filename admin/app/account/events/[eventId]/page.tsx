@@ -6,5 +6,5 @@ export const metadata: Metadata = { title: 'Event workspace', description: 'Mana
 
 export default async function EventWorkspacePage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params
-  return <Suspense fallback={<section className="member-card"><div className="member-empty">Loading event workspace…</div></section>}><EventWorkspaceView eventId={eventId} /></Suspense>
+  return <Suspense fallback={<section className="member-card"><div className="member-empty">Loading event workspace…</div></section>}><EventWorkspaceView key={eventId} eventId={eventId} /></Suspense>
 }
