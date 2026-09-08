@@ -14,8 +14,9 @@
     "test:web": "jest --config security/jest.web.config.cjs --runInBand",
     "test:event-files-db": "node scripts/test-event-files-db.mjs",
     "test:metro-security": "node --test scripts/__tests__/metro-security.test.mjs",
+    "test:db-bootstrap": "node --test scripts/__tests__/database-bootstrap.test.mjs",
     "verify:api": "node scripts/verify-api.mjs",
-    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security",
+    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security && npm run test:db-bootstrap",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "postinstall": "patch-package"

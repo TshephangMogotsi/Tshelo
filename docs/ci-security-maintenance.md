@@ -12,6 +12,20 @@ The root `Verify` workflow failed in two independent jobs:
   The root causes were Browserslist, fast-uri, PostCSS, and image-size, with the
   latter two inherited by Expo/Metro packages. The audit gate remains mandatory.
 
+Once setup was repaired, the database job exposed a third failure: the historical
+`20260818132000_add_support_platform_admin.sql` one-off data grant required a
+specific production user on an empty database. Its replay now returns without
+granting access only when `public.users` is completely empty. Populated databases
+still enforce the original missing/deleted/banned-user and active-super-admin
+checks, and successful grants still write the attributed audit record.
+
+This is a narrow replay correction to an already-applied data migration, not a
+new production schema change. A later migration cannot fix an earlier replay
+failure. Do not reapply it or repair/reset the hosted migration history: the
+existing production grant is unchanged. `npm run test:db-bootstrap` exercises the
+real grant and platform-admin schema in disposable PostgreSQL, including both
+the empty-database case and all existing validation paths.
+
 ## Compatible security updates
 
 Expo remains on SDK 54 and React Native on 0.81.5. No SDK-major migration or

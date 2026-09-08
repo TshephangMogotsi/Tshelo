@@ -9,6 +9,14 @@ DECLARE
   prior_admin public.platform_admins%ROWTYPE;
   had_prior_admin boolean := false;
 BEGIN
+  -- This one-off data grant applies to an existing installation. Fresh schema
+  -- replays have no users and must not manufacture a privileged account.
+  -- Keep the strict checks below for every populated installation.
+  IF NOT EXISTS (SELECT 1 FROM public.users) THEN
+    RAISE NOTICE 'Skipping existing-user support grant on an empty database';
+    RETURN;
+  END IF;
+
   SELECT profile.*
   INTO target_user
   FROM public.users AS profile
