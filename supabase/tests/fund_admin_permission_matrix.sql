@@ -231,6 +231,7 @@ $$;
 DO $$
 DECLARE
   ids permission_test_ids%ROWTYPE;
+  rejected boolean := false;
 BEGIN
   SELECT * INTO ids FROM permission_test_ids;
   DELETE FROM public.fund_admin_permissions
@@ -254,8 +255,21 @@ BEGIN
     'unknown permission must fail closed'
   );
 
+  -- Keeping a privileged role while changing its membership status is an
+  -- owner-only operation. First verify that protection, then prepare the
+  -- inactive-membership fixture as the owner and check access as the admin.
+  BEGIN
+    UPDATE public.fund_members SET status = 'left'
+    WHERE id = ids.admin_membership_id;
+  EXCEPTION WHEN OTHERS THEN
+    rejected := SQLERRM = 'Only the fund owner can manage privileged members';
+  END;
+  PERFORM pg_temp.assert_true(rejected, 'admin must not manage a privileged membership');
+
+  PERFORM pg_temp.set_test_user(ids.owner_id);
   UPDATE public.fund_members SET status = 'left'
   WHERE id = ids.admin_membership_id;
+  PERFORM pg_temp.set_test_user(ids.admin_id);
   PERFORM pg_temp.assert_true(
     NOT public.has_fund_permission(ids.fund_id, 'manage_event_guests'),
     'inactive admin membership must revoke effective access'

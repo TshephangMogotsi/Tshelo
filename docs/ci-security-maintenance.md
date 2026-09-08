@@ -26,6 +26,13 @@ existing production grant is unchanged. `npm run test:db-bootstrap` exercises th
 real grant and platform-admin schema in disposable PostgreSQL, including both
 the empty-database case and all existing validation paths.
 
+After migrations could run, the granular permission matrix exposed a fixture
+error: it changed an admin membership's status while retaining its privileged
+role and acting as that admin. The existing trigger correctly requires the
+fund owner. The test now asserts that rejection, prepares the inactive fixture
+as the owner, and switches back to the admin to verify access was revoked.
+No production permission rule was relaxed.
+
 ## Compatible security updates
 
 Expo remains on SDK 54 and React Native on 0.81.5. No SDK-major migration or
