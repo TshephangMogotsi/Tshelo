@@ -13,8 +13,9 @@
     "test:api-services": "tsc --noEmit -p security/tsconfig.api.json && jest --config security/jest.api.config.cjs --runInBand",
     "test:web": "jest --config security/jest.web.config.cjs --runInBand",
     "test:event-files-db": "node scripts/test-event-files-db.mjs",
+    "test:metro-security": "node --test scripts/__tests__/metro-security.test.mjs",
     "verify:api": "node scripts/verify-api.mjs",
-    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db",
+    "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "postinstall": "patch-package"
@@ -73,6 +74,25 @@
     "jest-expo": "~54.0.0",
     "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "@expo/metro-config": {
+      "postcss": "8.5.28"
+    },
+    "metro": "0.83.8",
+    "metro-babel-transformer": "0.83.8",
+    "metro-cache": "0.83.8",
+    "metro-cache-key": "0.83.8",
+    "metro-config": "0.83.8",
+    "metro-core": "0.83.8",
+    "metro-file-map": "0.83.8",
+    "metro-minify-terser": "0.83.8",
+    "metro-resolver": "0.83.8",
+    "metro-runtime": "0.83.8",
+    "metro-source-map": "0.83.8",
+    "metro-symbolicate": "0.83.8",
+    "metro-transform-plugins": "0.83.8",
+    "metro-transform-worker": "0.83.8"
   },
   "private": true
 }

@@ -46,8 +46,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.113.0
-      - name: Initialize disposable Supabase configuration
-        run: supabase init
+      - name: Verify checked-in Supabase configuration
+        run: test -f supabase/config.toml
       - name: Start migrated disposable database
         run: supabase start
       - name: Run granular admin permission matrix
