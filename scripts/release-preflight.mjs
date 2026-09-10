@@ -63,6 +63,28 @@ const appConfig = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'
 if (!appConfig.ios?.bundleIdentifier) failures.push('The iOS bundle identifier is missing')
 if (!appConfig.android?.package) failures.push('The Android application ID is missing')
 
+const expectedAndroidPackage = 'com.tshelo.app'
+if (appConfig.android?.package && appConfig.android.package !== expectedAndroidPackage) {
+  failures.push(`The Android application ID must be ${expectedAndroidPackage}`)
+}
+
+const googleServicesPath = path.join(root, appConfig.android?.googleServicesFile ?? 'google-services.json')
+if (!fs.existsSync(googleServicesPath)) {
+  failures.push(`The Firebase Android config is missing at ${path.relative(root, googleServicesPath)}`)
+} else {
+  try {
+    const googleServices = JSON.parse(fs.readFileSync(googleServicesPath, 'utf8'))
+    const firebasePackages = googleServices.client
+      ?.map(client => client.client_info?.android_client_info?.package_name)
+      .filter(Boolean) ?? []
+    if (!firebasePackages.includes(expectedAndroidPackage)) {
+      failures.push(`The Firebase Android config does not contain ${expectedAndroidPackage}`)
+    }
+  } catch {
+    failures.push(`The Firebase Android config at ${path.relative(root, googleServicesPath)} is not valid JSON`)
+  }
+}
+
 for (const warning of warnings) console.warn(`WARNING: ${warning}`)
 if (failures.length) {
   for (const failure of failures) console.error(`FAIL: ${failure}`)

@@ -12,6 +12,7 @@ const read = relative => readFile(resolve(root, relative), 'utf8')
 const ids = Array.from({ length: 20 }, (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`)
 const [owner, organiser, guest, delegate, member, stranger, eventId, otherEvent, fundId, capacityEvent, closedEvent] = ids
 const [limitedAdmin, pendingOrganiser, formerMember, standaloneEvent, legacyId, cancelledEvent] = ids.slice(12)
+const [announcementOne, announcementTwo] = ids.slice(18)
 let assertions = 0
 const check = (actual, expected) => { assert.deepEqual(actual, expected); assertions++ }
 const query = async (sql, params = []) => (await db.query(sql, params)).rows
@@ -49,6 +50,7 @@ try {
   }
   await loadFunction('20260812155000_fund_admin_permission_foundation.sql', 'has_fund_permission')
   await loadFunction('20260812160000_enforce_fund_admin_permissions.sql', 'has_linked_event_fund_permission')
+  await loadFunction('20260812160000_enforce_fund_admin_permissions.sql', 'can_manage_event_announcements')
   await query("INSERT INTO fund_permission_definitions(permission_key) VALUES ('post_event_announcements'), ('manage_event_guests')")
   await db.exec(await read('supabase/migrations/20260908100000_event_files.sql'))
   for (const id of [owner, organiser, guest, delegate, member, stranger, limitedAdmin, pendingOrganiser, formerMember]) await query('INSERT INTO users VALUES ($1)', [id])
@@ -70,6 +72,49 @@ try {
   await query("INSERT INTO event_files(id,event_id,uploaded_by,file_name,object_path,content_type,size_bytes) VALUES ($1,$2,$3,'Legacy.pdf',$4,'application/pdf',100)", [legacyId, otherEvent, owner, legacyPath])
   await query("INSERT INTO storage.objects(bucket_id,name,metadata) VALUES ('event-files',$1,'{\"mimetype\":\"application/pdf\",\"size\":100}')", [legacyPath])
   await db.exec(await read('supabase/migrations/20260908110000_event_file_upload_lifecycle.sql'))
+  await db.exec(await read('supabase/migrations/20260908120000_event_banners.sql'))
+  await db.exec(await read('supabase/migrations/20260909140000_event_banner_focal_points.sql'))
+  await db.exec(await read('supabase/migrations/20260909110000_event_schedule_details.sql'))
+  await db.exec(await read('supabase/migrations/20260909120000_event_announcement_pins.sql'))
+  check((await query('SELECT time_zone, rsvp_deadline FROM events WHERE id=$1', [eventId]))[0], { time_zone: 'Africa/Gaborone', rsvp_deadline: null })
+  await rejects("UPDATE events SET time_zone='Mars/Olympus' WHERE id=$1", [eventId], 'EVENT_TIME_ZONE_INVALID')
+  await rejects("UPDATE events SET event_date='2026-09-20', rsvp_deadline='2026-09-21' WHERE id=$1", [eventId], 'events_rsvp_deadline_order')
+  await rejects("UPDATE events SET event_date='2026-09-20', event_time='20:00', event_end_date='2026-09-20', event_end_time='19:00' WHERE id=$1", [eventId], 'EVENT_SCHEDULE_INVALID')
+  await query("UPDATE events SET event_date='2099-01-01', rsvp_deadline='2000-01-01' WHERE id=$1", [eventId])
+  await actor(guest)
+  await rejects("UPDATE event_guests SET rsvp_status='yes' WHERE event_id=$1 AND user_id=$2", [eventId, guest], 'EVENT_RSVP_DEADLINE_PASSED')
+  await actor(organiser)
+  check((await query("UPDATE event_guests SET rsvp_status='yes' WHERE event_id=$1 AND user_id=$2 RETURNING rsvp_status", [eventId, guest]))[0].rsvp_status, 'yes')
+  await admin()
+  await query("UPDATE event_guests SET rsvp_status='pending' WHERE event_id=$1 AND user_id=$2", [eventId, guest])
+  await query('UPDATE events SET rsvp_deadline=NULL WHERE id=$1', [eventId])
+  console.log('PASS event time-zone, schedule-order and RSVP-deadline enforcement')
+  await query("INSERT INTO event_announcements(id,event_id,author_id,title,body) VALUES ($1,$3,$4,'Venue changed','Use the north entrance'), ($2,$3,$4,'Reminder','Bring your invitation')", [announcementOne, announcementTwo, eventId, owner])
+  await actor(owner)
+  check((await query('SELECT set_event_announcement_pin($1,$2,true) AS pinned', [eventId, announcementOne]))[0].pinned, true)
+  await actor(organiser)
+  check((await query('SELECT set_event_announcement_pin($1,$2,true) AS pinned', [eventId, announcementTwo]))[0].pinned, true)
+  await admin()
+  check(await query('SELECT id FROM event_announcements WHERE event_id=$1 AND is_pinned', [eventId]), [{ id: announcementTwo }])
+  await actor(delegate)
+  check((await query('SELECT set_event_announcement_pin($1,$2,true) AS pinned', [eventId, announcementOne]))[0].pinned, true)
+  for (const user of [guest, member, stranger, limitedAdmin, pendingOrganiser, formerMember]) {
+    await actor(user)
+    await rejects('SELECT set_event_announcement_pin($1,$2,true)', [eventId, announcementTwo], 'EVENT_ANNOUNCEMENT_FORBIDDEN')
+  }
+  await actor(owner)
+  check((await query('SELECT set_event_announcement_pin($1,$2,true) AS pinned', [eventId, legacyId]))[0].pinned, false)
+  await rejects('UPDATE event_announcements SET is_pinned=true WHERE id=$1', [announcementTwo], 'permission denied')
+  await admin()
+  await query("UPDATE events SET status='completed' WHERE id=$1", [eventId])
+  await actor(owner)
+  await rejects('SELECT set_event_announcement_pin($1,$2,true)', [eventId, announcementTwo], 'EVENT_ANNOUNCEMENT_INACTIVE')
+  await admin()
+  await query("UPDATE events SET status='active' WHERE id=$1", [eventId])
+  await db.exec('SET ROLE anon')
+  await rejects('SELECT set_event_announcement_pin($1,$2,true)', [eventId, announcementTwo], 'permission denied')
+  await admin()
+  console.log('PASS single pinned announcement, atomic replacement and role enforcement')
   check((await query('SELECT status FROM event_file_uploads WHERE id=$1', [legacyId]))[0].status, 'published')
   check((await query("SELECT label FROM fund_permission_definitions WHERE permission_key='post_event_announcements'"))[0].label, 'Manage event updates and files')
   const bucket = (await query("SELECT * FROM storage.buckets WHERE id='event-files'"))[0]
@@ -78,6 +123,93 @@ try {
   check(bucket.allowed_mime_types, ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
 
   await actor(owner)
+  // Banner selection uses the same real lifecycle, roles and private storage.
+  const banner1 = await reserve(eventId, 'image/jpeg')
+  const banner2 = await reserve(eventId, 'image/webp')
+  const foreignBanner = await reserve(otherEvent, 'image/png')
+  const pendingBanner = await reserve(eventId, 'image/png')
+  for (const file of [banner1, banner2, foreignBanner]) {
+    await uploadBytes(file)
+    check((await finalise(file, file.event_id)).is_banner, false)
+  }
+  const setBanner = async id => (await query('SELECT set_event_banner($1,$2) AS id', [eventId, id]))[0].id
+  const setBannerFocal = async (id, x = 0.5, y = 0.5) => (await query(
+    'SELECT set_event_banner_focal_point($1,$2,$3,$4) AS result', [eventId, id, x, y],
+  ))[0].result
+  const banners = async () => (await query('SELECT id FROM event_files WHERE event_id=$1 AND is_banner', [eventId])).map(row => row.id)
+  const focalPoint = async id => {
+    const row = (await query('SELECT banner_focal_x, banner_focal_y FROM event_files WHERE id=$1', [id]))[0]
+    return { x: Number(row.banner_focal_x), y: Number(row.banner_focal_y) }
+  }
+  check(await focalPoint(banner1.id), { x: 0.5, y: 0.5 })
+  check(await setBanner(banner1.id), banner1.id)
+  for (const [user, canRead, canManage] of [
+    [owner, true, true], [organiser, true, true], [guest, true, false],
+    [delegate, true, true], [member, true, false], [stranger, false, false],
+    [limitedAdmin, true, false], [pendingOrganiser, false, false], [formerMember, false, false],
+  ]) {
+    await actor(user)
+    check(await banners(), canRead ? [banner1.id] : [])
+    if (canManage) check(await setBannerFocal(banner1.id, 0.2, 0.8), { file_id: banner1.id, focal_x: 0.2, focal_y: 0.8 })
+    else {
+      await rejects('SELECT set_event_banner($1,$2)', [eventId, banner2.id], 'EVENT_FILE_FORBIDDEN')
+      await rejects('SELECT set_event_banner($1,NULL)', [eventId], 'EVENT_FILE_FORBIDDEN')
+      await rejects('SELECT set_event_banner_focal_point($1,$2,$3,$4)', [eventId, banner2.id, 0.2, 0.8], 'EVENT_FILE_FORBIDDEN')
+    }
+    await rejects('UPDATE event_files SET is_banner=true WHERE id=$1', [banner2.id], 'permission denied')
+    await rejects('UPDATE event_files SET banner_focal_x=0.25 WHERE id=$1', [banner1.id], 'permission denied')
+  }
+  await actor(owner)
+  check(await focalPoint(banner1.id), { x: 0.2, y: 0.8 })
+  for (const [x, y] of [[-0.01, 0.5], [0.5, 1.01], [null, 0.5]]) {
+    await rejects('SELECT set_event_banner_focal_point($1,$2,$3,$4)', [eventId, banner1.id, x, y], 'EVENT_BANNER_FOCAL_INVALID')
+    check(await banners(), [banner1.id])
+    check(await focalPoint(banner1.id), { x: 0.2, y: 0.8 })
+  }
+  for (const id of [foreignBanner.id, pendingBanner.id, legacyId, stranger]) {
+    await rejects('SELECT set_event_banner($1,$2)', [eventId, id], 'EVENT_BANNER_INVALID')
+    check(await banners(), [banner1.id])
+  }
+  // A PDF from the same event is also rejected, independent of event scoping.
+  const bannerPdf = await reserve()
+  await uploadBytes(bannerPdf); await finalise(bannerPdf)
+  await rejects('SELECT set_event_banner($1,$2)', [eventId, bannerPdf.id], 'EVENT_BANNER_INVALID')
+  await admin()
+  await rejects('UPDATE event_files SET is_banner=true WHERE id=$1', [banner2.id], 'event_files_one_banner_per_event')
+  await rejects('UPDATE event_files SET is_banner=true WHERE id=$1', [bannerPdf.id], 'event_files_banner_image')
+  for (const status of ['completed', 'cancelled']) {
+    await query('UPDATE events SET status=$2 WHERE id=$1', [eventId, status])
+    await actor(owner)
+    check(await banners(), [banner1.id])
+    await rejects('SELECT set_event_banner($1,$2)', [eventId, banner2.id], 'EVENT_FILE_INACTIVE')
+    await rejects('SELECT set_event_banner($1,NULL)', [eventId], 'EVENT_FILE_INACTIVE')
+    await rejects('SELECT set_event_banner_focal_point($1,$2,$3,$4)', [eventId, banner2.id, 0.5, 0.5], 'EVENT_FILE_INACTIVE')
+    await admin()
+  }
+  await query("UPDATE events SET status='active', deleted_at=now() WHERE id=$1", [eventId])
+  await actor(owner)
+  await rejects('SELECT set_event_banner($1,$2)', [eventId, banner2.id], 'EVENT_FILE_NOT_FOUND')
+  await admin()
+  await query('UPDATE events SET deleted_at=NULL WHERE id=$1', [eventId])
+  await db.exec('SET ROLE anon')
+  await rejects('SELECT set_event_banner($1,NULL)', [eventId], 'permission denied')
+  await rejects('SELECT set_event_banner_focal_point($1,NULL,$2,$3)', [eventId, 0.5, 0.5], 'permission denied')
+  await actor(owner)
+  check(await setBannerFocal(banner2.id, 0.25, 0.75), { file_id: banner2.id, focal_x: 0.25, focal_y: 0.75 })
+  check(await banners(), [banner2.id])
+  check(await focalPoint(banner2.id), { x: 0.25, y: 0.75 })
+  check(await setBannerFocal(null), { file_id: null, focal_x: 0.5, focal_y: 0.5 })
+  check(await banners(), [])
+  check(await focalPoint(banner2.id), { x: 0.25, y: 0.75 })
+  check((await query('SELECT id FROM event_files WHERE id=$1', [banner2.id])).length, 1)
+  check(await access(banner2, 'select'), true)
+  await setBanner(banner2.id)
+  check(await discard(banner2, false), banner2.object_path)
+  check(await banners(), [])
+  // Leave the original file-suite fixtures unchanged.
+  for (const file of [banner1, foreignBanner, bannerPdf, pendingBanner]) await discard(file, false, file.event_id)
+  for (const file of [banner1, banner2, foreignBanner, bannerPdf]) await query('DELETE FROM storage.objects WHERE name=$1', [file.object_path])
+  console.log('PASS banner roles, focal bounds, private access, atomic replacement, image-only validation, deletion and inactive events')
   const first = await reserve()
   check(first.uploaded_by, owner)
   check(await access(first, 'insert'), true)

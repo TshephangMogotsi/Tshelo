@@ -30,7 +30,7 @@ export function EventFilesPanel({ eventId, manager, canManage, inactive }: {
       </div>}
     </header>
     <div className="member-card-body">
-      <div className="member-event-files-intro"><strong>{visible.length} of {EVENT_MAX_FILES} files · 10 MB each</strong><p>Images and PDFs shared with everyone in this event.</p></div>
+      <div className="member-event-files-intro"><strong>{visible.length} of {EVENT_MAX_FILES} files · 10 MB each</strong><p>Images use low-data previews until you select the eye icon. PDFs remain private event documents.</p></div>
       {!canManage ? <p className="member-event-files-notice"><LockKeyhole size={16} aria-hidden="true" /><span>{inactive ? 'This event is read-only. You can still preview and download its files.' : 'Only organisers with file-management access can add or delete files. You can preview and download them.'}</span></p>
         : <p className="member-event-files-hint">{atLimit ? 'File limit reached. Remove a file or dismiss a failed upload to make room.' : 'PDF, JPG, PNG, or WEBP. Choose one or more files.'}</p>}
       {error && <p className="member-form-error" role="alert">{error}</p>}

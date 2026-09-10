@@ -34,12 +34,14 @@ import type {
   JoinEventRequest,
   RespondEventRsvpRequest,
   RespondOrganiserInviteRequest,
+  SetEventAnnouncementPinRequest,
   UpdateEventGuestRequest,
   UpdateEventBudgetRequest,
   UpdateEventAnnouncementRequest,
   UpdateEventRequest,
   CreateEventFileUploadSessionRequest,
   FinalizeEventFileRequest,
+  UpdateEventBannerRequest,
 } from '@shared/contracts/events'
 import {
   EVENT_ANNOUNCEMENT_ATTACHMENT_MEDIA_TYPES,
@@ -205,6 +207,23 @@ function optionalTime(value: JsonObject, field: string, errors: ApiFieldError[])
   if (candidate === undefined || candidate === null) return
   if (typeof candidate !== 'string' || !TIME_PATTERN.test(candidate)) {
     errors.push(issue(field, 'invalid_time', 'Must use HH:mm:ss format.'))
+  }
+}
+
+function optionalTimeZone(value: JsonObject, field: string, errors: ApiFieldError[]) {
+  const candidate = value[field]
+  if (candidate === undefined) return
+  if (typeof candidate !== 'string' || candidate.length < 1 || candidate.length > 100) {
+    errors.push(issue(field, 'invalid_time_zone', 'Must be a recognised IANA time zone.'))
+    return
+  }
+  try {
+    const canonical = new Intl.DateTimeFormat('en', { timeZone: candidate }).resolvedOptions().timeZone
+    if (canonical !== candidate) {
+      errors.push(issue(field, 'invalid_time_zone', 'Must use the canonical, case-sensitive IANA time-zone name.'))
+    }
+  } catch {
+    errors.push(issue(field, 'invalid_time_zone', 'Must be a recognised IANA time zone.'))
   }
 }
 
@@ -475,7 +494,7 @@ export function validateUpdateEventRequest(input: unknown): ValidationResult<Upd
   if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
   const allowed = [
     'name', 'description', 'event_emoji', 'event_date', 'event_time', 'event_end_date',
-    'event_end_time', 'venue_name', 'venue_address', 'status',
+    'event_end_time', 'time_zone', 'rsvp_deadline', 'venue_name', 'venue_address', 'status',
   ] as const
   const errors: ApiFieldError[] = []
   rejectUnknownFields(value, allowed, errors)
@@ -488,6 +507,11 @@ export function validateUpdateEventRequest(input: unknown): ValidationResult<Upd
   optionalDate(value, 'event_end_date', errors)
   optionalTime(value, 'event_time', errors)
   optionalTime(value, 'event_end_time', errors)
+  optionalTimeZone(value, 'time_zone', errors)
+  optionalDate(value, 'rsvp_deadline', errors)
+  if (typeof value.event_date === 'string' && typeof value.rsvp_deadline === 'string' && value.rsvp_deadline > value.event_date) {
+    errors.push(issue('rsvp_deadline', 'invalid_deadline', 'RSVP deadline cannot be after the event date.'))
+  }
   if (value.status !== undefined && !['active', 'completed', 'cancelled'].includes(String(value.status))) {
     errors.push(issue('status', 'invalid_status', 'Unsupported event status.'))
   }
@@ -594,6 +618,17 @@ export function validateUpdateEventAnnouncementRequest(input: unknown): Validati
   return finish<UpdateEventAnnouncementRequest>(value, errors)
 }
 
+export function validateSetEventAnnouncementPinRequest(input: unknown): ValidationResult<SetEventAnnouncementPinRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['is_pinned'], errors)
+  if (typeof value.is_pinned !== 'boolean') {
+    errors.push(issue('is_pinned', 'invalid_boolean', 'Must be true or false.'))
+  }
+  return finish<SetEventAnnouncementPinRequest>(value, errors)
+}
+
 export function validateCreateEventAnnouncementUploadSessionRequest(input: unknown): ValidationResult<CreateEventAnnouncementUploadSessionRequest> {
   const value = objectValue(input)
   if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
@@ -636,6 +671,31 @@ export function validateFinalizeEventFileRequest(input: unknown): ValidationResu
     errors.push(issue('upload_id', 'invalid_uuid', 'Upload ID must be a valid UUID.'))
   }
   return finish<FinalizeEventFileRequest>(value, errors)
+}
+
+export function validateUpdateEventBannerRequest(input: unknown): ValidationResult<UpdateEventBannerRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['file_id', 'focal_x', 'focal_y'], errors)
+  if (value.file_id !== null && (typeof value.file_id !== 'string' || !UUID_PATTERN.test(value.file_id))) {
+    errors.push(issue('file_id', 'invalid_uuid', 'File ID must be a valid UUID, or null to remove the banner.'))
+  }
+  const hasFocalX = value.focal_x !== undefined
+  const hasFocalY = value.focal_y !== undefined
+  for (const field of ['focal_x', 'focal_y'] as const) {
+    const candidate = value[field]
+    if (candidate !== undefined && (typeof candidate !== 'number' || !Number.isFinite(candidate) || candidate < 0 || candidate > 1)) {
+      errors.push(issue(field, 'invalid_focal_point', 'Must be a finite number between 0 and 1.'))
+    }
+  }
+  if (hasFocalX !== hasFocalY) {
+    errors.push(issue(hasFocalX ? 'focal_y' : 'focal_x', 'missing_focal_point', 'Supply both focal-point coordinates together.'))
+  }
+  if (value.file_id === null && (hasFocalX || hasFocalY)) {
+    errors.push(issue('file_id', 'invalid_focal_point', 'Focal-point coordinates require a banner image.'))
+  }
+  return finish<UpdateEventBannerRequest>(value, errors)
 }
 
 export function validateEventAnnouncementAttachmentAccessRequest(input: unknown): ValidationResult<EventAnnouncementAttachmentAccessRequest> {

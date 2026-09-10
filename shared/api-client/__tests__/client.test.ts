@@ -45,12 +45,30 @@ describe('shared Tshelo API client', () => {
     await client.events.finalizeFile(eventId, { upload_id: fileId })
     await client.events.createFileAccess(eventId, fileId)
     await client.events.removeFile(eventId, fileId)
+    await client.events.updateBanner(eventId, { file_id: fileId, focal_x: 0.25, focal_y: 0.7 })
+    await client.events.updateBanner(eventId, { file_id: null })
     const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>
     expect(calls.map(([url, options]) => [url, options.method, options.body ? JSON.parse(options.body as string) : undefined])).toEqual([
       [`https://api.example/api/v1/events/${eventId}/files/upload-session`, 'POST', metadata],
       [`https://api.example/api/v1/events/${eventId}/files/finalize`, 'POST', { upload_id: fileId }],
       [`https://api.example/api/v1/events/${eventId}/files/${fileId}/access`, 'POST', undefined],
       [`https://api.example/api/v1/events/${eventId}/files/${fileId}`, 'DELETE', undefined],
+      [`https://api.example/api/v1/events/${eventId}/banner`, 'PATCH', { file_id: fileId, focal_x: 0.25, focal_y: 0.7 }],
+      [`https://api.example/api/v1/events/${eventId}/banner`, 'PATCH', { file_id: null }],
+    ])
+  })
+
+  it('serializes idempotent announcement pin changes', async () => {
+    const fetchMock = jest.fn(async () => success({}))
+    const client = createTsheloApiClient({ baseUrl: 'https://api.example', getAccessToken: async () => 'token', fetch: fetchMock as typeof fetch })
+    const eventId = '11111111-1111-4111-8111-111111111111'
+    const announcementId = '22222222-2222-4222-8222-222222222222'
+    await client.events.setAnnouncementPin(eventId, announcementId, { is_pinned: true })
+    await client.events.setAnnouncementPin(eventId, announcementId, { is_pinned: false })
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>
+    expect(calls.map(([url, options]) => [url, options.method, JSON.parse(options.body as string)])).toEqual([
+      [`https://api.example/api/v1/events/${eventId}/announcements/${announcementId}/pin`, 'PUT', { is_pinned: true }],
+      [`https://api.example/api/v1/events/${eventId}/announcements/${announcementId}/pin`, 'PUT', { is_pinned: false }],
     ])
   })
 

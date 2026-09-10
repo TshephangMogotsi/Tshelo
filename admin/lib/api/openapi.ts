@@ -411,7 +411,7 @@ export const tsheloOpenApiDocument = {
       patch: {
         tags: ['Events'], operationId: 'updateEvent', summary: 'Update an event',
         parameters: [uuidPathParameter('eventId', 'Event UUID.')],
-        requestBody: jsonBody({ type: 'object', minProperties: 1 }),
+        requestBody: jsonBody({ $ref: '#/components/schemas/UpdateEventRequest' }),
         responses: { '200': response('Event updated.', success({ $ref: '#/components/schemas/Event' })), ...standardErrors },
       },
       delete: {
@@ -522,6 +522,14 @@ export const tsheloOpenApiDocument = {
         responses: { '200': response('Event budget updated.', success({ $ref: '#/components/schemas/EventBudget' })), ...standardErrors },
       },
     },
+    '/events/{eventId}/banner': {
+      patch: {
+        tags: ['Events'], operationId: 'updateEventBanner', summary: 'Select a private event image and focal point as the banner, or remove the banner',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.')],
+        requestBody: jsonBody({ $ref: '#/components/schemas/UpdateEventBannerRequest' }),
+        responses: { '200': response('Banner selection saved; file bytes are preserved.', success({ $ref: '#/components/schemas/EventBanner' })), ...standardErrors },
+      },
+    },
     '/events/{eventId}/files/upload-session': {
       post: {
         tags: ['Events'], operationId: 'createEventFileUploadSession', summary: 'Reserve and authorise a private event file upload',
@@ -570,6 +578,15 @@ export const tsheloOpenApiDocument = {
         parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('announcementId', 'Announcement UUID.')],
         requestBody: jsonBody({ type: 'object', minProperties: 1, properties: { title: { type: 'string', minLength: 3, maxLength: 120 }, body: { type: 'string', minLength: 3, maxLength: 4000 }, attachments: { type: 'array', maxItems: 5, items: { $ref: '#/components/schemas/EventAnnouncementAttachment' } } } }),
         responses: { '200': response('Announcement updated.', success({ $ref: '#/components/schemas/EventAnnouncement' })), ...standardErrors },
+      },
+    },
+    '/events/{eventId}/announcements/{announcementId}/pin': {
+      put: {
+        tags: ['Events'], operationId: 'setEventAnnouncementPin', summary: 'Pin or unpin an event announcement',
+        description: 'Requires update-management permission on an active event. Pinning atomically replaces any announcement already pinned for the event.',
+        parameters: [uuidPathParameter('eventId', 'Event UUID.'), uuidPathParameter('announcementId', 'Announcement UUID.')],
+        requestBody: jsonBody({ type: 'object', required: ['is_pinned'], additionalProperties: false, properties: { is_pinned: { type: 'boolean' } } }),
+        responses: { '200': response('Announcement pin updated.', success({ $ref: '#/components/schemas/EventAnnouncementPin' })), ...standardErrors },
       },
     },
     '/events/{eventId}/announcements/upload-session': {
@@ -1128,7 +1145,7 @@ export const tsheloOpenApiDocument = {
       Event: {
         allOf: [
           { $ref: '#/components/schemas/EventSummary' },
-          { type: 'object', properties: { description: { type: ['string', 'null'] }, event_time: { type: ['string', 'null'], format: 'time' }, event_end_date: { type: ['string', 'null'], format: 'date' }, event_end_time: { type: ['string', 'null'], format: 'time' }, venue_address: { type: ['string', 'null'] }, updated_at: { type: 'string', format: 'date-time' } } },
+          { type: 'object', properties: { description: { type: ['string', 'null'] }, event_time: { type: ['string', 'null'], format: 'time' }, event_end_date: { type: ['string', 'null'], format: 'date' }, event_end_time: { type: ['string', 'null'], format: 'time' }, time_zone: { type: 'string', example: 'Africa/Gaborone' }, rsvp_deadline: { type: ['string', 'null'], format: 'date' }, venue_address: { type: ['string', 'null'] }, updated_at: { type: 'string', format: 'date-time' } } },
         ],
       },
       EventGuest: {
@@ -1213,11 +1230,15 @@ export const tsheloOpenApiDocument = {
         },
       },
       EventAnnouncement: {
-        type: 'object', required: ['id', 'event_id', 'author_id', 'author_name', 'title', 'body', 'attachments', 'created_at'],
+        type: 'object', required: ['id', 'event_id', 'author_id', 'author_name', 'title', 'body', 'is_pinned', 'attachments', 'created_at'],
         properties: {
           id: { type: 'string', format: 'uuid' }, event_id: { type: 'string', format: 'uuid' }, author_id: { type: 'string', format: 'uuid' },
-          author_name: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, attachments: { type: 'array', items: { $ref: '#/components/schemas/EventAnnouncementAttachment' } }, created_at: { type: 'string', format: 'date-time' },
+          author_name: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' }, is_pinned: { type: 'boolean' }, attachments: { type: 'array', items: { $ref: '#/components/schemas/EventAnnouncementAttachment' } }, created_at: { type: 'string', format: 'date-time' },
         },
+      },
+      EventAnnouncementPin: {
+        type: 'object', required: ['announcement_id', 'is_pinned'], additionalProperties: false,
+        properties: { announcement_id: { type: 'string', format: 'uuid' }, is_pinned: { type: 'boolean' } },
       },
       EventAnnouncementAttachment: {
         type: 'object', required: ['object_path', 'file_name', 'content_type', 'size_bytes'],
@@ -1234,11 +1255,12 @@ export const tsheloOpenApiDocument = {
       },
       EventInvitePreview: {
         type: 'object',
-        required: ['id', 'name', 'event_type', 'event_date', 'status', 'organiser_name', 'has_linked_fund', 'already_joined'],
+        required: ['id', 'name', 'event_type', 'event_date', 'status', 'organiser_name', 'has_linked_fund', 'already_joined', 'allowed_plus_ones'],
         properties: {
           id: { type: 'string', format: 'uuid' }, name: { type: 'string' }, event_type: { type: 'string' }, event_emoji: { type: ['string', 'null'] },
           event_date: { type: 'string', format: 'date' }, event_time: { type: ['string', 'null'], format: 'time' }, venue_name: { type: ['string', 'null'] },
           status: { type: 'string', enum: ['active', 'completed', 'cancelled'] }, organiser_name: { type: 'string' }, has_linked_fund: { type: 'boolean' }, already_joined: { type: 'boolean' },
+          allowed_plus_ones: { type: 'integer', minimum: 0, maximum: 20, description: 'Allowance tied to the authenticated user or their invited phone number; zero for a general link.' },
         },
       },
       CreateEventFileUploadSessionRequest: {
@@ -1252,6 +1274,9 @@ export const tsheloOpenApiDocument = {
       EventFile: {
         type: 'object', required: ['id', 'event_id', 'uploaded_by', 'file_name', 'object_path', 'content_type', 'size_bytes', 'created_at', 'updated_at'],
         properties: {
+          is_banner: { type: 'boolean', description: 'Whether this private image is the event banner. Absent on older deployments.' },
+          banner_focal_x: { type: 'number', minimum: 0, maximum: 1, description: 'Normalized horizontal banner focal point; defaults to 0.5.' },
+          banner_focal_y: { type: 'number', minimum: 0, maximum: 1, description: 'Normalized vertical banner focal point; defaults to 0.5.' },
           id: { type: 'string', format: 'uuid' }, event_id: { type: 'string', format: 'uuid' }, uploaded_by: { type: 'string', format: 'uuid' },
           file_name: { type: 'string' }, object_path: { type: 'string' }, content_type: { type: 'string', enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] },
           size_bytes: { type: 'integer', minimum: 1, maximum: 10485760 }, created_at: { type: 'string', format: 'date-time' }, updated_at: { type: 'string', format: 'date-time' },
@@ -1267,7 +1292,29 @@ export const tsheloOpenApiDocument = {
       },
       EventFileAccess: {
         type: 'object', required: ['file_id', 'download_url', 'expires_at'],
-        properties: { file_id: { type: 'string', format: 'uuid' }, download_url: { type: 'string', format: 'uri' }, expires_at: { type: 'string', format: 'date-time' } },
+        properties: {
+          file_id: { type: 'string', format: 'uuid' },
+          download_url: { type: 'string', format: 'uri', description: 'Short-lived private URL for the original file.' },
+          thumbnail_url: { type: 'string', format: 'uri', description: 'Optional short-lived 480×360 compressed image preview.' },
+          banner_thumbnail_url: { type: 'string', format: 'uri', description: 'Optional short-lived width-bounded compressed preview retaining enough source image for focal cropping.' },
+          expires_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      UpdateEventBannerRequest: {
+        type: 'object', additionalProperties: false, required: ['file_id'],
+        properties: {
+          file_id: { type: ['string', 'null'], format: 'uuid', description: 'A published JPG, PNG, or WEBP file in this event, or null to clear the banner without deleting the file.' },
+          focal_x: { type: 'number', minimum: 0, maximum: 1, description: 'Normalized horizontal focal point. Supply together with focal_y; omitted coordinates default to 0.5.' },
+          focal_y: { type: 'number', minimum: 0, maximum: 1, description: 'Normalized vertical focal point. Supply together with focal_x; omitted coordinates default to 0.5.' },
+        },
+      },
+      EventBanner: {
+        type: 'object', additionalProperties: false, required: ['file_id', 'focal_x', 'focal_y'],
+        properties: {
+          file_id: { type: ['string', 'null'], format: 'uuid' },
+          focal_x: { type: 'number', minimum: 0, maximum: 1 },
+          focal_y: { type: 'number', minimum: 0, maximum: 1 },
+        },
       },
       EventWorkspace: {
         type: 'object', required: ['event', 'guests', 'budget', 'announcements', 'files', 'capabilities', 'linked_fund'],
@@ -1297,6 +1344,17 @@ export const tsheloOpenApiDocument = {
           event_end_date: { type: ['string', 'null'], format: 'date' }, event_end_time: { type: ['string', 'null'], format: 'time' },
           venue_name: { type: ['string', 'null'] }, venue_address: { type: ['string', 'null'] }, currency_code: { type: 'string', pattern: '^[A-Z]{3}$' },
           organisers: { type: 'array', maxItems: 20, items: { type: 'object', required: ['name', 'phone'], properties: { name: { type: 'string' }, phone: { type: 'string', example: '+26771000000' } } } },
+        },
+      },
+      UpdateEventRequest: {
+        type: 'object', minProperties: 1, additionalProperties: false,
+        properties: {
+          name: { type: 'string', minLength: 3, maxLength: 200 }, description: { type: ['string', 'null'], maxLength: 4000 },
+          event_emoji: { type: ['string', 'null'], maxLength: 16 }, event_date: { type: 'string', format: 'date' },
+          event_time: { type: ['string', 'null'], format: 'time' }, event_end_date: { type: ['string', 'null'], format: 'date' },
+          event_end_time: { type: ['string', 'null'], format: 'time' }, time_zone: { type: 'string', minLength: 1, maxLength: 100, example: 'Africa/Gaborone' },
+          rsvp_deadline: { type: ['string', 'null'], format: 'date' }, venue_name: { type: ['string', 'null'], maxLength: 200 },
+          venue_address: { type: ['string', 'null'], maxLength: 2000 }, status: { type: 'string', enum: ['active', 'completed', 'cancelled'] },
         },
       },
       RespondOrganiserInviteRequest: {

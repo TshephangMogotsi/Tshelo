@@ -3,11 +3,11 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'com.digitalnatives.tshelo'
+group = 'com.tshelo.app'
 version = '0.1.0'
 
 android {
-  namespace "com.digitalnatives.tshelo.smslistener"
+  namespace "com.tshelo.app.smslistener"
   defaultConfig {
     versionCode 1
     versionName "0.1.0"

@@ -8,15 +8,23 @@ import type {
   EventFileUploadSession,
   FinalizeEventFileRequest,
   RemoveEventFileResult,
+  UpdateEventBannerRequest,
+  EventBanner,
 } from '@shared/contracts/events'
 import { dataFailure, dataSuccess, type ApiDataResult } from './api-pagination'
 
 const BUCKET = 'event-files'
 const ACCESS_SECONDS = 5 * 60
+export const EVENT_FILE_THUMBNAIL_TRANSFORM = { width: 480, height: 360, resize: 'cover', quality: 55 } as const
+export const EVENT_FILE_BANNER_TRANSFORM = { width: 1280, resize: 'contain', quality: 60 } as const
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const FILE_SELECT = 'id, event_id, uploaded_by, file_name, object_path, content_type, size_bytes, created_at, updated_at'
+const FILE_SELECT = 'id, event_id, uploaded_by, file_name, object_path, content_type, size_bytes, created_at, updated_at, is_banner, banner_focal_x, banner_focal_y'
 
-type FileRow = Omit<EventFile, 'size_bytes'> & { size_bytes: number | string }
+type FileRow = Omit<EventFile, 'size_bytes' | 'banner_focal_x' | 'banner_focal_y'> & {
+  size_bytes: number | string
+  banner_focal_x?: number | string | null
+  banner_focal_y?: number | string | null
+}
 type UploadRow = CreateEventFileUploadSessionRequest & {
   id: string
   object_path: string
@@ -24,7 +32,13 @@ type UploadRow = CreateEventFileUploadSessionRequest & {
 }
 
 function toEventFile(row: FileRow): EventFile {
-  return { ...row, size_bytes: Number(row.size_bytes) }
+  const { size_bytes, banner_focal_x, banner_focal_y, ...rest } = row
+  return {
+    ...rest,
+    size_bytes: Number(size_bytes),
+    ...(banner_focal_x == null ? {} : { banner_focal_x: Number(banner_focal_x) }),
+    ...(banner_focal_y == null ? {} : { banner_focal_y: Number(banner_focal_y) }),
+  }
 }
 
 function invalidIds<T>(...ids: string[]): ApiDataResult<T> | null {
@@ -35,6 +49,12 @@ function invalidIds<T>(...ids: string[]): ApiDataResult<T> | null {
 
 function fileFailure<T>(error: { code?: string; message?: string }): ApiDataResult<T> {
   const message = error.message ?? ''
+  if (message.includes('EVENT_BANNER_INVALID')) {
+    return dataFailure({ kind: 'validation', message: 'Choose a published JPG, PNG, or WEBP image from this event’s files.' })
+  }
+  if (message.includes('EVENT_BANNER_FOCAL_INVALID')) {
+    return dataFailure({ kind: 'validation', message: 'Choose a banner focal point within the image.' })
+  }
   if (message.includes('EVENT_FILE_LIMIT_REACHED')) {
     return dataFailure({ kind: 'business', code: 'CONFLICT', message: 'This event has reached its 10-file limit, including pending uploads.' })
   }
@@ -70,6 +90,36 @@ export async function listApiEventFiles(client: SupabaseClient, eventId: string)
     .order('created_at', { ascending: false }).order('id', { ascending: false })
   if (result.error) return fileFailure(result.error)
   return dataSuccess(((result.data ?? []) as FileRow[]).map(toEventFile))
+}
+
+export async function updateApiEventBanner(
+  client: SupabaseClient, eventId: string, input: UpdateEventBannerRequest,
+): Promise<ApiDataResult<EventBanner>> {
+  const invalid = invalidIds<EventBanner>(eventId, ...(input.file_id === null ? [] : [input.file_id]))
+  if (invalid) return invalid
+  try {
+    const focalX = input.focal_x ?? 0.5
+    const focalY = input.focal_y ?? 0.5
+    const result = await client.rpc('set_event_banner_focal_point', {
+      p_event_id: eventId, p_file_id: input.file_id, p_focal_x: focalX, p_focal_y: focalY,
+    })
+    if (result.error) return fileFailure(result.error)
+    const response = result.data as { file_id?: string | null; focal_x?: number | string; focal_y?: number | string } | null
+    if (!response || !('file_id' in response) || !('focal_x' in response) || !('focal_y' in response)) return unexpectedFailure()
+    if (response.file_id !== input.file_id) return unexpectedFailure()
+    const responseFocalX = Number(response.focal_x)
+    const responseFocalY = Number(response.focal_y)
+    if (!Number.isFinite(responseFocalX) || responseFocalX < 0 || responseFocalX > 1 || !Number.isFinite(responseFocalY) || responseFocalY < 0 || responseFocalY > 1) {
+      return unexpectedFailure()
+    }
+    return dataSuccess({
+      file_id: response.file_id,
+      focal_x: responseFocalX,
+      focal_y: responseFocalY,
+    })
+  } catch {
+    return unexpectedFailure()
+  }
 }
 
 type CleanupOutcome = 'complete' | 'pending' | 'uncertain'
@@ -169,14 +219,31 @@ export async function createApiEventFileAccess(
   try {
     // RLS checks current participation. Neither an arbitrary path nor a pending
     // upload can be used to obtain a participant preview/download URL.
-    const result = await client.from('event_files').select('id, object_path')
+    const result = await client.from('event_files').select('id, object_path, content_type')
       .eq('event_id', eventId).eq('id', fileId).maybeSingle()
     if (result.error) return fileFailure(result.error)
     if (!result.data) return fileFailure({ message: 'EVENT_FILE_NOT_FOUND' })
     const expiresAt = new Date(Date.now() + ACCESS_SECONDS * 1000).toISOString()
-    const signed = await client.storage.from(BUCKET).createSignedUrl(result.data.object_path, ACCESS_SECONDS)
+    const storage = client.storage.from(BUCKET)
+    const signed = await storage.createSignedUrl(result.data.object_path, ACCESS_SECONDS)
     if (signed.error) return fileFailure(signed.error)
-    return dataSuccess({ file_id: fileId, download_url: signed.data.signedUrl, expires_at: expiresAt })
+    if (!String(result.data.content_type).startsWith('image/')) {
+      return dataSuccess({ file_id: fileId, download_url: signed.data.signedUrl, expires_at: expiresAt })
+    }
+    // Supabase signs transformed render URLs without fetching the original.
+    // Transformation failures never weaken access or trigger a full-image
+    // thumbnail fallback; the client can still offer explicit original access.
+    const [thumbnail, banner] = await Promise.all([
+      storage.createSignedUrl(result.data.object_path, ACCESS_SECONDS, { transform: EVENT_FILE_THUMBNAIL_TRANSFORM }),
+      storage.createSignedUrl(result.data.object_path, ACCESS_SECONDS, { transform: EVENT_FILE_BANNER_TRANSFORM }),
+    ])
+    return dataSuccess({
+      file_id: fileId,
+      download_url: signed.data.signedUrl,
+      ...(!thumbnail.error ? { thumbnail_url: thumbnail.data.signedUrl } : {}),
+      ...(!banner.error ? { banner_thumbnail_url: banner.data.signedUrl } : {}),
+      expires_at: expiresAt,
+    })
   } catch {
     return unexpectedFailure()
   }

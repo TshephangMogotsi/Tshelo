@@ -31,7 +31,8 @@ BEGIN
     'public.update_event_guest(uuid,uuid,jsonb)',
     'public.remove_event_guest(uuid,uuid)',
     'public.respond_event_rsvp(uuid,text,text,integer,text[],text,text,text)',
-    'public.unlock_event_guest_capacity(uuid)'
+    'public.unlock_event_guest_capacity(uuid)',
+    'public.set_event_announcement_pin(uuid,uuid,boolean)'
   ]
   LOOP
     PERFORM pg_temp.assert_true(
@@ -84,6 +85,64 @@ SELECT pg_temp.assert_true(
       AND data_type = 'integer'
   ),
   'event_guests.allowed_plus_ones is missing'
+);
+
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'events'
+      AND column_name = 'time_zone'
+      AND data_type = 'text'
+      AND is_nullable = 'NO'
+  ),
+  'events.time_zone is missing or nullable'
+);
+
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'events'
+      AND column_name = 'rsvp_deadline'
+      AND data_type = 'date'
+  ),
+  'events.rsvp_deadline is missing'
+);
+
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger
+    WHERE tgname = 'enforce_event_schedule_details'
+      AND NOT tgisinternal
+  ),
+  'event schedule validation trigger is missing'
+);
+
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger
+    WHERE tgname = 'enforce_event_rsvp_deadline'
+      AND NOT tgisinternal
+  ),
+  'event RSVP deadline trigger is missing'
+);
+
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'event_announcements'
+      AND column_name = 'is_pinned'
+      AND data_type = 'boolean'
+      AND is_nullable = 'NO'
+  ),
+  'event_announcements.is_pinned is missing or nullable'
 );
 
 SELECT pg_temp.assert_true(
@@ -161,7 +220,8 @@ BEGIN
     'api_event_guests_user_event_idx',
     'user_entitlements_event_guest_unlock_unique',
     'event_guests_event_status_invited_idx',
-    'user_entitlements_active_pass_idx'
+    'user_entitlements_active_pass_idx',
+    'event_announcements_one_pinned_per_event_idx'
   ]
   LOOP
     PERFORM pg_temp.assert_true(

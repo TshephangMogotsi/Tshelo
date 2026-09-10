@@ -60,8 +60,60 @@ dependency-range problem; 8.5.28 also includes the later source-map fixes.
 Keep these overrides until Expo's own compatible dependencies incorporate the
 fixes. Re-evaluate them as part of a deliberate SDK upgrade. Do not use
 `npm audit fix --force`: its proposed SDK-major changes require separate native
-compatibility testing. Moderate advisories still need separate review; passing
-the high-severity gate is not a claim that the dependency tree has no advisories.
+compatibility testing. Passing the high-severity gate is not a claim that the
+dependency tree has no advisories.
+
+## Follow-up: remove the two moderate root causes
+
+The 25 moderate findings after the first repair represented two underlying
+advisories, propagated through dependent Expo and React Navigation packages.
+The follow-up removes the vulnerable versions with scoped overrides:
+
+| Consumer | Previously locked | Patched dependency |
+| --- | --- | --- |
+| `query-string@7.1.3` (React Navigation) | `decode-uri-component@0.2.2` | `decode-uri-component@0.5.0` |
+| `xcode@3.0.1` (Expo config plugins) | `uuid@7.0.3` | `uuid@11.1.1` |
+
+- [Decoder advisory](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr): malformed
+  percent-encoded input could cause excessive CPU usage. Version 0.5.0 replaces
+  the vulnerable decoding algorithm but also changes to an ESM default export.
+  `patches/query-string+7.1.3.patch` adapts its CommonJS consumer to that export;
+  an override alone throws `decodeComponent is not a function`. The patch changes
+  only module interoperability, not the upstream security fix. It is applied by
+  the existing `patch-package` postinstall and must survive a clean `npm ci`.
+- [UUID advisory](https://github.com/advisories/GHSA-w5hq-g745-h8pq): v3/v5/v6
+  functions could partially write an undersized caller-supplied buffer. Version
+  11.1.1 adds the bounds checks and retains the CommonJS v4 API used by Xcode.
+
+Expo SDK 54, React Native 0.81.5, and React Navigation remain on their existing
+versions. No forced SDK downgrade or advisory suppression is involved. Use the
+project's supported Node runtime (Node 20.19.4 or later); the CommonJS-to-ESM
+consumer is explicitly tested under Node 20 as well as the local runtime.
+Jest retains Expo's existing transform exclusions while allowing the new ESM
+decoder to be transformed, like Metro does.
+
+`npm run test:dependency-security` checks the actual consumer resolution paths
+and every installed lockfile copy, query compatibility, malformed input in
+timeout-bounded child processes, UUID rejection without partial writes, valid
+UUID output, and real Expo/Xcode project edits and serialization. It also builds
+and executes minified Android/iOS Metro fixtures to cover module interop outside
+Jest. `navigation/__tests__/dependencyCompatibility.test.ts` exercises the real
+React Navigation parsing/serialization chain and Tshelo's custom invite parser.
+These tests run in `npm run verify` without changing audit severity policy.
+
+Revisit the scoped overrides and compatibility patch when the upstream
+consumers adopt the fixes. A clean audit is a point-in-time dependency result,
+not a full application security certification. No live deployment or native
+binary is updated just by changing these repository dependencies.
+
+Verified locally on 2026-09-08 after a clean install:
+
+- `npm ci` applies both the existing confetti patch and the decoder interop patch.
+- Full `npm run verify` passes under Node 20.20.2, including the 23 new
+  dependency/navigation checks (16 Node tests and 7 Jest cases).
+- Root and `/admin` npm audits each report zero advisories at every severity.
+- Complete Android and iOS Hermes exports pass; Android remains within its
+  11 MiB total / 5.5 MiB bundle budgets. No simulator or native build was run.
 
 ## Verification
 

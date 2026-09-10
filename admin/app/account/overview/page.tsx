@@ -122,13 +122,11 @@ export default async function OverviewPage() {
         </div>
         <div className="member-card-body member-fund-grid member-overview-resource-grid">
           {eventOnly.map(event => {
-            const inviteHref = invitationUrl('event', event.share_code || event.event_code)
             return <article className="member-fund" key={event.id}>
               <Link className="member-fund-content" href={`/account/events/${event.id}` as Route}>
                 <div className="member-fund-head"><div><h3>{event.name}</h3><p>{event.event_code} · {formatDate(event.created_at)}</p></div><span>{titleCase(event.event_type)}</span></div>
                 <div className="member-fund-goal"><p>Event</p><strong>{titleCase(event.status)}</strong></div>
               </Link>
-              <div className="member-fund-foot"><span>Invitation link</span><CopyLinkButton href={inviteHref} label={`Copy invitation link for ${event.name}`} /></div>
             </article>
           })}
           {!eventOnly.length && <div className="member-empty">No standalone events are linked to this account yet.</div>}
@@ -139,13 +137,11 @@ export default async function OverviewPage() {
         <header><div className="member-section-title"><span><CalendarDays size={18} /></span><h2>Event + Funds</h2></div><Link href={'/account/events?tab=eventFund' as Route}>View Event + Funds <ArrowRight size={14} /></Link></header>
         <div className="member-card-body member-fund-grid">
           {eventFunds.map(event => {
-            const inviteHref = invitationUrl('event', event.share_code || event.event_code)
             return <article className="member-fund" key={event.id}>
               <Link className="member-fund-content" href={`/account/events/${event.id}` as Route}>
                 <div className="member-fund-head"><div><h3>{event.name}</h3><p>{event.event_code} · {formatDate(event.created_at)}</p></div><span>Event + Fund</span></div>
                 <div className="member-fund-goal"><p>Event status</p><strong>{titleCase(event.status)}</strong></div>
               </Link>
-              <div className="member-fund-foot"><span>Invitation link</span><CopyLinkButton href={inviteHref} label={`Copy invitation link for ${event.name}`} /></div>
             </article>
           })}
           {!eventFunds.length && <div className="member-empty">No Event + Funds are linked to this account yet.</div>}

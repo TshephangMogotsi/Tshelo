@@ -3,15 +3,17 @@ jest.mock('../../admin/lib/api/auth', () => ({ authenticateApiRequest: jest.fn()
 jest.mock('../../admin/lib/data/api', () => ({
   createApiEventFileUploadSession: jest.fn(), finalizeApiEventFile: jest.fn(),
   createApiEventFileAccess: jest.fn(), removeApiEventFile: jest.fn(),
+  updateApiEventBanner: jest.fn(),
 }))
 
 import { webcrypto } from 'node:crypto'
 import { authenticateApiRequest } from '../../admin/lib/api/auth'
-import { createApiEventFileUploadSession, finalizeApiEventFile, createApiEventFileAccess, removeApiEventFile } from '../../admin/lib/data/api'
+import { createApiEventFileUploadSession, finalizeApiEventFile, createApiEventFileAccess, removeApiEventFile, updateApiEventBanner } from '../../admin/lib/data/api'
 import { POST as upload } from '../../admin/app/api/v1/events/[eventId]/files/upload-session/route'
 import { POST as finalize } from '../../admin/app/api/v1/events/[eventId]/files/finalize/route'
 import { POST as access } from '../../admin/app/api/v1/events/[eventId]/files/[fileId]/access/route'
 import { DELETE as remove } from '../../admin/app/api/v1/events/[eventId]/files/[fileId]/route'
+import { PATCH as banner } from '../../admin/app/api/v1/events/[eventId]/banner/route'
 
 const eventId = '11111111-1111-4111-8111-111111111111'
 const fileId = '22222222-2222-4222-8222-222222222222'
@@ -22,6 +24,7 @@ const operations = [
   { handler: finalize, service: jest.mocked(finalizeApiEventFile), method: 'POST', body: { upload_id: fileId }, status: 200 },
   { handler: access, service: jest.mocked(createApiEventFileAccess), method: 'POST', body: undefined, status: 201 },
   { handler: remove, service: jest.mocked(removeApiEventFile), method: 'DELETE', body: undefined, status: 200 },
+  { handler: banner, service: jest.mocked(updateApiEventBanner), method: 'PATCH', body: { file_id: fileId, focal_x: 0.25, focal_y: 0.7 }, status: 200 },
 ]
 const context = { params: Promise.resolve({ eventId, fileId }) }
 
@@ -29,6 +32,18 @@ beforeAll(() => { Object.defineProperty(globalThis, 'crypto', { value: webcrypto
 beforeEach(() => jest.resetAllMocks())
 
 describe('event file route boundary', () => {
+  it.each([
+    { file_id: 'invalid' }, { file_id: fileId, object_path: 'other/event/file.jpg' }, {}, { file_id: fileId, is_banner: true },
+    { file_id: fileId, focal_x: 0.2 }, { file_id: fileId, focal_x: -0.1, focal_y: 0.5 },
+    { file_id: fileId, focal_x: 0.5, focal_y: 1.1 }, { file_id: null, focal_x: 0.5, focal_y: 0.5 },
+  ])('rejects forged banner input: %o', async body => {
+    auth.mockResolvedValue({ ok: true, auth: { supabase: client } } as never)
+    const response = await banner(new Request('https://api.example/banner', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    }), context)
+    expect(response.status).toBe(422)
+    expect(updateApiEventBanner).not.toHaveBeenCalled()
+  })
   it.each(operations)('authenticates $method before parsing input or resolving params', async ({ handler, method, service }) => {
     auth.mockResolvedValue({ ok: false, status: 401, error: { code: 'UNAUTHENTICATED', message: 'Authentication required.', retryable: false } })
     const request = new Request('https://api.example/files', { method })

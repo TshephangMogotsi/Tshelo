@@ -112,11 +112,7 @@ export function InvitationOnboardingForm({
                 onChange={event => setAccepted(event.target.checked)}
               />
               <span>
-                I agree to Tshelo&apos;s {termsUrl
-                  ? <a href={termsUrl} target="_blank" rel="noreferrer">terms of service</a>
-                  : 'terms of service'} and have read the {privacyUrl
-                  ? <a href={privacyUrl} target="_blank" rel="noreferrer">privacy policy</a>
-                  : <a href="/account/preferences/privacy-policy" target="_blank">privacy policy</a>}.
+                I agree to Tshelo&apos;s <a href={termsUrl ?? '/legal/terms'} target="_blank" rel="noreferrer">terms of service</a> and have read the <a href={privacyUrl ?? '/legal/privacy'} target="_blank" rel="noreferrer">privacy policy</a>.
               </span>
             </label>
 

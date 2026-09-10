@@ -7,28 +7,41 @@ import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon,
 import type { EventFile } from '@shared/contracts'
 import { formatEventFileSize } from '@shared/event-files'
 import { apiErrorMessage } from '@/lib/api-ui'
-import { eventAttachmentUrl, type EventAttachment } from './event-attachment-access'
+import { eventAttachmentThumbnailUrl, eventAttachmentUrl, type EventAttachment } from './event-attachment-access'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 3
 const ZOOM_STEP = .25
 
-function PrivateThumbnail({ eventId, attachment, compact = false, onPreview, disabled }: { eventId: string; attachment: EventAttachment; compact?: boolean; onPreview?: () => void; disabled?: boolean }) {
+function bannerCoordinate(value: number | undefined) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(1, Math.max(0, value))
+    : 0.5
+}
+
+export function eventBannerObjectPosition(attachment: EventAttachment) {
+  if (!('id' in attachment)) return '50% 50%'
+  return `${bannerCoordinate(attachment.banner_focal_x) * 100}% ${bannerCoordinate(attachment.banner_focal_y) * 100}%`
+}
+
+function PrivateThumbnail({ eventId, attachment, variant = 'thumbnail', compact = false, onPreview, disabled }: { eventId: string; attachment: EventAttachment; variant?: 'thumbnail' | 'banner'; compact?: boolean; onPreview?: () => void; disabled?: boolean }) {
   const [url, setUrl] = useState('')
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
-    void eventAttachmentUrl(eventId, attachment, controller.signal)
+    void eventAttachmentThumbnailUrl(eventId, attachment, variant, controller.signal)
       .then(value => { if (!controller.signal.aborted) setUrl(value) })
       .catch(() => { if (!controller.signal.aborted) setFailed(true) })
     return () => controller.abort()
-  }, [eventId, attachment, attempt])
-  if (failed) return compact ? <ImageIcon size={20} /> : <div className="member-event-file-thumbnail-failed"><ImageIcon size={24} aria-hidden="true" /><span>Preview unavailable</span><button type="button" onClick={() => { setFailed(false); setUrl(''); setAttempt(value => value + 1) }} aria-label={`Retry thumbnail for ${attachment.file_name}`}><RefreshCw size={14} /> Retry</button></div>
-  // Bypass the optimizer: these are private, short-lived URLs, not public cached images.
+  }, [eventId, attachment, attempt, variant])
+  if (failed) return compact ? <ImageIcon size={20} /> : <div className="member-event-file-thumbnail-failed"><ImageIcon size={24} aria-hidden="true" /><span>Low-data preview unavailable</span><button type="button" onClick={() => { setFailed(false); setUrl(''); setAttempt(value => value + 1) }} aria-label={`Retry thumbnail for ${attachment.file_name}`}><RefreshCw size={14} /> Retry</button></div>
+  // Storage already resized/compressed this private signed image. Bypass the
+  // public optimizer and make below-the-fold gallery loading explicit.
   if (!url) return <span className="member-event-file-loading" role="status" aria-label={`Loading thumbnail for ${attachment.file_name}`}><LoaderCircle size={22} aria-hidden="true" /></span>
-  const image = <Image src={url} alt={compact ? '' : attachment.file_name} width={480} height={360} unoptimized onError={() => setFailed(true)} />
-  return onPreview ? <button type="button" disabled={disabled} onClick={onPreview} aria-label={`Preview ${attachment.file_name}`}>{image}</button> : image
+  const banner = variant === 'banner'
+  const image = <Image src={url} alt={compact ? '' : attachment.file_name} width={banner ? 1280 : 480} height={banner ? 320 : 360} sizes={banner ? '100vw' : '(max-width: 480px) 50vw, 240px'} loading={banner ? 'eager' : 'lazy'} decoding="async" unoptimized onError={() => setFailed(true)} style={banner ? { objectPosition: eventBannerObjectPosition(attachment) } : undefined} />
+  return onPreview ? <button type="button" disabled={disabled} onClick={onPreview} aria-label={`View full image ${attachment.file_name}`}>{image}</button> : image
 }
 
 function ViewerDialog({ children, titleId, onClose }: { children: ReactNode; titleId: string; onClose: () => void }) {
@@ -57,7 +70,7 @@ function ViewerDialog({ children, titleId, onClose }: { children: ReactNode; tit
 export function EventAttachments({ eventId, attachments, layout = 'rows', onRemove, busy = false }: {
   eventId: string
   attachments: EventAttachment[]
-  layout?: 'rows' | 'gallery'
+  layout?: 'rows' | 'gallery' | 'banner'
   onRemove?: (file: EventFile) => void
   busy?: boolean
 }) {
@@ -116,12 +129,12 @@ export function EventAttachments({ eventId, attachments, layout = 'rows', onRemo
   const index = preview ? attachments.findIndex(item => item.object_path === preview.attachment.object_path) : -1
   const isImage = preview?.attachment.content_type !== 'application/pdf'
 
-  return <div className={layout === 'gallery' ? 'member-event-file-gallery' : 'member-announcement-files'}>
-    <div className={layout === 'gallery' ? 'member-event-file-grid' : undefined}>{attachments.map(attachment => <div className={layout === 'gallery' ? 'member-event-file-image' : 'member-announcement-file'} key={attachment.object_path}>
-      {layout === 'gallery' && <div className="member-event-file-thumbnail"><PrivateThumbnail eventId={eventId} attachment={attachment} onPreview={() => void previewAttachment(attachment)} disabled={loadingPath !== null} /></div>}
+  return <div className={layout === 'banner' ? 'member-event-banner-image' : layout === 'gallery' ? 'member-event-file-gallery' : 'member-announcement-files'}>
+    <div className={layout === 'gallery' ? 'member-event-file-grid' : undefined}>{attachments.map(attachment => <div className={layout !== 'rows' ? 'member-event-file-image' : 'member-announcement-file'} key={attachment.object_path}>
+      {layout !== 'rows' && <div className="member-event-file-thumbnail"><PrivateThumbnail eventId={eventId} attachment={attachment} variant={layout === 'banner' ? 'banner' : 'thumbnail'} onPreview={() => void previewAttachment(attachment)} disabled={loadingPath !== null} /></div>}
       <div className="member-announcement-file-details">{layout !== 'gallery' && (attachment.content_type === 'application/pdf' ? <FileText size={16} /> : <ImageIcon size={16} />)}<span title={attachment.file_name}>{attachment.file_name}</span><small>{formatEventFileSize(attachment.size_bytes)}</small></div>
       <div className="member-announcement-file-actions">
-        <button type="button" onClick={() => void previewAttachment(attachment)} disabled={loadingPath !== null} aria-label={`Preview ${attachment.file_name}`} title="Preview"><Eye size={16} /></button>
+        <button type="button" onClick={() => void previewAttachment(attachment)} disabled={loadingPath !== null} aria-label={layout !== 'rows' && attachment.content_type !== 'application/pdf' ? `View full image ${attachment.file_name}` : `Preview ${attachment.file_name}`} title={layout !== 'rows' && attachment.content_type !== 'application/pdf' ? 'View full image' : 'Preview'}><Eye size={16} /></button>
         <button type="button" onClick={() => void downloadAttachment(attachment)} disabled={loadingPath !== null} aria-label={`Download ${attachment.file_name}`} title="Download"><Download size={16} /></button>
         {onRemove && 'id' in attachment && <button type="button" className="danger" onClick={() => onRemove(attachment)} disabled={busy || loadingPath !== null} aria-label={`Delete ${attachment.file_name}`} title="Delete"><Trash2 size={16} /></button>}
         {loadingPath === attachment.object_path && <span role="status" aria-label={`Opening ${attachment.file_name}`}><LoaderCircle size={16} /></span>}

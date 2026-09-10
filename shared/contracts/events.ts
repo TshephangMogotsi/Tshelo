@@ -23,6 +23,8 @@ export type EventType = ExtensibleString<KnownEventType>
 export const EVENT_STATUSES = ['active', 'completed', 'cancelled'] as const
 export type EventStatus = (typeof EVENT_STATUSES)[number]
 
+export const DEFAULT_EVENT_TIME_ZONE = 'Africa/Gaborone'
+
 export const RSVP_STATUSES = ['pending', 'yes', 'no', 'maybe'] as const
 export type RsvpStatus = (typeof RSVP_STATUSES)[number]
 
@@ -49,6 +51,10 @@ export type Event = EventSummary & {
   description: string | null
   event_end_date: IsoDate | null
   event_end_time: IsoTime | null
+  /** Omitted only while an older API/database deployment is rolling forward. */
+  time_zone?: string
+  /** Omitted only while an older API/database deployment is rolling forward. */
+  rsvp_deadline?: IsoDate | null
   venue_address: string | null
   venue_lat: number | null
   venue_lng: number | null
@@ -197,6 +203,8 @@ export type CreateEventRequest = {
 
 export type UpdateEventRequest = Partial<Omit<CreateEventRequest, 'event_type' | 'currency_code' | 'organisers'>> & {
   status?: EventStatus
+  time_zone?: string
+  rsvp_deadline?: IsoDate | null
 }
 
 export type JoinEventRequest = {
@@ -220,6 +228,7 @@ export type EventAnnouncement = {
   author_name: string
   title: string
   body: string
+  is_pinned: boolean
   attachments: EventAnnouncementAttachment[]
   created_at: IsoDateTime
 }
@@ -283,6 +292,12 @@ export type CreateEventFileUploadSessionRequest = {
 
 export type EventFile = CreateEventFileUploadSessionRequest & {
   id: Uuid
+  /** Absent on older API deployments; otherwise true for the event's cover image. */
+  is_banner?: boolean
+  /** Normalized horizontal banner focal point from 0 (left) to 1 (right). */
+  banner_focal_x?: number
+  /** Normalized vertical banner focal point from 0 (top) to 1 (bottom). */
+  banner_focal_y?: number
   event_id: Uuid
   uploaded_by: Uuid
   object_path: string
@@ -302,10 +317,23 @@ export type FinalizeEventFileRequest = { upload_id: Uuid }
 export type EventFileAccess = {
   file_id: Uuid
   download_url: string
+  /** Private, short-lived 480×360 low-data preview; absent for documents or if transformation is unavailable. */
+  thumbnail_url?: string
+  /** Private, short-lived width-bounded preview retaining the source aspect ratio for client-side focal cropping. */
+  banner_thumbnail_url?: string
   expires_at: IsoDateTime
 }
 /** Also accepts an upload_id to cancel an unfinished upload. */
 export type RemoveEventFileResult = { file_id: Uuid }
+
+/** Select a published image belonging to this event; null removes only the banner. */
+export type UpdateEventBannerRequest = {
+  file_id: Uuid | null
+  /** Both coordinates must be supplied together. Omitted coordinates default to the centre. */
+  focal_x?: number
+  focal_y?: number
+}
+export type EventBanner = { file_id: Uuid | null; focal_x: number; focal_y: number }
 
 export type EventWorkspace = {
   event: Event
@@ -329,6 +357,8 @@ export type EventInvitePreview = {
   organiser_name: string
   has_linked_fund: boolean
   already_joined: boolean
+  /** Personal allowance for the authenticated invitee; zero for a general forwarded link. */
+  allowed_plus_ones: number
 }
 
 export type JoinedEvent = {
@@ -386,6 +416,15 @@ export type UpdateEventAnnouncementRequest = {
   attachments?: EventAnnouncementAttachment[]
 }
 
+export type SetEventAnnouncementPinRequest = {
+  is_pinned: boolean
+}
+
+export type EventAnnouncementPin = {
+  announcement_id: Uuid
+  is_pinned: boolean
+}
+
 export type InviteEventOrganiserRequest = EventOrganiserInput
 
 export type CompleteEventRequest = {
@@ -420,6 +459,7 @@ export type CreateEventFileUploadSessionResponse = ApiResponse<EventFileUploadSe
 export type FinalizeEventFileResponse = ApiResponse<EventFile>
 export type CreateEventFileAccessResponse = ApiResponse<EventFileAccess>
 export type RemoveEventFileResponse = ApiResponse<RemoveEventFileResult>
+export type UpdateEventBannerResponse = ApiResponse<EventBanner>
 export type GetEventInvitePreviewResponse = ApiResponse<EventInvitePreview>
 export type JoinEventByCodeResponse = ApiResponse<JoinedEvent>
 export type LeaveEventResultResponse = ApiResponse<LeftEvent>

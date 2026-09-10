@@ -87,14 +87,14 @@ test('sends bearer authentication without logging or transforming the token', as
 
 test('always verifies every unauthenticated route and only enables token suites explicitly', () => {
   const unauthenticated = buildVerificationCases({})
-  assert.equal(unauthenticated.length, 99)
+  assert.equal(unauthenticated.length, 101)
   assert.ok(unauthenticated.every(testCase => testCase.expectedStatus === 401))
 
   const authenticated = buildVerificationCases({
     API_ACCESS_TOKEN: 'user-token',
     API_ADMIN_ACCESS_TOKEN: 'admin-token',
   })
-  assert.equal(authenticated.length, 133)
+  assert.equal(authenticated.length, 140)
   assert.ok(authenticated.some(testCase => testCase.expectedStatus === 422))
   assert.ok(authenticated.some(testCase => testCase.name === 'platform admin list audit entries'))
 })
@@ -118,15 +118,15 @@ test('runs the unauthenticated black-box suite with a supplied fetch implementat
     onPass: result => passes.push(result),
   })
 
-  assert.equal(result.passed, 99)
-  assert.equal(calls, 99)
-  assert.equal(passes.length, 99)
+  assert.equal(result.passed, 101)
+  assert.equal(calls, 101)
+  assert.equal(passes.length, 101)
   assert.equal(result.authenticatedUserChecks, false)
 })
 
-test('exercises each file route with a malformed bearer token, without valid credentials', async () => {
+test('exercises each file and banner route with a malformed bearer token, without valid credentials', async () => {
   const invalidCases = buildVerificationCases({}).filter(item => item.tokenKind === 'invalid')
-  assert.equal(invalidCases.length, 4)
+  assert.equal(invalidCases.length, 5)
   let invalidRequests = 0
   await runApiVerification({
     environment: { API_BASE_URL: 'https://api.example.com' },
@@ -135,5 +135,5 @@ test('exercises each file route with a malformed bearer token, without valid cre
       return apiResponse(401, { ok: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required.', retryable: false } })
     },
   })
-  assert.equal(invalidRequests, 4)
+  assert.equal(invalidRequests, 5)
 })

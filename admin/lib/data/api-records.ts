@@ -52,6 +52,8 @@ export function toEvent(row: EventRow): Event {
     event_time: row.event_time,
     event_end_date: row.event_end_date,
     event_end_time: row.event_end_time,
+    time_zone: row.time_zone,
+    rsvp_deadline: row.rsvp_deadline,
     venue_address: row.venue_address,
     venue_lat: row.venue_lat,
     venue_lng: row.venue_lng,

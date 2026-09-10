@@ -9,6 +9,7 @@ import type {
   CreateEventFundRequest,
   Event,
   EventAnnouncement,
+  EventAnnouncementPin,
   EventAnnouncementAttachment,
   EventAnnouncementAttachmentAccess,
   EventAnnouncementAttachmentAccessRequest,
@@ -27,6 +28,7 @@ import type {
   LeftEvent,
   RemoveEventGuestResult,
   RespondEventRsvpRequest,
+  SetEventAnnouncementPinRequest,
   UnlockEventGuestCapacityResult,
   UpdateEventBudgetRequest,
   UpdateEventAnnouncementRequest,
@@ -83,6 +85,9 @@ function eventGuestRpcFailure<T>(error: { code?: string; message?: string }): Ap
   }
   if (message.includes('EVENT_INACTIVE')) {
     return dataFailure({ kind: 'business', code: 'CONFLICT', message: 'Completed or cancelled events cannot accept guest-list changes.' })
+  }
+  if (message.includes('EVENT_RSVP_DEADLINE_PASSED')) {
+    return dataFailure({ kind: 'business', code: 'CONFLICT', message: 'The RSVP deadline for this event has passed.' })
   }
   if (message.includes('EVENT_GUEST_DUPLICATE')) {
     return dataFailure({ kind: 'business', code: 'CONFLICT', message: 'That phone number is already on this event guest list.' })
@@ -167,6 +172,34 @@ function toAnnouncementAttachments(value: unknown): EventAnnouncementAttachment[
   })
 }
 
+function toEventAnnouncement(row: Record<string, unknown>): EventAnnouncement {
+  return {
+    id: row.id as string,
+    event_id: row.event_id as string,
+    author_id: row.author_id as string,
+    author_name: String(row.author_name ?? 'Organiser'),
+    title: row.title as string,
+    body: row.body as string,
+    is_pinned: Boolean(row.is_pinned),
+    attachments: toAnnouncementAttachments(row.attachments),
+    created_at: row.created_at as string,
+  }
+}
+
+function eventAnnouncementPinFailure<T>(error: { code?: string; message?: string }): ApiDataResult<T> {
+  const message = error.message ?? ''
+  if (message.includes('EVENT_ANNOUNCEMENT_FORBIDDEN')) {
+    return dataFailure({ kind: 'business', code: 'FORBIDDEN', message: 'Event update-management permission is required.' })
+  }
+  if (message.includes('EVENT_ANNOUNCEMENT_INACTIVE')) {
+    return dataFailure({ kind: 'business', code: 'CONFLICT', message: 'Completed or cancelled events cannot change pinned updates.' })
+  }
+  if (message.includes('EVENT_ANNOUNCEMENT_NOT_FOUND')) {
+    return dataFailure({ kind: 'business', code: 'NOT_FOUND', message: 'The requested event or announcement could not be found.' })
+  }
+  return dataFailure({ kind: 'database', error })
+}
+
 function hasValidAnnouncementAttachmentPath(
   attachment: EventAnnouncementAttachment,
   eventId: string,
@@ -205,7 +238,9 @@ export async function getApiEventWorkspace(
       .maybeSingle(),
     client
       .from('event_announcements')
-      .select('id, event_id, author_id, author_name, title, body, attachments, created_at')
+      // Select all during the rolling migration so older deployments simply
+      // map a missing is_pinned field to false.
+      .select('*')
       .eq('event_id', eventId)
       .order('created_at', { ascending: false }),
     client
@@ -256,16 +291,7 @@ export async function getApiEventWorkspace(
       total_budget: money(budgetResult.data.total_budget),
       currency_code: budgetResult.data.currency_code as EventBudget['currency_code'],
     } : null,
-    announcements: (announcementResult.data ?? []).map(row => ({
-      id: row.id as string,
-      event_id: row.event_id as string,
-      author_id: row.author_id as string,
-      author_name: String(row.author_name ?? 'Organiser'),
-      title: row.title as string,
-      body: row.body as string,
-      attachments: toAnnouncementAttachments(row.attachments),
-      created_at: row.created_at as string,
-    })),
+    announcements: (announcementResult.data ?? []).map(row => toEventAnnouncement(row)),
     capabilities: {
       is_creator: isCreator,
       is_organiser: isOrganiser,
@@ -504,6 +530,11 @@ export async function updateApiEvent(
   ]))
   const result = await client.from('events').update({ ...changes, updated_at: new Date().toISOString() })
     .eq('id', eventId).is('deleted_at', null).select('*').maybeSingle()
+  if (result.error && (
+    result.error.message.includes('EVENT_TIME_ZONE_INVALID')
+    || result.error.message.includes('EVENT_SCHEDULE_INVALID')
+    || result.error.message.includes('events_rsvp_deadline_order')
+  )) return dataFailure({ kind: 'validation', message: 'The event schedule, time zone, or RSVP deadline is invalid.' })
   if (result.error) return dataFailure({ kind: 'database', error: result.error })
   return dataSuccess(result.data ? toEvent(result.data as EventRow) : null)
 }
@@ -550,6 +581,7 @@ export async function previewApiEventInvite(client: SupabaseClient, code: string
 
 export async function joinApiEvent(client: SupabaseClient, code: string): Promise<ApiDataResult<JoinedEvent>> {
   const result = await client.rpc('join_event_by_code', { p_code: code.trim() }).single()
+  if (result.error?.message.includes('EVENT_RSVP_DEADLINE_PASSED')) return eventGuestRpcFailure(result.error)
   if (result.error) return dataFailure({ kind: 'database', error: result.error })
   return dataSuccess(result.data as JoinedEvent)
 }
@@ -633,18 +665,9 @@ export async function createApiEventAnnouncement(
     title: input.title.trim(),
     body: input.body.trim(),
     attachments,
-  }).select('id, event_id, author_id, author_name, title, body, attachments, created_at').single()
+  }).select('*').single()
   if (result.error) return dataFailure({ kind: 'database', error: result.error })
-  return dataSuccess({
-    id: result.data.id as string,
-    event_id: result.data.event_id as string,
-    author_id: result.data.author_id as string,
-    author_name: String(result.data.author_name ?? 'Organiser'),
-    title: result.data.title as string,
-    body: result.data.body as string,
-    attachments: toAnnouncementAttachments(result.data.attachments),
-    created_at: result.data.created_at as string,
-  })
+  return dataSuccess(toEventAnnouncement(result.data))
 }
 
 export async function updateApiEventAnnouncement(
@@ -681,22 +704,33 @@ export async function updateApiEventAnnouncement(
   const result = await client.from('event_announcements').update(changes)
     .eq('id', announcementId)
     .eq('event_id', eventId)
-    .select('id, event_id, author_id, author_name, title, body, attachments, created_at')
+    .select('*')
     .maybeSingle()
   if (result.error) return dataFailure({ kind: 'database', error: result.error })
   if (result.data && removedAttachmentPaths.length > 0) {
     await client.storage.from(EVENT_ANNOUNCEMENT_ATTACHMENT_BUCKET).remove(removedAttachmentPaths)
   }
-  return dataSuccess(result.data ? {
-    id: result.data.id as string,
-    event_id: result.data.event_id as string,
-    author_id: result.data.author_id as string,
-    author_name: String(result.data.author_name ?? 'Organiser'),
-    title: result.data.title as string,
-    body: result.data.body as string,
-    attachments: toAnnouncementAttachments(result.data.attachments),
-    created_at: result.data.created_at as string,
-  } : null)
+  return dataSuccess(result.data ? toEventAnnouncement(result.data) : null)
+}
+
+export async function setApiEventAnnouncementPin(
+  client: SupabaseClient,
+  eventId: string,
+  announcementId: string,
+  input: SetEventAnnouncementPinRequest,
+): Promise<ApiDataResult<EventAnnouncementPin | null>> {
+  const validEvent = validEventId(eventId)
+  if (validEvent.error) return validEvent as ApiDataResult<EventAnnouncementPin | null>
+  if (!UUID_PATTERN.test(announcementId)) return dataFailure({ kind: 'validation', message: 'announcement_id must be a valid UUID.' })
+
+  const pinResult = await client.rpc('set_event_announcement_pin', {
+    p_event_id: eventId,
+    p_announcement_id: announcementId,
+    p_is_pinned: input.is_pinned,
+  })
+  if (pinResult.error) return eventAnnouncementPinFailure(pinResult.error)
+  if (!pinResult.data) return dataSuccess(null)
+  return dataSuccess({ announcement_id: announcementId, is_pinned: input.is_pinned })
 }
 
 export async function createApiEventAnnouncementUploadSession(

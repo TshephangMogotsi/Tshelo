@@ -1,13 +1,9 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { ArrowLeft, ArrowRight, Mail, ShieldCheck } from 'lucide-react'
+import type { LegalSection } from '@/lib/legal-content'
 
-export type PolicySection = {
-  id: string
-  title: string
-  paragraphs: string[]
-  bullets?: string[]
-}
+export type PolicySection = LegalSection
 
 type PolicyDocumentProps = {
   title: string
@@ -17,6 +13,12 @@ type PolicyDocumentProps = {
   sections: PolicySection[]
   relatedHref: Route
   relatedLabel: string
+  version?: string
+  effectiveDate?: string
+  backHref?: Route
+  backLabel?: string
+  eyebrow?: string
+  contactPrompt?: string
 }
 
 export function PolicyDocument({
@@ -27,20 +29,26 @@ export function PolicyDocument({
   sections,
   relatedHref,
   relatedLabel,
+  version = '1.0',
+  effectiveDate = '27 August 2026',
+  backHref = '/account/preferences' as Route,
+  backLabel = 'Account preferences',
+  eyebrow = 'Privacy & consent',
+  contactPrompt = 'Questions about your data?',
 }: PolicyDocumentProps) {
   return (
     <section className="member-policy-page">
-      <Link className="member-policy-back" href={'/account/preferences' as Route}>
-        <ArrowLeft size={15} /> Account preferences
+      <Link className="member-policy-back" href={backHref}>
+        <ArrowLeft size={15} /> {backLabel}
       </Link>
 
       <header className="member-policy-hero">
-        <span className="member-policy-eyebrow"><ShieldCheck size={14} /> Privacy &amp; consent</span>
+        <span className="member-policy-eyebrow"><ShieldCheck size={14} /> {eyebrow}</span>
         <h1>{title} <em>{highlightedTitle}</em></h1>
         <p>{summary}</p>
         <dl className="member-policy-meta">
-          <div><dt>Version</dt><dd>1.0</dd></div>
-          <div><dt>Effective date</dt><dd>27 August 2026</dd></div>
+          <div><dt>Version</dt><dd>{version}</dd></div>
+          <div><dt>Effective date</dt><dd>{effectiveDate}</dd></div>
           <div><dt>Contact</dt><dd><a href="mailto:support@tshelo.co.bw">support@tshelo.co.bw</a></dd></div>
         </dl>
       </header>
@@ -76,7 +84,7 @@ export function PolicyDocument({
           <footer className="member-policy-footer">
             <div>
               <Mail size={18} />
-              <p><strong>Questions about your data?</strong> Contact <a href="mailto:support@tshelo.co.bw">support@tshelo.co.bw</a>.</p>
+              <p><strong>{contactPrompt}</strong> Contact <a href="mailto:support@tshelo.co.bw">support@tshelo.co.bw</a>.</p>
             </div>
             <Link href={relatedHref}>Read {relatedLabel} <ArrowRight size={14} /></Link>
           </footer>

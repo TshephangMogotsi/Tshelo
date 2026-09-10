@@ -1,41 +1,21 @@
 {
   "project_info": {
-    "project_number": "517477731476",
-    "firebase_url": "https://qrtest-c2544.firebaseio.com",
-    "project_id": "qrtest-c2544",
-    "storage_bucket": "qrtest-c2544.firebasestorage.app"
+    "project_number": "415905792672",
+    "project_id": "tshelo-7a41e",
+    "storage_bucket": "tshelo-7a41e.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:517477731476:android:de730fab2d831a7a97b881",
+        "mobilesdk_app_id": "1:415905792672:android:7c7b21fe220a71485c3fc5",
         "android_client_info": {
-          "package_name": "com.digitalnatives.tshelo"
+          "package_name": "com.tshelo.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDparoMRxRUosIdgzqoiJrV3e39Y9z4N0w"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:517477731476:android:ca939de71dd6d4e997b881",
-        "android_client_info": {
-          "package_name": "com.example.qrtest"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDparoMRxRUosIdgzqoiJrV3e39Y9z4N0w"
+          "current_key": "AIzaSyCm9dQ3xLgv5zQj0jfiAopWMH995l1jv7I"
         }
       ],
       "services": {

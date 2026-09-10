@@ -9,6 +9,10 @@ If the native app is installed and the operating system has verified the domain 
 
 ## Production association values
 
+The Android application ID is `com.tshelo.app`. This must match the package
+registered in Google Play, the Firebase Android app, and the package name in
+the deployed Digital Asset Links response.
+
 Configure these variables on the deployment serving `app.tshelo.com`:
 
 - `TSHELO_APPLE_TEAM_ID`: the ten-character Apple Developer team ID. For certificate rotation or multiple apps, `TSHELO_APPLE_APP_IDS` may instead contain comma-separated full application IDs.

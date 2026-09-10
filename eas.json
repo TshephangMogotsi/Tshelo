@@ -8,7 +8,9 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com",
+        "EXPO_PUBLIC_TERMS_OF_SERVICE_URL": "https://app.tshelo.com/legal/terms",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://app.tshelo.com/legal/privacy"
       },
       "android": {
         "buildType": "apk"
@@ -25,7 +27,9 @@
       "channel": "preview",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com",
+        "EXPO_PUBLIC_TERMS_OF_SERVICE_URL": "https://app.tshelo.com/legal/terms",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://app.tshelo.com/legal/privacy"
       },
       "android": {
         "buildType": "apk"
@@ -35,7 +39,9 @@
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com",
+        "EXPO_PUBLIC_TERMS_OF_SERVICE_URL": "https://app.tshelo.com/legal/terms",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://app.tshelo.com/legal/privacy"
       }
     }
   },

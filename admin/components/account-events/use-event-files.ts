@@ -70,10 +70,10 @@ export function useEventFiles(eventId: string, canManage: boolean) {
     remove: id => createApiClient().events.removeFile(eventId, id),
   }
 
-  async function work(action: () => Promise<void>) {
+  async function work<T>(action: () => Promise<T>): Promise<T | undefined> {
     if (locked.current) return
     locked.current = true; setBusy(true); setError('')
-    try { await action() } catch (cause) { if (mounted.current) setError(eventFileError(cause)) }
+    try { return await action() } catch (cause) { if (mounted.current) setError(eventFileError(cause)) }
     finally { locked.current = false; if (mounted.current) setBusy(false) }
   }
 
@@ -85,6 +85,7 @@ export function useEventFiles(eventId: string, canManage: boolean) {
     setFiles(current => [saved, ...current.filter(file => file.id !== saved.id)]
       .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)))
     setUploads(current => current.filter(item => item.key !== task.key))
+    return saved
   }
 
   function addFiles(selected: File[]) {
@@ -96,7 +97,28 @@ export function useEventFiles(eventId: string, canManage: boolean) {
         return { key: `${Date.now()}-${index}`, asset, input: validateEventFile(asset), step: 'upload', status: 'queued' }
       })
       setUploads(current => [...current, ...tasks])
-      for (const task of tasks) await upload(task)
+      const saved: EventFile[] = []
+      for (const task of tasks) {
+        const file = await upload(task)
+        if (file) saved.push(file)
+      }
+      return saved
+    })
+  }
+
+  function updateBanner(fileId: string | null, focalPoint?: { focal_x: number; focal_y: number }) {
+    if (!allowed.current) return
+    return work(async () => {
+      const result = await createApiClient().events.updateBanner(eventId, { file_id: fileId, ...focalPoint })
+      if (mounted.current) setFiles(current => current.map(file => ({
+        ...file,
+        is_banner: file.id === result.file_id,
+        ...(file.id === result.file_id ? {
+          banner_focal_x: result.focal_x,
+          banner_focal_y: result.focal_y,
+        } : {}),
+      })))
+      return result
     })
   }
 
@@ -131,8 +153,8 @@ export function useEventFiles(eventId: string, canManage: boolean) {
 
   function confirmRemove(file: EventFile) {
     if (!allowed.current || locked.current) return
-    if (window.confirm(`Delete “${file.file_name}” from this event? Everyone will lose access. This cannot be undone.`) && allowed.current) return remove(file)
+    if (window.confirm(`Delete “${file.file_name}” from this event? ${file.is_banner ? 'This will also remove the event banner. ' : ''}Everyone will lose access. This cannot be undone.`) && allowed.current) return remove(file)
   }
 
-  return { files, uploads, removals, busy, error, replaceFiles, addFiles, retryUpload, dismissUpload, confirmRemove, retryRemove: remove }
+  return { files, uploads, removals, busy, error, replaceFiles, addFiles, updateBanner, retryUpload, dismissUpload, confirmRemove, retryRemove: remove }
 }

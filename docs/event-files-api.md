@@ -7,6 +7,20 @@ preserves existing Phase 1 files, and routes metadata creation/removal through
 caller-owned database functions. The permission key remains
 `post_event_announcements`.
 
+For the web banner increment, also apply `20260908120000_event_banners.sql`, then
+`20260909140000_event_banner_focal_points.sql` before deploying the updated API.
+These add `EventFile.is_banner`, normalized `banner_focal_x`/`banner_focal_y`
+coordinates, and `events.updateBanner(eventId, { file_id, focal_x, focal_y })`;
+null clears the selection without deleting its image. Only published same-event
+JPG/PNG/WEBP images are eligible. The banner shares file permissions, quota,
+signed access and completion rules.
+See [the web → mobile tracker](web-mobile-parity.md) for implementation details,
+rollout order and the pending native UI work.
+
+Hosted status (2026-09-09): the original banner migration is applied to the
+linked Tshelo project. The focal-point migration and matching API/website still
+need deployment.
+
 The shared client exposes this flow:
 
 1. `events.createFileUploadSession(eventId, { file_name, content_type, size_bytes })`
@@ -22,8 +36,13 @@ The shared client exposes this flow:
    The file ID equals `upload_id`. Retrying a successful finalisation returns
    the same file. `events.workspace(eventId)` includes the ordered `files` array.
 4. `events.createFileAccess(eventId, fileId)` returns a five-minute
-   `download_url` and `expires_at`. This checks current participation and only
-   accepts finalised file IDs. Completed/cancelled events remain readable.
+   `download_url` and `expires_at`. Image responses can also include private
+   `thumbnail_url` (480×360, quality 55) and `banner_thumbnail_url` (up to 1280
+   pixels wide, quality 60, retaining the source aspect ratio). Browser/native
+   layout applies the responsive crop around the stored focal point; the server
+   must not pre-crop away pixels required by another viewport. Supabase renders
+   these without making the bucket public. This checks current participation and
+   only accepts finalised file IDs. Completed/cancelled events remain readable.
 5. `events.removeFile(eventId, fileId)` removes a published file for an active
    event manager, or cancels the caller's pending upload. Passing `upload_id`
    also cancels an upload before it is finalised.
@@ -103,9 +122,19 @@ so switching tabs retains uploads, successful files and recovery controls.
 
 The website reuses one `EventAttachments` component for update attachments and
 event files: image gallery, PDF iframe preview, zoom, filmstrip navigation and
-Blob downloads. Private images bypass Next's public image optimizer. The viewer
-refreshes signed access on each interaction, supports Escape/focus restoration,
-and shows retryable thumbnail, preview and download errors.
+Blob downloads. Event-wide banner/gallery surfaces use the transformed private
+URLs and bypass Next's public image optimizer; gallery images explicitly lazy
+load. The original URL is used only after **View full image** or Download. A
+missing transformed URL shows a retryable low-data-preview state rather than
+silently downloading the original. The viewer refreshes signed access on each
+interaction and supports Escape/focus restoration.
+
+The banner editor lets an authorised organiser click or drag a marker on the
+full low-data preview, with horizontal/vertical range controls and a centre reset
+for keyboard access. The API stores normalized coordinates from 0 through 1 on
+the selected private `event_files` row. CSS `object-position` applies that point
+to each responsive crop; the original bytes are never rewritten. A newly
+uploaded image remains in Files until its focal point is explicitly confirmed.
 
 Uploads use a binary PUT with progress and a two-minute transfer timeout. Guests
 and completed events stay read-only; cleanup/deletion recovery remains available.
@@ -123,7 +152,7 @@ data-service and route tests, API-verifier self-tests, web DOM tests, and the
 database/RLS suite. Run `npm --prefix admin run verify` for website typechecking,
 lint and its production build.
 
-`npm run test:event-files-db` executes both migrations and the actual project
+`npm run test:event-files-db` executes the file and banner migrations and the actual project
 permission helpers in a disposable in-memory PostgreSQL runtime using the pinned
 PGlite dev dependency. It covers the role matrix, legacy backfill, private storage
 policies, ownership, limits, completion and cleanup. It does not connect to
@@ -133,7 +162,7 @@ independent database connections. An alternate PGlite module path can optionally
 be passed to `node scripts/test-event-files-db.mjs`.
 
 With a running API, `API_BASE_URL=http://127.0.0.1:3100 npm run verify:api`
-performs 99 unauthenticated/invalid-token checks. Supplying `API_ACCESS_TOKEN`
+performs unauthenticated/invalid-token checks. Supplying `API_ACCESS_TOKEN`
 and `API_ADMIN_ACCESS_TOKEN` in the process environment enables authenticated
 validation/read checks. Tokens must not be committed or pasted into reports.
 These checks do not replace a signed-in upload/preview/download/delete smoke test.

@@ -162,7 +162,9 @@ export async function getApiEvent(
   const [eventResult, guestResult] = await Promise.all([
     client
       .from('events')
-      .select('id, creator_id, event_code, name, description, event_type, event_emoji, event_date, event_time, event_end_date, event_end_time, venue_name, venue_address, venue_lat, venue_lng, cover_photo_url, currency_code, linked_fund_id, share_code, estimated_spend_amount, status, completed_at, cancelled_at, created_at, updated_at')
+      // Keep rolling deploys readable: the mapper exposes only contracted fields,
+      // while `*` lets older schemas omit newly introduced schedule metadata.
+      .select('*')
       .eq('id', eventId)
       .is('deleted_at', null)
       .maybeSingle(),

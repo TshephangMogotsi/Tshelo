@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   Check,
-  Clipboard,
   Infinity as InfinityIcon,
   Mail,
   Pencil,
@@ -16,10 +15,10 @@ import {
   X,
 } from 'lucide-react'
 import type { EventGuest, EventGuestDirectory, EventWorkspace, RsvpStatus } from '@shared/contracts'
-import { invitationUrl } from '@shared/invitations'
 import { StatusPill } from '@/components/status-pill'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage, runApiRead } from '@/lib/api-ui'
+import { isEventRsvpClosed, rsvpDeadlineDetails } from '@/lib/event-schedule'
 
 type GuestFilter = RsvpStatus | 'all'
 type RsvpChoice = Exclude<RsvpStatus, 'pending'> | ''
@@ -38,6 +37,12 @@ function guestName(guest: EventGuest) {
 
 function guestContact(guest: EventGuest) {
   return [guest.guest_phone, guest.guest_email].filter(Boolean).join(' · ') || 'No contact details'
+}
+
+function guestAllowanceTitle(allowedPlusOnes: number) {
+  if (allowedPlusOnes <= 0) return 'This invitation is for you only.'
+  if (allowedPlusOnes === 1) return 'This invitation is for you and 1 additional guest.'
+  return `This invitation is for you and up to ${allowedPlusOnes} additional guests.`
 }
 
 function GuestDialog({
@@ -154,12 +159,9 @@ function GuestManager({ workspace, reloadWorkspace }: { workspace: EventWorkspac
   const [version, setVersion] = useState(0)
   const [dialogGuest, setDialogGuest] = useState<EventGuest | 'new' | null>(null)
   const [busy, setBusy] = useState('')
-  const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const eventId = workspace.event.id
-  const eventCode = workspace.event.share_code || workspace.event.event_code
-  const inviteLink = invitationUrl('event', eventCode)
 
   const refresh = useCallback(() => {
     setLoading(true)
@@ -232,16 +234,6 @@ function GuestManager({ workspace, reloadWorkspace }: { workspace: EventWorkspac
     }
   }
 
-  async function copyInvite() {
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      setError('The invitation link could not be copied. Please try again.')
-    }
-  }
-
   async function unlockCapacity() {
     const cost = directory?.capacity.unlock_cost_tokens ?? 10
     if (!window.confirm(`Use ${cost} tokens to unlock guest invitations above 100 people for this event?`)) return
@@ -274,7 +266,6 @@ function GuestManager({ workspace, reloadWorkspace }: { workspace: EventWorkspac
       <header>
         <div className="member-section-title"><span><UsersRound size={18} /></span><div><h2>Guest list</h2><small>Invite guests and track every RSVP</small></div></div>
         <div className="member-card-header-actions">
-          <button className="member-guest-secondary-action" type="button" onClick={copyInvite}><Clipboard size={14} /> {copied ? 'Copied' : 'Copy invite link'}</button>
           {workspace.event.status === 'active' && <button className="member-header-action" type="button" onClick={() => setDialogGuest('new')}><Plus size={14} /> Add guest</button>}
         </div>
       </header>
@@ -331,6 +322,7 @@ function AttendeeRsvp({ workspace, reloadWorkspace }: { workspace: EventWorkspac
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [now, setNow] = useState(() => new Date())
   const eventId = workspace.event.id
 
   useEffect(() => {
@@ -350,6 +342,11 @@ function AttendeeRsvp({ workspace, reloadWorkspace }: { workspace: EventWorkspac
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [eventId])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   function changePlusOnes(value: number) {
     setPlusOnes(value)
@@ -389,13 +386,19 @@ function AttendeeRsvp({ workspace, reloadWorkspace }: { workspace: EventWorkspac
   if (loading) return <section className="member-card"><div className="member-empty">Loading your invitation…</div></section>
   if (!guest) return <section className="member-card"><div className="member-empty">Your guest invitation could not be found. Open the original invitation link or ask the organiser to invite your current phone number.</div></section>
 
-  const canRespond = workspace.event.status === 'active'
+  const deadline = rsvpDeadlineDetails(workspace.event, now)
+  const deadlineClosed = isEventRsvpClosed(workspace.event, now)
+  const canRespond = workspace.event.status === 'active' && !deadlineClosed
   return <section className="member-card member-rsvp-card" id="guests">
-    <header><div className="member-section-title"><span><UsersRound size={18} /></span><div><h2>Your RSVP</h2><small>Let the organiser know if you can attend</small></div></div><StatusPill value={guest.rsvp_status} /></header>
+    <header><div className="member-section-title"><span><UsersRound size={18} /></span><div><h2>Your RSVP</h2><small>{workspace.event.rsvp_deadline ? `Respond by ${deadline.date} · ${deadline.countdown}` : 'Let the organiser know if you can attend'}</small></div></div><StatusPill value={guest.rsvp_status} /></header>
     <form className="member-rsvp-form" onSubmit={submit}>
       {notice && <p className="member-guest-notice"><Check size={14} /> {notice}</p>}
       {error && <p className="member-form-error" role="alert">{error}</p>}
       <div className="member-rsvp-intro"><strong>{guestName(guest)}</strong><span>{guestContact(guest)}</span></div>
+      <section className="member-invite-allowance" aria-label="Invitation guest allowance">
+        <span><UsersRound size={18} aria-hidden="true" /></span>
+        <div><strong>{guestAllowanceTitle(guest.allowed_plus_ones)}</strong><small>{guest.allowed_plus_ones > 0 ? `You can add no more than ${guest.allowed_plus_ones} ${guest.allowed_plus_ones === 1 ? 'guest' : 'guests'} to this RSVP.` : 'No additional guests are included with this invitation.'}</small></div>
+      </section>
       <fieldset className="member-rsvp-choices" disabled={!canRespond || busy}>
         <legend>Will you attend?</legend>
         <button type="button" className={status === 'yes' ? 'selected' : ''} onClick={() => setStatus('yes')} aria-pressed={status === 'yes'}><Check size={17} /><span><strong>Yes</strong><small>I’ll be there</small></span></button>
@@ -415,7 +418,7 @@ function AttendeeRsvp({ workspace, reloadWorkspace }: { workspace: EventWorkspac
       </div>
       <div className="member-rsvp-contact"><Phone size={14} /><span>{guest.guest_phone}</span>{guest.guest_email && <><Mail size={14} /><span>{guest.guest_email}</span></>}</div>
       <div className="member-form-actions"><button className="primary" type="submit" disabled={!canRespond || !status || busy}>{busy ? 'Saving RSVP…' : 'Save RSVP'}</button></div>
-      {!canRespond && <p className="member-form-note">This event is {workspace.event.status}, so RSVP responses are closed.</p>}
+      {!canRespond && <p className="member-form-note">{deadlineClosed ? `The RSVP deadline was ${deadline.date}, so responses are closed.` : `This event is ${workspace.event.status}, so RSVP responses are closed.`}</p>}
     </form>
   </section>
 }

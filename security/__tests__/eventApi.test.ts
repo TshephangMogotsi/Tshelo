@@ -23,6 +23,7 @@ describe('event API slice', () => {
     'admin/app/api/v1/events/[eventId]/complete/route.ts',
     'admin/app/api/v1/events/[eventId]/budget/route.ts',
     'admin/app/api/v1/events/[eventId]/announcements/route.ts',
+    'admin/app/api/v1/events/[eventId]/announcements/[announcementId]/pin/route.ts',
     'admin/app/api/v1/events/[eventId]/files/upload-session/route.ts',
     'admin/app/api/v1/events/[eventId]/files/finalize/route.ts',
     'admin/app/api/v1/events/[eventId]/files/[fileId]/access/route.ts',
@@ -43,16 +44,25 @@ describe('event API slice', () => {
       'EventFile', 'EventFileUploadSession', 'EventFileAccess', 'FinalizeEventFileRequest',
       'EventGuestDirectory', 'EventGuestSummary', 'EventGuestCapacity',
       'InviteEventGuestsRequest', 'UpdateEventGuestRequest', 'RespondEventRsvpRequest',
+      'SetEventAnnouncementPinRequest',
     ]) expect(contracts).toContain(`type ${contract}`)
+    expect(contracts).toContain('thumbnail_url?: string')
+    expect(contracts).toContain('banner_thumbnail_url?: string')
+    expect(contracts).toContain('banner_focal_x?: number')
+    expect(contracts).toContain('banner_focal_y?: number')
+    expect(contracts).toContain('time_zone?: string')
+    expect(contracts).toContain('rsvp_deadline?: IsoDate | null')
   })
 
   it('exposes every event operation through the shared client', () => {
     for (const method of [
       'createFund(', 'update(', 'remove(', 'workspace(', 'previewInvite(', 'join(',
       'leave(', 'complete(', 'budget(', 'updateBudget(', 'createAnnouncement(',
+      'setAnnouncementPin(',
       'listGuests(', 'getGuest(', 'inviteGuests(', 'updateGuest(', 'removeGuest(',
       'myRsvp(', 'respondRsvp(', 'guestCapacity(', 'unlockGuestCapacity(', 'inviteOrganiser(',
       'createFileUploadSession(', 'finalizeFile(', 'createFileAccess(', 'removeFile(',
+      'updateBanner(',
     ]) expect(client).toContain(method)
   })
 
@@ -75,6 +85,7 @@ describe('event API slice', () => {
       'can_manage_event_guests', 'get_event_guest_overview', 'invite_event_guests',
       'update_event_guest', 'remove_event_guest', 'respond_event_rsvp',
       'unlock_event_guest_capacity',
+      'set_event_announcement_pin',
     ]) expect(data).toContain(`'${rpc}'`)
     expect(data).not.toContain('service_role')
     expect(data).not.toContain('createClient(')
@@ -88,6 +99,7 @@ describe('event API slice', () => {
       'validateInviteEventOrganiserRequest', 'validateInviteEventGuestsRequest',
       'validateUpdateEventGuestRequest', 'validateRespondEventRsvpRequest',
       'validateCreateEventFileUploadSessionRequest', 'validateFinalizeEventFileRequest',
+      'validateSetEventAnnouncementPinRequest',
     ]) expect(validation).toContain(validator)
     expect(validation).toContain('PHONE_PATTERN')
     expect(validation).toContain('MONEY_PATTERN')
@@ -142,6 +154,8 @@ describe('event API slice', () => {
 
   it('provides organiser guest management and attendee RSVP views on the website', () => {
     const guestView = read('admin/components/account-events/event-guests.tsx')
+    const workspaceView = read('admin/components/account-events/event-workspace.tsx')
+    const accountOverview = read('admin/app/account/overview/page.tsx')
 
     for (const operation of [
       'events.listGuests(', 'events.inviteGuests(', 'events.updateGuest(',
@@ -152,7 +166,10 @@ describe('event API slice', () => {
     expect(guestView).toContain("linked_fund_permissions.includes('manage_event_guests')")
     expect(guestView).toContain('Invite guests and track every RSVP')
     expect(guestView).toContain('Your RSVP')
-    expect(guestView).toContain('Copy invite link')
+    expect(guestView).not.toContain('Copy invite link')
+    expect(workspaceView).toContain('Share invite')
+    expect(workspaceView).toContain('Add to calendar')
+    expect(accountOverview).not.toContain("invitationUrl('event'")
     expect(guestView).toContain('Search guests')
     expect(guestView).toContain('Filter by RSVP status')
     expect(guestView).toContain('Allowed plus-ones')

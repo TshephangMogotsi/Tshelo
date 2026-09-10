@@ -3,6 +3,7 @@ import {
   invitationAccountPath,
   invitationUrl,
   normalizeInvitationCode,
+  normalizeInvitationPathCode,
   parseInvitationUrl,
 } from '../invitations'
 
@@ -29,5 +30,12 @@ describe('invitation links', () => {
     expect(parseInvitationUrl('https://app.tshelo.com/invite/event/short')).toBeNull()
     expect(parseInvitationUrl('https://app.tshelo.com/invite/event/EVT-A1B2C3D4/extra')).toBeNull()
     expect(normalizeInvitationCode('EVT-ABC/123')).toBeNull()
+  })
+
+  it('recovers only the known sentence appended by legacy native share targets', () => {
+    expect(normalizeInvitationPathCode('D247DF3DD6CF4E03AA23%20Join%20Test%20Event%2028%20Aug%20on%20Tshelo')).toBe('D247DF3DD6CF4E03AA23')
+    expect(normalizeInvitationPathCode('D247DF3DD6CF4E03AA23 Join Test Event 28 Aug on Tshelo')).toBe('D247DF3DD6CF4E03AA23')
+    expect(normalizeInvitationPathCode('D247DF3DD6CF4E03AA23 arbitrary trailing text')).toBeNull()
+    expect(normalizeInvitationCode('D247DF3DD6CF4E03AA23 Join Test Event 28 Aug on Tshelo')).toBeNull()
   })
 })

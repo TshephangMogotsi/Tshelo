@@ -1,4 +1,4 @@
-const ANDROID_PACKAGE = 'com.digitalnatives.tshelo'
+const ANDROID_PACKAGE = 'com.tshelo.app'
 const SHA256_FINGERPRINT = /^(?:[A-F0-9]{2}:){31}[A-F0-9]{2}$/
 
 function configuredFingerprints() {

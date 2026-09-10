@@ -21,10 +21,40 @@ CREATE TABLE public.fund_permission_definitions (
 );
 CREATE TABLE public.fund_admin_permissions (fund_id uuid, user_id uuid, permission_key text);
 CREATE TABLE public.events (
-  id uuid PRIMARY KEY, creator_id uuid, linked_fund_id uuid, status text DEFAULT 'active', deleted_at timestamptz
+  id uuid PRIMARY KEY,
+  creator_id uuid,
+  linked_fund_id uuid,
+  status text DEFAULT 'active',
+  event_date date NOT NULL DEFAULT DATE '2099-01-01',
+  event_time time,
+  event_end_date date,
+  event_end_time time,
+  deleted_at timestamptz
 );
+GRANT SELECT ON public.events TO authenticated;
 CREATE TABLE public.event_organisers (event_id uuid, user_id uuid, status text);
-CREATE TABLE public.event_guests (event_id uuid, user_id uuid);
+CREATE TABLE public.event_guests (
+  event_id uuid,
+  user_id uuid,
+  rsvp_status text DEFAULT 'pending',
+  plus_ones integer DEFAULT 0,
+  plus_ones_names text[] DEFAULT '{}'::text[],
+  rsvp_note text,
+  dietary_requirements text,
+  accessibility_needs text
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.event_guests TO authenticated;
+CREATE TABLE public.event_announcements (
+  id uuid PRIMARY KEY,
+  event_id uuid NOT NULL,
+  author_id uuid NOT NULL,
+  author_name text NOT NULL DEFAULT 'Organiser',
+  title text NOT NULL,
+  body text NOT NULL,
+  attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE storage.buckets (
   id text PRIMARY KEY, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]
 );

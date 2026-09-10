@@ -17,6 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.datasentinels.tshelo",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "buildNumber": "1",
       "associatedDomains": ["applinks:app.tshelo.com"],
       "infoPlist": {
@@ -35,7 +36,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.digitalnatives.tshelo",
+      "package": "com.tshelo.app",
       "permissions": ["android.permission.RECEIVE_SMS"],
       "intentFilters": [
         {

@@ -149,6 +149,7 @@ describe('mobile API migration boundaries', () => {
       'admin/components/account-events/event-attachment-access.ts',
       'admin/components/account-events/event-files-panel.tsx',
       'admin/components/account-events/event-attachments.tsx',
+      'admin/components/account-events/event-banner.tsx',
       'shared/event-files.ts',
     ]
     for (const file of callers) {

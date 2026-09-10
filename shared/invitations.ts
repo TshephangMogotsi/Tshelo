@@ -21,6 +21,20 @@ export function normalizeInvitationCode(value: string): string | null {
   return code
 }
 
+/**
+ * Normalizes a code received from an invitation route. Older native share
+ * targets could append Tshelo's share sentence to the URL path, so accept only
+ * that known legacy suffix while keeping the general code validator strict.
+ */
+export function normalizeInvitationPathCode(value: string): string | null {
+  const decoded = decodePathSegment(value)
+  const direct = normalizeInvitationCode(decoded)
+  if (direct) return direct
+
+  const legacyShare = decoded.match(/^([A-Z0-9-]{8,32})\s+Join\s+.+\s+on\s+Tshelo\.?$/i)
+  return legacyShare ? normalizeInvitationCode(legacyShare[1]) : null
+}
+
 export function invitationPath(kind: InvitationKind, value: string): string {
   const code = normalizeInvitationCode(value)
   if (!code) throw new Error('Invitation codes must contain 8 to 32 letters, numbers, or hyphens.')

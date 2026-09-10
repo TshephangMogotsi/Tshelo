@@ -32,11 +32,17 @@ Authenticated calls require `Authorization: Bearer <supabase-access-token>`. The
 | `GET/PUT` | `/api/v1/events/:eventId/budget` | UUID path parameter / `UpdateEventBudgetRequest` | `EventBudget \| null` / `EventBudget` | Caller-scoped budget read/upsert; RLS decides authorization. |
 | `POST` | `/api/v1/events/:eventId/announcements` | `CreateEventAnnouncementRequest` | `EventAnnouncement` | Caller-scoped announcement insert; RLS decides authorization. |
 | `PATCH` | `/api/v1/events/:eventId/announcements/:announcementId` | `UpdateEventAnnouncementRequest` | `EventAnnouncement` | Caller-scoped announcement update; RLS limits editing to event announcement managers. |
+| `PATCH` | `/api/v1/events/:eventId/announcements/:announcementId/pin` | `SetEventAnnouncementPinRequest` | `SetEventAnnouncementPinResult` | `set_event_announcement_pin(...)` atomically selects at most one Overview announcement. |
 | `POST` | `/api/v1/events/:eventId/announcements/upload-session` | `CreateEventAnnouncementUploadSessionRequest` | `EventAnnouncementUploadSession` | Authorises a private direct PDF or image upload for an event announcement. |
 | `POST` | `/api/v1/events/:eventId/announcements/attachments` | `EventAnnouncementAttachmentAccessRequest` | `EventAnnouncementAttachmentAccess` | Creates a short-lived private preview/download URL for an event participant. |
 | `DELETE` | `/api/v1/events/:eventId/announcements/attachments` | `EventAnnouncementAttachmentAccessRequest` | `{}` | Removes an unpublished attachment owned by the caller; published files must be removed through announcement editing. |
+| `POST` | `/api/v1/events/:eventId/files/upload-session` | `CreateEventFileUploadSessionRequest` | `EventFileUploadSession` | Reserves one caller-owned private event-file upload without accepting a caller-selected object path. |
+| `POST` | `/api/v1/events/:eventId/files/finalize` | `FinalizeEventFileRequest` | `EventFile` | Verifies the reserved object and publishes it through `finalize_event_file_upload(...)`. |
+| `POST` | `/api/v1/events/:eventId/files/:fileId/access` | UUID path parameters | `EventFileAccess` | RLS-gated five-minute original and optional low-data signed URLs for current event participants. |
+| `DELETE` | `/api/v1/events/:eventId/files/:fileId` | UUID path parameters | `RemoveEventFileResult` | Claims removal in SQL before deleting private Storage bytes; supports safe retry. |
+| `PATCH` | `/api/v1/events/:eventId/banner` | `UpdateEventBannerRequest` | `EventBanner` | `set_event_banner_focal_point(...)` atomically selects a same-event image and stores bounded normalized focal coordinates; null clears only the selection. |
 | `POST` | `/api/v1/events/:eventId/organiser-invites` | `InviteEventOrganiserRequest` | `{}` | `invite_event_fund_organiser(...)` |
-| `GET` | `/api/v1/events/invite-preview` | `code` query | `EventInvitePreview` | `find_event_by_code(...)` |
+| `GET` | `/api/v1/events/invite-preview` | `code` query | `EventInvitePreview` | `find_event_by_code(...)`; includes only the authenticated invitee's personal plus-one allowance, defaulting to zero for a forwarded/general link. |
 | `POST` | `/api/v1/events/join` | `JoinEventRequest` | `JoinedEvent` | `join_event_by_code(...)` |
 | `POST` | `/api/v1/events/event-funds` | `CreateEventFundRequest` | `CreatedEventFund` | `create_event_fund(...)`, followed by a caller-scoped venue-address update when supplied. |
 | `GET` | `/api/v1/funds` | `ListFundsRequest` query | `Paginated<FundSummary>` | Caller-scoped `funds` query; RLS decides visibility. |

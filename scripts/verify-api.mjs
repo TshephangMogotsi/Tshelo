@@ -60,6 +60,7 @@ const unauthenticatedCases = [
   ['update event budget', 'PUT', `/api/v1/events/${TEST_UUID}/budget`],
   ['create event announcement', 'POST', `/api/v1/events/${TEST_UUID}/announcements`],
   ['create event file upload session', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`],
+  ['update event banner', 'PATCH', `/api/v1/events/${TEST_UUID}/banner`],
   ['finalize event file', 'POST', `/api/v1/events/${TEST_UUID}/files/finalize`],
   ['access event file', 'POST', `/api/v1/events/${TEST_UUID}/files/${TEST_UUID}/access`],
   ['remove event file', 'DELETE', `/api/v1/events/${TEST_UUID}/files/${TEST_UUID}`],
@@ -111,7 +112,7 @@ const unauthenticatedCases = [
 }))
 
 const invalidEventFileTokenCases = unauthenticatedCases
-  .filter(testCase => testCase.path.includes('/files/'))
+  .filter(testCase => testCase.path.includes('/files/') || testCase.path.endsWith('/banner'))
   .map(testCase => ({ ...testCase, name: testCase.name.replace('unauthenticated', 'invalid-token'), tokenKind: 'invalid' }))
 
 const authenticatedReadCases = [
@@ -144,6 +145,11 @@ const authenticatedValidationCases = [
   ['reject short event invite code', 'GET', '/api/v1/events/invite-preview?code=x'],
   ['reject empty event join', 'POST', '/api/v1/events/join', {}],
   ['reject invalid event file upload', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'bad.svg', content_type: 'image/svg+xml', size_bytes: 10 }],
+  ['reject invalid banner selection', 'PATCH', `/api/v1/events/${TEST_UUID}/banner`, { file_id: 'invalid' }],
+  ['reject public banner URL', 'PATCH', `/api/v1/events/${TEST_UUID}/banner`, { file_id: TEST_UUID, url: 'https://example.com/image.jpg' }],
+  ['reject partial banner focal point', 'PATCH', `/api/v1/events/${TEST_UUID}/banner`, { file_id: TEST_UUID, focal_x: 0.25 }],
+  ['reject out-of-range banner focal point', 'PATCH', `/api/v1/events/${TEST_UUID}/banner`, { file_id: TEST_UUID, focal_x: -0.01, focal_y: 0.5 }],
+  ['reject focal point without banner', 'PATCH', `/api/v1/events/${TEST_UUID}/banner`, { file_id: null, focal_x: 0.5, focal_y: 0.5 }],
   ['reject invalid event file finalization', 'POST', `/api/v1/events/${TEST_UUID}/files/finalize`, { upload_id: 'invalid' }],
   ['reject oversized event file', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'big.pdf', content_type: 'application/pdf', size_bytes: 10485761 }],
   ['reject empty event file', 'POST', `/api/v1/events/${TEST_UUID}/files/upload-session`, { file_name: 'empty.pdf', content_type: 'application/pdf', size_bytes: 0 }],

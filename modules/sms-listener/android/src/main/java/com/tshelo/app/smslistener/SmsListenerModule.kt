@@ -1,4 +1,4 @@
-package com.digitalnatives.tshelo.smslistener
+package com.tshelo.app.smslistener
 
 import android.content.BroadcastReceiver
 import android.content.Context

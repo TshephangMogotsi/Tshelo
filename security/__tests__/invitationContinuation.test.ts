@@ -80,7 +80,7 @@ describe('native invitation-link associations', () => {
       relation: ['delegate_permission/common.handle_all_urls'],
       target: {
         namespace: 'android_app',
-        package_name: 'com.digitalnatives.tshelo',
+        package_name: 'com.tshelo.app',
         sha256_cert_fingerprints: [ANDROID_FINGERPRINT],
       },
     }])

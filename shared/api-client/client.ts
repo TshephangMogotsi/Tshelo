@@ -21,6 +21,7 @@ import type {
   EventGuestCapacity,
   EventGuestDirectory,
   EventAnnouncement,
+  EventAnnouncementPin,
   EventAnnouncementAttachmentAccess,
   EventAnnouncementAttachmentAccessRequest,
   EventAnnouncementUploadSession,
@@ -34,6 +35,8 @@ import type {
   EventFile,
   EventFileAccess,
   RemoveEventFileResult,
+  UpdateEventBannerRequest,
+  EventBanner,
   EvaluateRewardsResult,
   Expense,
   FundContributor,
@@ -88,6 +91,7 @@ import type {
   RespondOrganiserInviteRequest,
   RespondOrganiserInviteResult,
   RespondEventRsvpRequest,
+  SetEventAnnouncementPinRequest,
   RewardProgressOverview,
   RewardSnackbarItem,
   SearchConnectionsRequest,
@@ -428,6 +432,9 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       createFileUploadSession(eventId: string, input: CreateEventFileUploadSessionRequest, call?: ApiCallOptions) {
         return request<EventFileUploadSession>(`/api/v1/events/${encodeURIComponent(eventId)}/files/upload-session`, { ...call, method: 'POST', body: input })
       },
+      updateBanner(eventId: string, input: UpdateEventBannerRequest, call?: ApiCallOptions) {
+        return request<EventBanner>(`/api/v1/events/${encodeURIComponent(eventId)}/banner`, { ...call, method: 'PATCH', body: input })
+      },
       finalizeFile(eventId: string, input: FinalizeEventFileRequest, call?: ApiCallOptions) {
         return request<EventFile>(`/api/v1/events/${encodeURIComponent(eventId)}/files/finalize`, { ...call, method: 'POST', body: input })
       },
@@ -511,6 +518,9 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       },
       updateAnnouncement(eventId: string, announcementId: string, input: UpdateEventAnnouncementRequest, call?: ApiCallOptions) {
         return request<EventAnnouncement>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/${encodeURIComponent(announcementId)}`, { ...call, method: 'PATCH', body: input })
+      },
+      setAnnouncementPin(eventId: string, announcementId: string, input: SetEventAnnouncementPinRequest, call?: ApiCallOptions) {
+        return request<EventAnnouncementPin>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/${encodeURIComponent(announcementId)}/pin`, { ...call, method: 'PUT', body: input })
       },
       createAnnouncementUploadSession(eventId: string, input: CreateEventAnnouncementUploadSessionRequest, call?: ApiCallOptions) {
         return request<EventAnnouncementUploadSession>(`/api/v1/events/${encodeURIComponent(eventId)}/announcements/upload-session`, { ...call, method: 'POST', body: input })
