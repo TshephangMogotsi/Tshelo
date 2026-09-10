@@ -7,15 +7,17 @@ describe('buildCalendarEventDetails', () => {
       eventDate: '2026-08-20',
       eventTime: '14:30:00',
       venue: 'Cresta Botsalo',
-      shareCode: 'EVT-123',
+      timeZone: 'Africa/Gaborone',
+      rsvpDeadline: '2026-08-18',
     })
 
     expect(result?.title).toBe('Wedding')
-    expect(result?.startDate.getHours()).toBe(14)
-    expect(result?.startDate.getMinutes()).toBe(30)
+    expect(result?.startDate.toISOString()).toBe('2026-08-20T12:30:00.000Z')
     expect(result?.endDate.getTime()).toBe((result?.startDate.getTime() ?? 0) + 60 * 60 * 1000)
     expect(result?.location).toBe('Cresta Botsalo')
-    expect(result?.notes).toContain('EVT-123')
+    expect(result?.notes).toContain('Africa/Gaborone')
+    expect(result?.notes).toContain('2026-08-18')
+    expect(result?.notes).not.toContain('EVT-')
     expect(result?.allDay).toBe(false)
   })
 
@@ -26,16 +28,26 @@ describe('buildCalendarEventDetails', () => {
       eventTime: '09:00:00',
       eventEndDate: '2026-08-21',
       eventEndTime: '16:00:00',
+      timeZone: 'Africa/Gaborone',
     })
 
-    expect(result?.endDate.getDate()).toBe(21)
-    expect(result?.endDate.getHours()).toBe(16)
+    expect(result?.endDate.toISOString()).toBe('2026-08-21T14:00:00.000Z')
   })
 
   it('creates an all-day entry when no time is available', () => {
     const result = buildCalendarEventDetails({ title: 'Festival', eventDate: '2026-08-20' })
     expect(result?.allDay).toBe(true)
     expect(result?.endDate.getTime()).toBe((result?.startDate.getTime() ?? 0) + 24 * 60 * 60 * 1000)
+  })
+
+  it('keeps a multi-day all-day event inclusive of its saved end date', () => {
+    const result = buildCalendarEventDetails({
+      title: 'Festival',
+      eventDate: '2026-08-20',
+      eventEndDate: '2026-08-22',
+    })
+    expect(result?.allDay).toBe(true)
+    expect((result?.endDate.getTime() ?? 0) - (result?.startDate.getTime() ?? 0)).toBe(3 * 24 * 60 * 60 * 1000)
   })
 
   it('rejects an invalid event date', () => {

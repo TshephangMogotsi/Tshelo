@@ -1,6 +1,6 @@
 # Web → mobile feature tracker
 
-Updated: 2026-09-09.
+Updated: 2026-09-10.
 
 Track web-first changes here until their native UI and device verification are
 complete. This is a forward-looking handoff, not a full audit of older platform
@@ -11,12 +11,13 @@ storage or permissions path.
 
 | Feature | Website | Shared API/database | Mobile |
 | --- | --- | --- | --- |
-| Event banner and focal point | Implemented locally; not deployed | Base banner migration is hosted; focal-point API/migration implemented locally and not deployed | Pending — no native screen/hook changes in this increment |
+| Event banner and focal point | Deployed 2026-09-10 | Banner and focal-point migrations hosted; shared typed API deployed | Implemented locally 2026-09-10; physical-device smoke pending |
 | Event-wide Files tab (existing baseline) | Already implemented | Existing private file lifecycle reused by banners | Already implemented; not a new porting task |
-| Event-list hover highlight | Subtle theme-aware tint implemented locally | No API/database changes | Web-only hover correction; no native UI change required |
-| Low-data event images | Compressed banner/gallery previews and explicit full-image access implemented locally | Optional private preview URLs added to existing signed-access response | Pending native consumption and device data-use verification |
-| Event schedule details | Countdown, duration, RSVP deadline, timezone and calendar export implemented locally | Schedule migration applied to hosted Supabase on 2026-09-09; optional response fields implemented locally | Pending native schedule UI, calendar integration and device verification |
-| Pinned urgent update | One announcement can be promoted prominently on Overview; implemented locally | Atomic single-pin migration applied to hosted Supabase on 2026-09-09; typed API implemented locally | Pending native pin controls and Overview treatment |
+| Event-list hover highlight | Deployed 2026-09-10 | No API/database changes | Web-only hover correction; no native UI change required |
+| Low-data event images | Deployed 2026-09-10 | Optional private preview URLs deployed on the signed-access response | Implemented locally 2026-09-10; physical-device data-use verification pending |
+| Event schedule details | Deployed 2026-09-10 | Schedule migration hosted; typed response/update fields deployed | Implemented locally 2026-09-10; physical-device calendar/layout verification pending |
+| Pinned urgent update | Deployed 2026-09-10 | Atomic single-pin migration and typed API hosted | Implemented locally 2026-09-10; physical-device role/offline verification pending |
+| Personal allowance and RSVP entry | Deployed 2026-09-10 | Caller-scoped allowance migration and RSVP API hosted | Implemented locally 2026-09-10; physical-device invitation/deep-link verification pending |
 
 ## WEB-001 — Private event banner
 
@@ -91,24 +92,24 @@ and event-list cards are outside this increment. MIME metadata validation is not
 malware scanning; existing orphan-cleanup and signed-URL expiry limitations in
 [the file API guide](event-files-api.md) still apply.
 
-### Mobile implementation checklist — not started
+### Mobile implementation checklist — code complete; device sign-off pending
 
-- [ ] Add a banner component above the native event tabs/header content in
-  `screens/main/EventDetailScreen.tsx`; keep it present when switching tabs.
-- [ ] Derive the selected image from the screen-level file state, treating a
+- [x] Add the banner as the first item in the scrollable native Overview in
+  `screens/main/EventDetailScreen.tsx` without duplicating it on task tabs.
+- [x] Derive the selected image from the screen-level file state, treating a
   missing `is_banner` as false. Reconcile it on workspace reload and file deletion.
-- [ ] Reuse native Files manager permissions and lifecycle. Add typed
+- [x] Reuse native Files manager permissions and lifecycle. Add typed
   `events.updateBanner` handling and update local file flags only after success.
-- [ ] Support choose-existing and single-image upload; validate before upload,
+- [x] Support choose-existing and single-image upload; validate before upload,
   retain quota limits, and keep failed/uncertain work in Files recovery.
-- [ ] Reuse native attachment access, preview/zoom and OS download/share behaviour.
-- [ ] Apply `banner_focal_x`/`banner_focal_y` to the native image crop, defaulting
+- [x] Reuse native attachment access, preview/zoom and OS download/share behaviour.
+- [x] Apply `banner_focal_x`/`banner_focal_y` to the native image crop, defaulting
   to centre for older responses. Add a full-image point picker with accessible
   alternatives that works for touch and screen readers.
-- [ ] Add confirmed banner removal and a banner warning to underlying file deletion.
-- [ ] Match empty, busy, failure/retry, success and read-only states; disable
+- [x] Add confirmed banner removal and a banner warning to underlying file deletion.
+- [x] Match empty, busy, failure/retry, success and read-only states; disable
   conflicting operations and preserve work while switching tabs.
-- [ ] Add native component/hook regressions for selection, upload, failure,
+- [x] Add native component/hook regressions for selection, upload, failure,
   confirmation, deletion and all permission/completion states.
 - [ ] User-owned iOS/Android device smoke: picker, image crop, zoom, share/save,
   narrow/large-text/dark-mode layouts, connection interruption and resume.
@@ -140,7 +141,7 @@ underlying file deletion and completed/cancelled events.
 
 These are not live multi-account Storage tests or a native-device sign-off.
 No simulator has been used. The hosted banner migration was applied on
-2026-09-09; the API/website deployment is still pending.
+2026-09-09; the matching API/website was deployed on 2026-09-10.
 
 Local results on 2026-09-08:
 
@@ -155,7 +156,7 @@ Local results on 2026-09-08:
 | Website lint and production build | Passed; banner PATCH route included |
 | Rebuilt local HTTP API | 101 missing/invalid-credential checks passed |
 | Local connected browser | Event URL redirects to rendered sign-in page, preserving its return path |
-| Signed-in browser/Storage and native device smoke | Pending; no local signed-in session or hosted banner migration |
+| Signed-in browser/Storage and native device smoke | Pending; automated API, component, bundle and migration checks passed |
 
 During the initial 2026-09-08 verification, no production mutations were performed.
 Browser inspection stopped at sign-in;
@@ -203,6 +204,19 @@ test. Browser reconnection failed twice with a native-pipe startup error, so the
 user was asked to refresh the event page. A signed-in browser pass is not claimed.
 The local server remains available at `http://127.0.0.1:3100`. No application
 deployment or Git push was performed in this rollout.
+
+### 2026-09-10 — Native implementation and focal-point rollout
+
+Implemented the native banner, low-data image, schedule, pinned-update and
+enhanced RSVP flows described below. The banner focal-point migration
+`20260909140000_event_banner_focal_points.sql` was the only pending linked
+database change; an approved dry run confirmed its scope before application,
+and the linked migration list now matches the repository through that version.
+
+The complete automated verification suite and production Expo exports pass.
+A local connected-browser preview also rendered the mobile web bundle without
+an error overlay. Signed physical-device testing, signed Android/iOS artifacts
+and store-console submission remain account-owner release steps.
 
 ## WEB-002 — Subtle event-list highlight
 
@@ -295,24 +309,25 @@ increment.
 
 Mobile parity checklist:
 
-- Consume optional `thumbnail_url` for event gallery cards and
+- [x] Consume optional `thumbnail_url` for event gallery cards and
   `banner_thumbnail_url` for the event banner; retain `download_url` for explicit
   full-image preview, save and share only.
-- Do not fall back from a missing/failed compressed preview to original bytes
+- [x] Do not fall back from a missing/failed compressed preview to original bytes
   without a user action. Show a lightweight placeholder with retry and full-view
   choices.
-- Lazy-load or virtualise below-the-fold gallery thumbnails and cancel requests
-  for rows leaving the viewport.
-- Make **View full image** explicit and warn or confirm when appropriate on a
+- [x] Load only the first visible gallery group automatically, require a tap for
+  later previews, and abort signed-preview requests when the panel unmounts.
+- [x] Make **View full image** explicit and warn or confirm when appropriate on a
   constrained/mobile data connection before retrieving a large original.
-- Verify byte use on real iOS/Android devices for long galleries, repeated tab
+- [ ] Verify byte use on real iOS/Android devices for long galleries, repeated tab
   changes, preview failure, offline recovery and signed-URL expiry. No simulator
   was used for this web increment.
 
 Verification covers exact Storage transform options, document exclusion,
 graceful transform failure, explicit lazy/eager browser attributes, transformed
 thumbnail selection and original access only after an intentional full-view or
-download action. This requires an API/website deployment but no database change.
+download action. The matching API/website is deployed and the native code was
+completed locally on 2026-09-10; physical-device data-use verification remains.
 
 ## WEB-005 — Timezone-aware event schedule
 
@@ -343,20 +358,20 @@ editing remains disabled until the matching database fields are present.
 
 Mobile parity checklist:
 
-- Add the same countdown, duration, deadline and timezone summary without
+- [x] Add the same countdown, duration, deadline and timezone summary without
   changing the current native event navigation.
-- Interpret `event_date`/`event_time` in `Event.time_zone`, falling back to
+- [x] Interpret `event_date`/`event_time` in `Event.time_zone`, falling back to
   `Africa/Gaborone` only when an older API omits the field.
-- Refresh active countdowns without a high-frequency timer and pause unnecessary
+- [x] Refresh active countdowns without a high-frequency timer and pause unnecessary
   work while the screen is backgrounded.
-- Disable attendee RSVP after the local deadline while still handling the server
+- [x] Disable attendee RSVP after the local deadline while still handling the server
   conflict response; retain organiser guest management.
-- Use the native calendar permission/integration where appropriate, preserving
+- [x] Use the native calendar integration where appropriate, preserving
   the exact event instant and making any permission denial recoverable. Never add
   the private invitation link to a calendar entry by default.
-- Add schedule editing with recognised IANA zones and the same deadline ordering
+- [x] Add schedule editing with recognised IANA zones and the same deadline ordering
   rules; do not infer the event zone from the phone after it has been saved.
-- Verify daylight-saving zones, cross-midnight/multi-day events, date-only events,
+- [ ] Verify daylight-saving zones, cross-midnight/multi-day events, date-only events,
   expired deadlines, offline behaviour and large-text layouts on real devices.
   No simulator was used for this web increment.
 
@@ -366,7 +381,9 @@ web rendering and real migration/trigger execution in isolated PostgreSQL. The
 hosted `20260909110000_event_schedule_details.sql` migration was applied on
 2026-09-09 after a dry run confirmed it was the only pending migration; no seeds
 or role changes were included. Post-apply migration history shows local and remote
-at the same version. The application deployment remains pending.
+at the same version. The matching application is deployed and the native code
+was completed locally on 2026-09-10; physical-device calendar and layout checks
+remain.
 
 ## WEB-006 — Pinned urgent event update
 
@@ -389,16 +406,16 @@ web asks for confirmation before replacing an existing pin.
 
 Mobile parity checklist:
 
-- Render the pinned announcement prominently near the start of the native
+- [x] Render the pinned announcement prominently near the start of the native
   Overview, while preserving the existing event flow and announcement viewer.
-- Sort the pinned item first in Updates and show a restrained pinned badge.
-- Add pin/unpin controls only for active-event users with the existing
+- [x] Sort the pinned item first in Updates and show a restrained pinned badge.
+- [x] Add pin/unpin controls only for active-event users with the existing
   `post_event_announcements` capability; confirm replacement of another pin.
-- Call the shared `events.setAnnouncementPin` client operation and reload from
+- [x] Call the shared `events.setAnnouncementPin` client operation and reload from
   the server after success rather than maintaining a separate native pin state.
-- Treat a missing `is_pinned` field as false during a rolling deployment and
+- [x] Treat a missing `is_pinned` field as false during a rolling deployment and
   surface forbidden, inactive-event and network failures without hiding updates.
-- Verify creator, organiser, delegated admin, guest and linked-fund member roles,
+- [ ] Verify creator, organiser, delegated admin, guest and linked-fund member roles,
   concurrent replacement, offline retry and large-text layouts on real devices.
   No simulator should be launched unless the user changes that instruction.
 
@@ -407,7 +424,8 @@ serialization, caller-scoped API service errors, Overview prominence, replacemen
 confirmation, the unique database invariant, atomic replacement and role/inactive
 event enforcement using the real migration in isolated PostgreSQL. The hosted
 migration was applied on 2026-09-09 after a dry run confirmed it was the only
-pending change. The application code still requires deployment.
+pending change. The matching application is deployed and the native code was
+completed locally on 2026-09-10; physical-device role/offline checks remain.
 
 ## WEB-007 — Personal allowance and RSVP during invitation entry
 
@@ -428,15 +446,16 @@ invitation emails also state the same allowance, including when none is granted.
 
 Mobile parity checklist:
 
-- Add `allowedPlusOnes` to the native invite preview model from the shared
+- [x] Add `allowedPlusOnes` to the native invite preview model from the shared
   `EventInvitePreview.allowed_plus_ones` field.
-- Replace the native one-tap Join action with Yes/Maybe/No, a selector capped at
+- [x] Replace the native one-tap Join action with Yes/Maybe/No, a selector capped at
   the returned allowance, and optional guest-name fields before Event Detail.
-- Submit through `api.events.respondRsvp` with the invitation code so the same
+- [x] Submit through `api.events.respondRsvp` with the invitation code so the same
   database claim and limit enforcement is used; keep `join` only for legacy flow
   compatibility until all clients have migrated.
-- Repeat the personal allowance prominently in the native attendee RSVP screen.
-- Treat a missing allowance as zero during rollout and verify forwarded links,
+- [x] Repeat the personal allowance prominently in the native attendee RSVP screen.
+- [ ] Treating a missing allowance as zero and the zero/one/multiple allowance
+  cases are covered by regression tests. Verify forwarded links,
   mismatched phone numbers, forged counts, zero/one/multiple allowances, and
   offline recovery on real devices. No simulator should be launched unless the
   user changes that instruction.
@@ -445,7 +464,8 @@ The additive `20260909130000_event_invite_plus_one_preview.sql` migration was
 applied to the linked Supabase database on 2026-09-09 after a dry run confirmed
 it was the only pending change and contained no seeds or role changes. A
 post-apply dry run reports the remote database is up to date. The application
-code still requires deployment.
+is deployed and the native code was completed locally on 2026-09-10; physical-
+device invitation/deep-link and offline checks remain.
 
 ## Maintaining this tracker
 

@@ -16,7 +16,10 @@ let props
 
 beforeEach(() => {
   jest.clearAllMocks()
-  api.events.createFileAccess.mockResolvedValue({ download_url: 'https://storage.test/private-image' })
+  api.events.createFileAccess.mockResolvedValue({
+    download_url: 'https://storage.test/private-image',
+    thumbnail_url: 'https://storage.test/low-data-image',
+  })
   props = {
     eventId: 'event-1', canManage: true, inactive: false, actionPath: null,
     onPreview: jest.fn(), onDownload: jest.fn(),
@@ -51,7 +54,7 @@ it.each([false, true])('keeps files readable without edit controls (inactive=%s)
 it('renders a signed image gallery and separate PDF rows, wired to the shared viewer', async () => {
   props.manager.files = [photo, pdf]
   await render()
-  expect(tree.root.findByType(Image).props.source.uri).toBe('https://storage.test/private-image')
+  expect(tree.root.findByType(Image).props.source.uri).toBe('https://storage.test/low-data-image')
   expect(api.events.createFileAccess).toHaveBeenCalledTimes(1)
   button('Preview Venue.jpg').props.onPress()
   expect(props.onPreview).toHaveBeenCalledWith([photo], photo)
@@ -65,9 +68,30 @@ it('offers an explicit retry when the image fails to load', async () => {
   props.manager.files = [photo]
   await render()
   await act(async () => tree.root.findByType(Image).props.onError())
-  expect(text()).toContain('Preview unavailable')
-  await act(async () => button('Retry thumbnail for Venue.jpg').props.onPress())
+  expect(text()).toContain('Low-data preview unavailable')
+  await act(async () => button('Retry low-data preview for Venue.jpg').props.onPress())
   expect(api.events.createFileAccess).toHaveBeenCalledTimes(2)
+})
+
+it('does not silently use the original when a transformed preview is unavailable', async () => {
+  api.events.createFileAccess.mockResolvedValue({ download_url: 'https://storage.test/private-image' })
+  props.manager.files = [photo]
+  await render()
+  expect(tree.root.findAllByType(Image)).toHaveLength(0)
+  expect(text()).toContain('Low-data preview unavailable')
+})
+
+it('defers below-fold gallery previews until the user requests them', async () => {
+  props.manager.files = Array.from({ length: 5 }, (_, index) => ({
+    ...photo,
+    id: `image-${index}`,
+    object_path: `event-1/image-${index}`,
+    file_name: `Venue-${index}.jpg`,
+  }))
+  await render()
+  expect(api.events.createFileAccess).toHaveBeenCalledTimes(4)
+  await act(async () => button('Load low-data preview for Venue-4.jpg').props.onPress())
+  expect(api.events.createFileAccess).toHaveBeenCalledTimes(5)
 })
 
 it('shows upload progress, failures and recovery controls without allowing duplicate adds', async () => {

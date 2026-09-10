@@ -52,12 +52,12 @@ export function useEventFiles(eventId: string, canManage: boolean) {
     remove: id => api.events.removeFile(eventId, id),
   }
 
-  async function work(action: () => Promise<void>) {
+  async function work<T>(action: () => Promise<T>): Promise<T | undefined> {
     if (locked.current) return
     locked.current = true
     setBusy(true)
     setError(null)
-    try { await action() } catch (cause) { if (mounted.current) setError(eventFileError(cause)) }
+    try { return await action() } catch (cause) { if (mounted.current) setError(eventFileError(cause)) }
     finally { locked.current = false; if (mounted.current) setBusy(false) }
   }
 
@@ -70,6 +70,7 @@ export function useEventFiles(eventId: string, canManage: boolean) {
         .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)))
       setUploads(current => current.filter(item => item.key !== task.key))
     }
+    return saved
   }
 
   function addFiles() {
@@ -88,6 +89,55 @@ export function useEventFiles(eventId: string, canManage: boolean) {
       // Keep successful files even if another file fails; retries target only failed items.
       for (const task of tasks) await upload(task)
     })
+  }
+
+  function addBannerImage() {
+    if (!allowed.current) return Promise.resolve(null)
+    return work(async () => {
+      validateEventFileCount(files.length + uploads.length, 1)
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'image/webp'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      })
+      if (result.canceled) return null
+      const asset = result.assets[0]
+      const info = asset.size == null && !asset.file ? await FileSystem.getInfoAsync(asset.uri) : null
+      const size = asset.size ?? asset.file?.size ?? (info?.exists && 'size' in info ? info.size : undefined)
+      const task: FileUpload = {
+        key: `${Date.now()}-banner`,
+        asset,
+        input: validateEventFile({ ...asset, size }),
+        step: 'upload',
+        status: 'queued',
+      }
+      if (!task.input.content_type.startsWith('image/')) {
+        throw new EventFileInputError('Choose a JPG, PNG, or WEBP image for the event banner.')
+      }
+      if (!mounted.current) return null
+      setUploads(current => [...current, task])
+      return await upload(task)
+    }).then(result => result ?? null)
+  }
+
+  function updateBanner(fileId: string | null, focalX = 0.5, focalY = 0.5) {
+    if (!allowed.current) return Promise.resolve(null)
+    return work(async () => {
+      const result = await api.events.updateBanner(eventId, {
+        file_id: fileId,
+        ...(fileId ? { focal_x: focalX, focal_y: focalY } : {}),
+      })
+      if (mounted.current) {
+        setFiles(current => current.map(file => ({
+          ...file,
+          is_banner: result.file_id === file.id,
+          ...(result.file_id === file.id
+            ? { banner_focal_x: result.focal_x, banner_focal_y: result.focal_y }
+            : {}),
+        })))
+      }
+      return result
+    }).then(result => result ?? null)
   }
 
   function retryUpload(task: FileUpload) {
@@ -125,11 +175,18 @@ export function useEventFiles(eventId: string, canManage: boolean) {
 
   function confirmRemove(file: EventFile) {
     if (!allowed.current || locked.current) return
-    Alert.alert('Delete file?', `Remove “${file.file_name}” from this event? Everyone will lose access. This cannot be undone.`, [
+    const bannerWarning = file.is_banner
+      ? ' This is the event banner, so deleting it will also remove the banner from the event.'
+      : ''
+    Alert.alert('Delete file?', `Remove “${file.file_name}” from this event? Everyone will lose access.${bannerWarning} This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete file', style: 'destructive', onPress: () => { if (allowed.current) return remove(file) } },
     ])
   }
 
-  return { files, uploads, removals, busy, error, replaceFiles, addFiles, retryUpload, dismissUpload, confirmRemove, retryRemove: remove }
+  return {
+    files, uploads, removals, busy, error, replaceFiles,
+    addFiles, addBannerImage, updateBanner, retryUpload, dismissUpload,
+    confirmRemove, retryRemove: remove,
+  }
 }

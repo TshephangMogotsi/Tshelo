@@ -1,3 +1,6 @@
+import { DEFAULT_EVENT_TIME_ZONE } from '@shared/contracts'
+import { eventLocalDateTime, resolvedEventTimeZone } from '@shared/event-schedule'
+
 export type CalendarEventSource = {
   title: string
   description?: string | null
@@ -6,7 +9,8 @@ export type CalendarEventSource = {
   eventEndDate?: string | null
   eventEndTime?: string | null
   venue?: string | null
-  shareCode?: string | null
+  timeZone?: string
+  rsvpDeadline?: string | null
 }
 
 export type CalendarEventDetails = {
@@ -18,12 +22,11 @@ export type CalendarEventDetails = {
   notes: string
 }
 
-function localDate(dateValue: string, timeValue?: string | null) {
+function localDate(dateValue: string) {
   const [year, month, day] = dateValue.split('-').map(Number)
   if (!year || !month || !day) return null
 
-  const [hour = 0, minute = 0, second = 0] = (timeValue ?? '00:00:00').split(':').map(Number)
-  const result = new Date(year, month - 1, day, hour, minute, second, 0)
+  const result = new Date(year, month - 1, day, 0, 0, 0, 0)
   if (
     result.getFullYear() !== year
     || result.getMonth() !== month - 1
@@ -34,23 +37,32 @@ function localDate(dateValue: string, timeValue?: string | null) {
 
 export function buildCalendarEventDetails(source: CalendarEventSource): CalendarEventDetails | null {
   const allDay = !source.eventTime
-  const startDate = localDate(source.eventDate, source.eventTime)
+  const timeZone = resolvedEventTimeZone({ time_zone: source.timeZone ?? DEFAULT_EVENT_TIME_ZONE })
+  const startDate = allDay
+    ? localDate(source.eventDate)
+    : eventLocalDateTime(source.eventDate, source.eventTime ?? null, timeZone)
   if (!startDate) return null
 
-  let endDate = source.eventEndDate
-    ? localDate(source.eventEndDate, source.eventEndTime ?? source.eventTime)
-    : source.eventEndTime
-      ? localDate(source.eventDate, source.eventEndTime)
+  let endDate = allDay && source.eventEndDate
+    ? localDate(source.eventEndDate)
+    : !allDay && source.eventEndDate
+    ? eventLocalDateTime(source.eventEndDate, source.eventEndTime ?? source.eventTime ?? null, timeZone)
+    : !allDay && source.eventEndTime
+      ? eventLocalDateTime(source.eventDate, source.eventEndTime, timeZone)
       : null
 
-  if (!endDate || endDate <= startDate) {
+  if (allDay && endDate && endDate >= startDate) {
+    endDate = new Date(endDate)
+    endDate.setDate(endDate.getDate() + 1)
+  } else if (!endDate || endDate <= startDate) {
     endDate = new Date(startDate)
     endDate.setTime(startDate.getTime() + (allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
   }
 
   const notes = [
     source.description?.trim(),
-    source.shareCode ? `Tshelo RSVP code: ${source.shareCode}` : null,
+    `Event time zone: ${timeZone}`,
+    source.rsvpDeadline ? `RSVP deadline: ${source.rsvpDeadline}` : null,
   ].filter(Boolean).join('\n\n') || 'Added from Tshelo.'
 
   return {

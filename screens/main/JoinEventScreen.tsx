@@ -25,6 +25,13 @@ import { api } from '../../lib/api'
 import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
+import {
+  allowedPlusOnes,
+  invitationAllowanceTitle,
+  resizePlusOneNames,
+  rsvpParty,
+  type RsvpChoice,
+} from './eventDetail/rsvp'
 
 type Props = {
   navigation: NativeStackNavigationProp<MainStackParamList, 'JoinEvent'>
@@ -45,6 +52,7 @@ type EventPreview = {
   organiserName: string
   hasLinkedFund: boolean
   alreadyJoined: boolean
+  allowedPlusOnes: number
 }
 
 function cleanEventCode(value: string) {
@@ -86,6 +94,9 @@ export default function JoinEventScreen({ navigation, route }: Props) {
   const [phase, setPhase] = useState<Phase>('input')
   const [preview, setPreview] = useState<EventPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [rsvpStatus, setRsvpStatus] = useState<RsvpChoice | null>(null)
+  const [plusOnes, setPlusOnes] = useState(0)
+  const [plusOneNames, setPlusOneNames] = useState<string[]>([])
   const openedFromInvitation = useRef(false)
 
   const cleanedCode = cleanEventCode(code.trim())
@@ -106,6 +117,9 @@ export default function JoinEventScreen({ navigation, route }: Props) {
     setPreview(null)
     setError(null)
     setPhase('input')
+    setRsvpStatus(null)
+    setPlusOnes(0)
+    setPlusOneNames([])
   }
 
   async function findEvent() {
@@ -145,7 +159,11 @@ export default function JoinEventScreen({ navigation, route }: Props) {
       organiserName: row.organiser_name || 'Event organiser',
       hasLinkedFund: Boolean(row.has_linked_fund),
       alreadyJoined: Boolean(row.already_joined),
+      allowedPlusOnes: allowedPlusOnes(row.allowed_plus_ones),
     })
+    setRsvpStatus(null)
+    setPlusOnes(0)
+    setPlusOneNames([])
     setPhase('preview')
   }
 
@@ -161,18 +179,39 @@ export default function JoinEventScreen({ navigation, route }: Props) {
       navigation.replace('EventDetail', { eventId: preview.id })
       return
     }
+    if (!rsvpStatus) {
+      setError('Choose Yes, Maybe, or No before opening the event.')
+      return
+    }
 
     setPhase('joining')
     setError(null)
     try {
-      const joined = await api.events.join(cleanedCode)
+      await api.events.respondRsvp(preview.id, {
+        code: cleanedCode,
+        status: rsvpStatus,
+        ...rsvpParty(rsvpStatus, Math.min(plusOnes, preview.allowedPlusOnes), plusOneNames),
+      })
       hapticSuccess()
-      navigation.replace('EventDetail', { eventId: joined.event_id })
+      navigation.replace('EventDetail', { eventId: preview.id })
     } catch (joinError) {
       hapticError()
       setError(toApiUiError(joinError).message)
       setPhase('preview')
     }
+  }
+
+  function changePlusOnes(value: number) {
+    if (!preview) return
+    const next = Math.max(0, Math.min(preview.allowedPlusOnes, value))
+    setPlusOnes(next)
+    setPlusOneNames(current => resizePlusOneNames(current, next))
+  }
+
+  function selectRsvp(value: RsvpChoice) {
+    setRsvpStatus(value)
+    setError(null)
+    if (value === 'no') changePlusOnes(0)
   }
 
   return (
@@ -239,12 +278,72 @@ export default function JoinEventScreen({ navigation, route }: Props) {
                   <Text style={styles.noticeText}>This event has a contribution fund. Joining here gives you event access only.</Text>
                 </View>
               ) : null}
+              {!preview.alreadyJoined ? (
+                <>
+                  <View style={styles.allowanceCard}>
+                    <Ionicons name="people-outline" size={20} color={colors.primary} />
+                    <View style={styles.allowanceCopy}>
+                      <Text style={styles.allowanceTitle}>{invitationAllowanceTitle(preview.allowedPlusOnes)}</Text>
+                      <Text style={styles.allowanceText}>{preview.allowedPlusOnes > 0
+                        ? 'Choose how many guests will join you when you respond.'
+                        : 'No additional guests are included with this invitation.'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.rsvpLabel}>WILL YOU ATTEND?</Text>
+                  <View style={styles.rsvpChoices}>
+                    {([
+                      ['yes', 'checkmark', 'Yes'],
+                      ['maybe', 'help', 'Maybe'],
+                      ['no', 'close', 'No'],
+                    ] as const).map(([value, icon, label]) => (
+                      <TouchableOpacity
+                        key={value}
+                        style={[styles.rsvpChoice, rsvpStatus === value && styles.rsvpChoiceSelected]}
+                        onPress={() => selectRsvp(value)}
+                        disabled={isBusy}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: rsvpStatus === value, disabled: isBusy }}
+                        accessibilityLabel={`${label} RSVP`}
+                      >
+                        <Ionicons name={icon} size={17} color={rsvpStatus === value ? '#FFFFFF' : colors.textSecondary} />
+                        <Text style={[styles.rsvpChoiceText, rsvpStatus === value && styles.rsvpChoiceTextSelected]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {rsvpStatus && rsvpStatus !== 'no' && preview.allowedPlusOnes > 0 ? (
+                    <View style={styles.plusOneCard}>
+                      <View style={styles.counterRow}>
+                        <View style={styles.counterCopy}>
+                          <Text style={styles.rsvpLabel}>GUESTS JOINING YOU</Text>
+                          <Text style={styles.counterHelp}>{plusOnes} of {preview.allowedPlusOnes} additional guests</Text>
+                        </View>
+                        <TouchableOpacity style={styles.counterButton} onPress={() => changePlusOnes(plusOnes - 1)} disabled={plusOnes === 0 || isBusy} accessibilityLabel="Remove one additional guest"><Ionicons name="remove" size={19} color={colors.textPrimary} /></TouchableOpacity>
+                        <Text style={styles.counterValue}>{plusOnes}</Text>
+                        <TouchableOpacity style={styles.counterButton} onPress={() => changePlusOnes(plusOnes + 1)} disabled={plusOnes >= preview.allowedPlusOnes || isBusy} accessibilityLabel="Add one additional guest"><Ionicons name="add" size={19} color={colors.textPrimary} /></TouchableOpacity>
+                      </View>
+                      {plusOneNames.map((name, index) => (
+                        <TextInput
+                          key={index}
+                          value={name}
+                          onChangeText={value => setPlusOneNames(current => current.map((item, itemIndex) => itemIndex === index ? value : item))}
+                          editable={!isBusy}
+                          maxLength={100}
+                          placeholder={`Guest ${index + 1} name (optional)`}
+                          placeholderTextColor={colors.textMuted}
+                          style={styles.guestNameInput}
+                          accessibilityLabel={`Additional guest ${index + 1} name`}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              ) : null}
             </View>
           ) : null}
 
           {phase === 'preview' ? (
-            <TouchableOpacity style={styles.primaryButton} onPress={joinEvent} activeOpacity={0.86}>
-              <Text style={styles.primaryButtonText}>{preview?.alreadyJoined ? 'Open Event' : 'Join Event'}</Text>
+            <TouchableOpacity style={[styles.primaryButton, (!preview?.alreadyJoined && !rsvpStatus) && styles.primaryButtonDisabled]} onPress={joinEvent} disabled={!preview?.alreadyJoined && !rsvpStatus} activeOpacity={0.86}>
+              <Text style={styles.primaryButtonText}>{preview?.alreadyJoined ? 'Open Event' : 'Save RSVP and Open Event'}</Text>
               <Ionicons name={preview?.alreadyJoined ? 'arrow-forward' : 'checkmark'} size={19} color="#FFFFFF" />
             </TouchableOpacity>
           ) : (
@@ -348,6 +447,23 @@ function makeStyles(colors: AppColors) {
     detailText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.textSecondary },
     notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: 13, backgroundColor: colors.primaryLight, marginTop: 5 },
     noticeText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: colors.textSecondary },
+    allowanceCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: 13, backgroundColor: colors.primaryLight, marginTop: 12 },
+    allowanceCopy: { flex: 1 },
+    allowanceTitle: { fontSize: 12, fontWeight: '800', color: colors.textPrimary },
+    allowanceText: { marginTop: 2, fontSize: 11, lineHeight: 16, color: colors.textSecondary },
+    rsvpLabel: { marginTop: 15, marginBottom: 7, fontSize: 10, fontWeight: '900', letterSpacing: 0.55, color: colors.textSecondary },
+    rsvpChoices: { flexDirection: 'row', gap: 7 },
+    rsvpChoice: { flex: 1, minHeight: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+    rsvpChoiceSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
+    rsvpChoiceText: { fontSize: 11, fontWeight: '800', color: colors.textSecondary },
+    rsvpChoiceTextSelected: { color: '#FFFFFF' },
+    plusOneCard: { gap: 8, marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: colors.background },
+    counterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    counterCopy: { flex: 1 },
+    counterHelp: { fontSize: 10, color: colors.textMuted },
+    counterButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+    counterValue: { minWidth: 22, textAlign: 'center', fontSize: 15, fontWeight: '900', color: colors.textPrimary },
+    guestNameInput: { minHeight: 45, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, fontSize: 12, color: colors.textPrimary },
     primaryButton: { height: 56, borderRadius: 17, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
     primaryButtonDisabled: { opacity: 0.42 },
     primaryButtonText: { fontSize: 16, fontWeight: '900', color: '#FFFFFF' },

@@ -1,4 +1,4 @@
-jest.mock('../../../../lib/api', () => ({ api: { events: { createFileUploadSession: jest.fn(), finalizeFile: jest.fn(), removeFile: jest.fn() } } }))
+jest.mock('../../../../lib/api', () => ({ api: { events: { createFileUploadSession: jest.fn(), finalizeFile: jest.fn(), removeFile: jest.fn(), updateBanner: jest.fn() } } }))
 jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }))
 jest.mock('expo-file-system/legacy', () => ({ createUploadTask: jest.fn(), getInfoAsync: jest.fn(), FileSystemUploadType: { BINARY_CONTENT: 0 } }))
 
@@ -26,6 +26,7 @@ beforeEach(() => {
   api.events.createFileUploadSession.mockResolvedValue(session)
   api.events.finalizeFile.mockResolvedValue(file)
   api.events.removeFile.mockResolvedValue({ file_id: file.id })
+  api.events.updateBanner.mockResolvedValue({ file_id: file.id, focal_x: 0.25, focal_y: 0.75 })
   fs.createUploadTask.mockImplementation((_url, _uri, _options, progress) => ({ uploadAsync: async () => { progress({ totalBytesSent: 100, totalBytesExpectedToSend: 100 }); return { status: 200 } } }))
   jest.spyOn(Alert, 'alert').mockImplementation(() => {})
 })
@@ -62,6 +63,30 @@ it('handles picker cancellation without an error or upload', async () => {
   expect(manager.error).toBeNull()
   expect(manager.busy).toBe(false)
   expect(api.events.createFileUploadSession).not.toHaveBeenCalled()
+})
+
+it('uploads one image for banner selection and applies server-confirmed focal state', async () => {
+  const imageAsset = { ...asset, uri: 'file:///venue.jpg', name: 'Venue.jpg', mimeType: 'image/jpeg' }
+  const imageFile = { ...file, file_name: imageAsset.name, object_path: 'event-1/image', content_type: imageAsset.mimeType }
+  picker.getDocumentAsync.mockResolvedValue({ canceled: false, assets: [imageAsset] })
+  api.events.createFileUploadSession.mockResolvedValue({ ...session, ...imageFile })
+  api.events.finalizeFile.mockResolvedValue(imageFile)
+  await mount()
+  let uploaded
+  await act(async () => { uploaded = await manager.addBannerImage() })
+  expect(picker.getDocumentAsync).toHaveBeenCalledWith({
+    type: ['image/jpeg', 'image/png', 'image/webp'],
+    copyToCacheDirectory: true,
+    multiple: false,
+  })
+  expect(uploaded).toEqual(imageFile)
+  await act(async () => { await manager.updateBanner(imageFile.id, 0.25, 0.75) })
+  expect(api.events.updateBanner).toHaveBeenCalledWith('event-1', {
+    file_id: imageFile.id,
+    focal_x: 0.25,
+    focal_y: 0.75,
+  })
+  expect(manager.files[0]).toEqual(expect.objectContaining({ is_banner: true, banner_focal_x: 0.25, banner_focal_y: 0.75 }))
 })
 
 it('keeps partial success and retries only the uncertain save', async () => {
@@ -104,6 +129,13 @@ it('requires confirmation, retains deletion failures, and can retry cleanup read
   await act(async () => { await manager.retryRemove(file) })
   expect(manager.removals).toEqual([])
   expect(manager.files).toEqual([])
+})
+
+it('warns when deleting the selected banner image', async () => {
+  await mount()
+  await act(async () => manager.replaceFiles([{ ...file, is_banner: true }]))
+  manager.confirmRemove({ ...file, is_banner: true })
+  expect(Alert.alert.mock.calls[0][1]).toContain('also remove the banner')
 })
 
 it('rechecks permission after a deletion confirmation was opened', async () => {

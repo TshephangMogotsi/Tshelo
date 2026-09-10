@@ -25,6 +25,7 @@ import * as Contacts from 'expo-contacts'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
+import NetInfo from '@react-native-community/netinfo'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { RouteProp, useFocusEffect, usePreventRemove } from '@react-navigation/native'
 import { MainStackParamList } from '../../navigation/types'
@@ -41,6 +42,10 @@ import { isFundReadOnly } from './fundDetail/finance'
 import { buildCalendarEventDetails } from './eventDetail/calendar'
 import { parseEstimatedSpend, summarizeEventGuests } from './eventDetail/eventOnly'
 import EventFilesPanel from './eventDetail/EventFilesPanel'
+import EventBanner from './eventDetail/EventBanner'
+import EventScheduleCard from './eventDetail/EventScheduleCard'
+import EventRsvpCard from './eventDetail/EventRsvpCard'
+import { sortEventAnnouncements } from './eventDetail/announcements'
 import { useEventFiles } from './eventDetail/useEventFiles'
 import { eventAttachmentUrl, type EventAttachment } from './eventDetail/attachmentAccess'
 import type { FundPermission } from '../../lib/fundPermissions'
@@ -57,6 +62,7 @@ import type {
   EventAnnouncement as ApiEventAnnouncement,
   EventAnnouncementAttachment,
   EventAnnouncementAttachmentMediaType,
+  EventGuest as ApiEventGuest,
 } from '@shared/contracts'
 
 type Props = {
@@ -64,7 +70,7 @@ type Props = {
   route: RouteProp<MainStackParamList, 'EventDetail'>
 }
 
-type EventTab = 'guests' | 'announcements' | 'files' | 'budget'
+type EventTab = 'overview' | 'guests' | 'announcements' | 'files' | 'budget'
 type EventFundWorkspace = 'event' | 'fund'
 type GuestStatus = 'confirmed' | 'pending' | 'declined'
 
@@ -81,6 +87,7 @@ type EventAnnouncement = {
   authorName: string
   title: string
   body: string
+  isPinned: boolean
   attachments: EventAnnouncementAttachment[]
   createdAt: string
 }
@@ -97,6 +104,8 @@ type EventView = {
   time: string | null
   endDateIso: string | null
   endTime: string | null
+  timeZone?: string
+  rsvpDeadline?: string | null
   venue: string
   venueMapLink: string | null
   venueSearchText: string
@@ -139,8 +148,22 @@ function mapEventAnnouncement(item: ApiEventAnnouncement): EventAnnouncement {
     authorName: item.author_name,
     title: item.title,
     body: item.body,
+    isPinned: Boolean(item.is_pinned),
     attachments: item.attachments,
     createdAt: item.created_at,
+  }
+}
+
+function mapEventGuest(item: ApiEventGuest): EventGuest {
+  return {
+    id: item.id,
+    name: String(item.guest_name?.trim() || item.guest_phone?.trim() || 'Guest'),
+    status: item.rsvp_status === 'yes'
+      ? 'confirmed'
+      : item.rsvp_status === 'no'
+        ? 'declined'
+        : 'pending',
+    plusOnes: Math.max(0, Number(item.plus_ones ?? 0)),
   }
 }
 
@@ -213,7 +236,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const [event, setEvent] = useState<EventView | null>(null)
   const [eventGuests, setEventGuests] = useState<EventGuest[]>([])
   const [announcements, setAnnouncements] = useState<EventAnnouncement[]>([])
-  const [activeTab, setActiveTab] = useState<EventTab>(route.params.tab ?? 'guests')
+  const [activeTab, setActiveTab] = useState<EventTab>(route.params.tab ?? 'overview')
   const [workspace, setWorkspace] = useState<EventFundWorkspace>(route.params.workspace ?? 'event')
   const [fundWorkspaceExpanded, setFundWorkspaceExpanded] = useState(false)
   const [eventWorkspaceExpanded, setEventWorkspaceExpanded] = useState(false)
@@ -227,6 +250,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const [announcementBody, setAnnouncementBody] = useState('')
   const [announcementAttachments, setAnnouncementAttachments] = useState<EventAnnouncementAttachment[]>([])
   const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false)
+  const [pinningAnnouncementId, setPinningAnnouncementId] = useState<string | null>(null)
   const [isUploadingAnnouncementFiles, setIsUploadingAnnouncementFiles] = useState(false)
   const [attachmentActionPath, setAttachmentActionPath] = useState<string | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<{ attachment: EventAttachment; url: string } | null>(null)
@@ -275,16 +299,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         if (!active || controller.signal.aborted) return
 
         const row = eventWorkspace.event
-        const guests: EventGuest[] = eventWorkspace.guests.map(guest => ({
-          id: guest.id,
-          name: String(guest.guest_name?.trim() || guest.guest_phone?.trim() || 'Guest'),
-          status: guest.rsvp_status === 'yes'
-            ? 'confirmed'
-            : guest.rsvp_status === 'no'
-              ? 'declined'
-              : 'pending',
-          plusOnes: Math.max(0, Number(guest.plus_ones ?? 0)),
-        }))
+        const guests: EventGuest[] = eventWorkspace.guests.map(mapEventGuest)
         const count = (status: GuestStatus) => guests.filter(guest => guest.status === status).length
         const budgetAmount = eventWorkspace.budget ? Number(eventWorkspace.budget.total_budget) : null
         const shareCode = row.share_code?.trim() || null
@@ -315,6 +330,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           time: row.event_time ?? null,
           endDateIso: row.event_end_date ?? null,
           endTime: row.event_end_time ?? null,
+          timeZone: row.time_zone,
+          rsvpDeadline: row.rsvp_deadline,
           venue,
           venueMapLink,
           venueSearchText: venueAddressMapLink ? venueName : venueAddress || venueName,
@@ -391,7 +408,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
       eventEndDate: event.endDateIso,
       eventEndTime: event.endTime,
       venue: event.venue === 'Venue to be confirmed' ? null : event.venue,
-      shareCode: event.shareCode,
+      timeZone: event.timeZone,
+      rsvpDeadline: event.rsvpDeadline,
     })
 
     if (!details) {
@@ -627,6 +645,40 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     }
   }
 
+  async function applyAnnouncementPin(announcement: EventAnnouncement, isPinned: boolean) {
+    if (!canPostAnnouncements || event?.status !== 'active' || pinningAnnouncementId) return
+    setPinningAnnouncementId(announcement.id)
+    try {
+      await api.events.setAnnouncementPin(eventId, announcement.id, { is_pinned: isPinned })
+      const refreshed = await runApiRead(call => api.events.workspace(eventId, call))
+      setAnnouncements(refreshed.announcements.map(mapEventAnnouncement))
+    } catch (error) {
+      Alert.alert(isPinned ? 'Could not pin update' : 'Could not unpin update', toApiUiError(error).message)
+    } finally {
+      setPinningAnnouncementId(null)
+    }
+  }
+
+  function changeAnnouncementPin(announcement: EventAnnouncement) {
+    if (announcement.isPinned) {
+      void applyAnnouncementPin(announcement, false)
+      return
+    }
+    const existing = announcements.find(item => item.isPinned && item.id !== announcement.id)
+    if (!existing) {
+      void applyAnnouncementPin(announcement, true)
+      return
+    }
+    Alert.alert(
+      'Replace pinned update?',
+      `“${existing.title}” is currently pinned. Replace it with “${announcement.title}”?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Replace', onPress: () => { void applyAnnouncementPin(announcement, true) } },
+      ],
+    )
+  }
+
   async function previewAttachment(items: EventAttachment[], attachment: EventAttachment) {
     if (attachmentActionPath) return
     const request = ++attachmentPreviewRequest.current
@@ -643,6 +695,32 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     } finally {
       setAttachmentActionPath(null)
     }
+  }
+
+  async function previewEventFile(items: EventAttachment[], attachment: EventAttachment) {
+    if (attachment.content_type === 'application/pdf' || Platform.OS === 'web') {
+      await previewAttachment(items, attachment)
+      return
+    }
+    try {
+      const connection = await NetInfo.fetch()
+      const details = connection.details
+      const metered = Boolean(details && 'isConnectionExpensive' in details && details.isConnectionExpensive)
+      if (metered) {
+        Alert.alert(
+          'View full image?',
+          'The low-data preview is not used in the full viewer. This image may use up to 10 MB of mobile data.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'View full image', onPress: () => { void previewAttachment(items, attachment) } },
+          ],
+        )
+        return
+      }
+    } catch {
+      // A connectivity metadata failure should not make an explicit user action unusable.
+    }
+    await previewAttachment(items, attachment)
   }
 
   function closeAttachmentPreview() {
@@ -905,6 +983,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const totalIn = fund?.contributions ?? 0
   const totalSpent = fund?.expenses ?? 0
   const remaining = Math.max(totalBudget - totalSpent, 0)
+  const pinnedAnnouncement = announcements.find(item => item.isPinned) ?? null
+  const sortedAnnouncements = sortEventAnnouncements(announcements)
   const hasOverflowActions = !event.linkedFundId
     || canLeaveEvent
     || Boolean(fund?.ownerId === userId && !isFundReadOnly(fund.status))
@@ -1108,8 +1188,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           <>
             <View style={styles.tabBar}>
               {(isEventOnly
-                ? ([['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files']] as const)
-                : ([['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files'], ['budget', 'Budget']] as const)
+                ? ([['overview', 'Overview'], ['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files']] as const)
+                : ([['overview', 'Overview'], ['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files'], ['budget', 'Budget']] as const)
               ).map(([id, label]) => (
                 <TouchableOpacity key={id} style={[styles.tab, activeTab === id && styles.tabActive]} onPress={() => setActiveTab(id)} accessibilityRole="tab" accessibilityState={{ selected: activeTab === id }}>
                   <Text style={[styles.tabText, activeTab === id && styles.tabTextActive]}>{label}</Text>
@@ -1118,8 +1198,85 @@ export default function EventDetailScreen({ navigation, route }: Props) {
             </View>
 
             <ScrollView style={styles.sheetContent} contentContainerStyle={styles.sheetContentInner} showsVerticalScrollIndicator={false}>
-          {activeTab === 'guests' ? (
+          {activeTab === 'overview' ? (
+            <View style={styles.nativeOverview}>
+              <EventBanner
+                eventId={eventId}
+                manager={eventFiles}
+                canManage={canManageFiles}
+                inactive={event.status !== 'active'}
+                onViewFull={file => { void previewEventFile([file], file) }}
+              />
+              <EventScheduleCard
+                eventId={eventId}
+                schedule={{
+                  eventDate: event.dateIso,
+                  eventTime: event.time,
+                  eventEndDate: event.endDateIso,
+                  eventEndTime: event.endTime,
+                  timeZone: event.timeZone,
+                  rsvpDeadline: event.rsvpDeadline,
+                  status: event.status as 'active' | 'completed' | 'cancelled',
+                }}
+                canManage={isEventAdmin}
+                onUpdated={metadata => setEvent(current => current ? {
+                  ...current,
+                  date: displayEventDate(metadata.eventDate),
+                  dateIso: metadata.eventDate,
+                  time: metadata.eventTime,
+                  endDateIso: metadata.eventEndDate,
+                  endTime: metadata.eventEndTime,
+                  timeZone: metadata.timeZone,
+                  rsvpDeadline: metadata.rsvpDeadline,
+                } : current)}
+              />
+              {pinnedAnnouncement ? (
+                <TouchableOpacity
+                  style={styles.pinnedOverview}
+                  onPress={() => setActiveTab('announcements')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open pinned update: ${pinnedAnnouncement.title}`}
+                >
+                  <View style={styles.pinnedOverviewIcon}>
+                    <Ionicons name="pin" size={15} color={colors.primary} />
+                  </View>
+                  <View style={styles.pinnedOverviewCopy}>
+                    <Text style={styles.pinnedOverviewLabel}>PINNED UPDATE</Text>
+                    <Text style={styles.pinnedOverviewTitle} numberOfLines={1}>{pinnedAnnouncement.title}</Text>
+                    <Text style={styles.pinnedOverviewBody} numberOfLines={2}>{pinnedAnnouncement.body}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.overviewUpdatesLink} onPress={() => setActiveTab('announcements')}>
+                  <Ionicons name="notifications-outline" size={17} color={colors.primary} />
+                  <Text style={styles.overviewUpdatesText}>{announcements.length ? 'View event updates' : 'No event updates yet'}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : activeTab === 'guests' ? (
             <>
+              {!canManageGuests ? (
+                <EventRsvpCard
+                  eventId={eventId}
+                  schedule={{
+                    eventDate: event.dateIso,
+                    eventTime: event.time,
+                    eventEndDate: event.endDateIso,
+                    eventEndTime: event.endTime,
+                    timeZone: event.timeZone,
+                    rsvpDeadline: event.rsvpDeadline,
+                    status: event.status as 'active' | 'completed' | 'cancelled',
+                  }}
+                  onSaved={saved => {
+                    const mapped = mapEventGuest(saved)
+                    setEventGuests(current => current.some(item => item.id === mapped.id)
+                      ? current.map(item => item.id === mapped.id ? mapped : item)
+                      : [mapped, ...current])
+                  }}
+                />
+              ) : null}
               {canManageGuests && (
                 <View style={styles.tabInviteCard}>
                   <View style={styles.tabInviteHeader}>
@@ -1159,7 +1316,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   <Text style={styles.newAnnouncementButtonText}>Manage guest list</Text>
                 </TouchableOpacity>
               ) : null}
-              {eventGuests.length === 0 ? (
+              {canManageGuests ? (eventGuests.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="people-outline" size={26} color={MUTED} />
                   <Text style={styles.emptyTitle}>No guests yet</Text>
@@ -1191,7 +1348,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                     ]}>{guestStatusLabel(guest.status)}</Text>
                   </View>
                 </View>
-              ))}
+              ))) : null}
             </>
           ) : activeTab === 'announcements' ? (
             <View style={styles.announcementList}>
@@ -1212,25 +1369,47 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                       : 'Event admins will post important details and changes here.'}
                   </Text>
                 </View>
-              ) : announcements.map(announcement => (
-                <View key={announcement.id} style={styles.announcementCard}>
+              ) : sortedAnnouncements.map(announcement => (
+                <View key={announcement.id} style={[styles.announcementCard, announcement.isPinned && styles.announcementCardPinned]}>
                   <View style={styles.announcementHeader}>
                     <View style={styles.announcementIcon}>
                       <Ionicons name="megaphone-outline" size={18} color={colors.primary} />
                     </View>
                     <View style={styles.announcementHeading}>
-                      <Text style={styles.announcementEyebrow}>ANNOUNCEMENT</Text>
+                      <View style={styles.announcementLabelRow}>
+                        <Text style={styles.announcementEyebrow}>ANNOUNCEMENT</Text>
+                        {announcement.isPinned ? (
+                          <View style={styles.pinnedBadge}>
+                            <Ionicons name="pin" size={9} color={colors.primary} />
+                            <Text style={styles.pinnedBadgeText}>PINNED</Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Text style={styles.announcementTitle}>{announcement.title}</Text>
                     </View>
-                    {canPostAnnouncements && event.status !== 'completed' ? (
-                      <TouchableOpacity
-                        style={styles.announcementEditButton}
-                        onPress={() => openAnnouncementComposer(announcement)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Edit ${announcement.title}`}
-                      >
-                        <Ionicons name="pencil-outline" size={16} color={INK} />
-                      </TouchableOpacity>
+                    {canPostAnnouncements && event.status === 'active' ? (
+                      <View style={styles.announcementHeaderActions}>
+                        <TouchableOpacity
+                          style={styles.announcementEditButton}
+                          onPress={() => changeAnnouncementPin(announcement)}
+                          disabled={pinningAnnouncementId !== null}
+                          accessibilityRole="button"
+                          accessibilityLabel={announcement.isPinned ? `Unpin ${announcement.title}` : `Pin ${announcement.title} to overview`}
+                        >
+                          {pinningAnnouncementId === announcement.id
+                            ? <ActivityIndicator size="small" color={colors.primary} />
+                            : <Ionicons name={announcement.isPinned ? 'pin' : 'pin-outline'} size={16} color={announcement.isPinned ? colors.primary : INK} />}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.announcementEditButton}
+                          onPress={() => openAnnouncementComposer(announcement)}
+                          disabled={pinningAnnouncementId !== null}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Edit ${announcement.title}`}
+                        >
+                          <Ionicons name="pencil-outline" size={16} color={INK} />
+                        </TouchableOpacity>
+                      </View>
                     ) : null}
                   </View>
                   <Text style={styles.announcementBody}>{announcement.body}</Text>
@@ -1289,7 +1468,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
               canManage={canManageFiles}
               inactive={event.status !== 'active'}
               actionPath={attachmentActionPath}
-              onPreview={(items, file) => { void previewAttachment(items, file) }}
+              onPreview={(items, file) => { void previewEventFile(items, file) }}
               onDownload={file => { void downloadAttachment(file) }}
             />
           ) : !isEventOnly ? (
@@ -1741,6 +1920,23 @@ function makeStyles(colors: AppColors) {
       letterSpacing: 0.35,
     },
     detailCard: { padding: 14, borderRadius: 16, backgroundColor: '#FFFFFF' },
+    pinnedOverview: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 10,
+      padding: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#CDB6F8',
+      backgroundColor: '#F6F0FF',
+    },
+    pinnedOverviewIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FFFFFF' },
+    pinnedOverviewCopy: { flex: 1, minWidth: 0 },
+    pinnedOverviewLabel: { fontSize: 7, fontFamily: fonts.inter.black, letterSpacing: 0.55, color: colors.primary },
+    pinnedOverviewTitle: { marginTop: 2, fontSize: 11, fontFamily: fonts.inter.extraBold, color: INK },
+    pinnedOverviewBody: { marginTop: 2, fontSize: 9, lineHeight: 12, fontFamily: fonts.inter.regular, color: '#52525B' },
     rsvpSummaryHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1862,6 +2058,9 @@ function makeStyles(colors: AppColors) {
     tabTextActive: { color: colors.primary },
     sheetContent: { flex: 1 },
     sheetContentInner: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40 },
+    nativeOverview: { gap: 2 },
+    overviewUpdatesLink: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, borderRadius: 13, borderWidth: 1, borderColor: BORDER, backgroundColor: '#F7F7F8' },
+    overviewUpdatesText: { flex: 1, fontSize: 11, fontFamily: fonts.inter.bold, color: INK },
     tabInviteCard: {
       padding: 14,
       marginBottom: 14,
@@ -1955,6 +2154,7 @@ function makeStyles(colors: AppColors) {
       borderWidth: 1,
       borderColor: '#DEDEE1',
     },
+    announcementCardPinned: { borderColor: '#BFA2F5', backgroundColor: '#F8F4FF' },
     announcementHeader: { flexDirection: 'row', alignItems: 'center' },
     announcementIcon: {
       width: 36,
@@ -1966,8 +2166,12 @@ function makeStyles(colors: AppColors) {
       backgroundColor: EVENT_HEADER_PURPLE,
     },
     announcementHeading: { flex: 1, minWidth: 0 },
+    announcementLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     announcementEyebrow: { fontSize: 8, fontFamily: fonts.inter.bold, letterSpacing: 0.45, color: colors.primary },
+    pinnedBadge: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 999, backgroundColor: '#E8DDFF' },
+    pinnedBadgeText: { fontSize: 6, fontFamily: fonts.inter.black, letterSpacing: 0.3, color: colors.primary },
     announcementTitle: { marginTop: 2, fontSize: 13, lineHeight: 17, fontFamily: fonts.inter.extraBold, color: INK },
+    announcementHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 8 },
     announcementEditButton: {
       width: 34,
       height: 34,

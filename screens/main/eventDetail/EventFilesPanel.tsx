@@ -20,28 +20,42 @@ type Props = {
   onDownload: (file: EventFile) => void
 }
 
-function FileThumbnail({ eventId, file, disabled, onPreview }: {
-  eventId: string; file: EventFile; disabled: boolean; onPreview: () => void
+function FileThumbnail({ eventId, file, disabled, autoLoad, onPreview }: {
+  eventId: string; file: EventFile; disabled: boolean; autoLoad: boolean; onPreview: () => void
 }) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [shouldLoad, setShouldLoad] = useState(autoLoad)
   useEffect(() => {
     const controller = new AbortController()
     setUrl(null)
     setFailed(false)
+    if (!shouldLoad) return () => controller.abort()
     void runApiRead(call => api.events.createFileAccess(eventId, file.id, call), { signal: controller.signal })
-      .then(access => { if (!controller.signal.aborted) setUrl(access.download_url) })
+      .then(access => {
+        if (controller.signal.aborted) return
+        if (access.thumbnail_url) setUrl(access.thumbnail_url)
+        else setFailed(true)
+      })
       .catch(() => { if (!controller.signal.aborted) setFailed(true) })
     return () => controller.abort()
-  }, [eventId, file.id, attempt])
+  }, [eventId, file.id, attempt, shouldLoad])
+
+  if (!shouldLoad) return (
+    <TouchableOpacity style={styles.thumbnail} onPress={() => setShouldLoad(true)} accessibilityRole="button" accessibilityLabel={`Load low-data preview for ${file.file_name}`}>
+      <Ionicons name="image-outline" size={28} color={colors.textSecondary} />
+      <Text style={styles.hint}>Low-data preview</Text>
+      <Text style={styles.actionText}>Tap to load</Text>
+    </TouchableOpacity>
+  )
 
   if (failed) return (
-    <TouchableOpacity style={styles.thumbnail} onPress={() => setAttempt(value => value + 1)} accessibilityRole="button" accessibilityLabel={`Retry thumbnail for ${file.file_name}`}>
+    <TouchableOpacity style={styles.thumbnail} onPress={() => setAttempt(value => value + 1)} accessibilityRole="button" accessibilityLabel={`Retry low-data preview for ${file.file_name}`}>
       <Ionicons name="image-outline" size={28} color={colors.textSecondary} />
-      <Text style={styles.hint}>Preview unavailable</Text>
+      <Text style={styles.hint}>Low-data preview unavailable</Text>
       <Text style={styles.actionText}>Tap to retry</Text>
     </TouchableOpacity>
   )
@@ -144,9 +158,9 @@ export default function EventFilesPanel({ eventId, manager, canManage, inactive,
       ) : null}
       {images.length > 0 ? <>
         <Text style={styles.sectionTitle} accessibilityRole="header">Images · {images.length}</Text>
-        <View style={styles.gallery}>{images.map(file => (
+        <View style={styles.gallery}>{images.map((file, index) => (
           <View key={file.id} style={styles.imageCard}>
-            <FileThumbnail eventId={eventId} file={file} disabled={actionPath !== null} onPreview={() => onPreview(images, file)} />
+            <FileThumbnail eventId={eventId} file={file} disabled={actionPath !== null} autoLoad={index < 4} onPreview={() => onPreview(images, file)} />
             <View style={styles.imageCaption}>
               <Text style={styles.fileName} numberOfLines={2}>{file.file_name}</Text>
               <Text style={styles.hint}>{formatEventFileSize(file.size_bytes)}</Text>

@@ -1,6 +1,13 @@
 # Phase 8 — Public-launch hardening and handoff
 
-Status date: 12 August 2026
+Status date: 10 September 2026
+
+Update — 10 September 2026: the public Terms and Privacy pages are live, and
+registration/Settings links are configured. Native event banners, low-data
+images, timezone-aware schedules, pinned updates and enhanced RSVP are
+implemented locally; the linked database is current through
+`20260909140000_event_banner_focal_points.sql`. Signed physical-device testing,
+distribution artifacts and store-console actions remain.
 
 ## Outcome
 
@@ -21,6 +28,8 @@ External release actions and the product/legal decisions listed below must be co
 - Installed and launched the iOS Release build successfully on an iPhone 17 simulator.
 - Exported the Android production JavaScript/Hermes bundle successfully: 1,296 modules and 54 assets.
 - Confirmed all local and linked Supabase migrations match through `20260812180000`.
+- Published the Terms of Service and Privacy Policy on public HTTPS pages and
+  wired the registration consent and Settings links to them.
 
 ## Required before public submission
 
@@ -33,8 +42,6 @@ External release actions and the product/legal decisions listed below must be co
 
 ### Legal and store policy
 
-- Publish the final Terms of Service and Privacy Policy on public HTTPS pages.
-- Wire the registration consent links and Settings rows to those verified pages. They are currently display-only/inert.
 - Complete Apple and Google privacy/data-safety questionnaires, age rating, support URL, screenshots, and store descriptions.
 - Confirm that SMS access remains an Android-only core feature and prepare the Play Console permission declaration for `RECEIVE_SMS`.
 
@@ -71,4 +78,6 @@ For native artifacts, also run the appropriate signed EAS production build and c
 
 Engineering release candidate: **ready for final stakeholder and account-owner actions**.
 
-Public store submission: **not yet ready** until the legal links are live, the Android JDK/AAB gate passes, store credentials and metadata are verified, and the client approves the trust-points/reward draft.
+Public store submission: **not yet ready** until the Android JDK/AAB gate passes,
+store credentials and metadata are verified, physical-device testing is complete,
+and the client approves the trust-points/reward draft.
