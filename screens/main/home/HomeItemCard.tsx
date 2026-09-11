@@ -5,7 +5,7 @@ import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import { formatFundMemberCount } from '../../../lib/fundMembers'
 import { fundIconForEmoji } from '../createFund/constants'
-import { HomeItem, formatEventDate, formatMoney, isClosedHomeItem } from './helpers'
+import { HomeItem, formatEventDate, formatEventTime, formatMoney, isClosedHomeItem } from './helpers'
 
 type Props = {
   item: HomeItem
@@ -76,7 +76,10 @@ export default function HomeItemCard({ item, onPress }: Props) {
           <View style={styles.eventMetaCard}>
             <View style={styles.eventMetaItem}>
               <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
-              <Text style={styles.eventMetaText} numberOfLines={1}>{formatEventDate(item.event_date)}</Text>
+              <View style={styles.eventDateCopy}>
+                <Text style={styles.eventMetaText} numberOfLines={1}>{formatEventDate(item.event_date)}</Text>
+                <Text style={styles.eventTimeText} numberOfLines={1}>{formatEventTime(item.event_time)}</Text>
+              </View>
             </View>
             <View style={[styles.eventMetaItem, styles.eventMetaVenue]}>
               <Ionicons name="location-outline" size={13} color={colors.textMuted} />
@@ -238,11 +241,18 @@ function makeStyles(colors: AppColors) {
     },
     eventMetaVenue: { flex: 1, minWidth: 0, flexShrink: 1 },
     eventMetaVenueText: { flex: 1, minWidth: 0 },
+    eventDateCopy: { gap: 1 },
     eventMetaText: {
       fontSize: 11,
       lineHeight: 15,
       fontWeight: '700',
       color: colors.textSecondary,
+    },
+    eventTimeText: {
+      fontSize: 9,
+      lineHeight: 12,
+      fontWeight: '600',
+      color: colors.textMuted,
     },
     overviewBottom: {
       flexDirection: 'row',

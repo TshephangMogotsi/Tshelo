@@ -27,6 +27,7 @@ const baseItem = {
   guest_count: 0,
   role: 'owner',
   event_date: '',
+  event_time: '',
   venue_name: '',
   category: 'Fund',
   emoji: '🩺',
@@ -82,6 +83,7 @@ it('does not show an event-budget snapshot on event cards', () => {
     title: 'Wedding',
     budget_amount: 25000,
     event_date: '2026-10-11',
+    event_time: '14:30:00',
     venue_name: 'Cresta Lodge',
   })
 
@@ -89,5 +91,6 @@ it('does not show an event-budget snapshot on event cards', () => {
   expect(visibleText).not.toContain('Event budget')
   expect(visibleText).not.toContain('P 25,000')
   expect(visibleText).toContain('11 Oct 2026')
+  expect(visibleText).toContain('2:30 PM')
   expect(visibleText).toContain('Cresta Lodge')
 })

@@ -318,6 +318,7 @@ export type HomeSummaryItem = {
   guest_count: number
   role: FundMemberRole | 'organiser'
   event_date: IsoDate | null
+  event_time: IsoTime | null
   contribution_deadline: IsoDate | null
   venue_name: string | null
   category: string

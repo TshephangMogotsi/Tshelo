@@ -27,6 +27,7 @@ export async function loadHomeSummary(signal?: AbortSignal): Promise<LoadedHomeS
       guest_count: item.guest_count,
       role: item.role,
       event_date: item.event_date ?? '',
+      event_time: item.event_time ?? '',
       venue_name: item.venue_name ?? '',
       category: item.category,
       emoji: item.emoji,
