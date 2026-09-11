@@ -105,7 +105,7 @@ export default function AboutLegalScreen({ navigation }: Props) {
         </View>
 
         <Text style={styles.legalNote}>
-          These documents open securely inside Tshelo. If a document is unavailable, contact Tshelo support from your Profile.
+          These documents open securely inside Tshelo and remain current with the Tshelo website.
         </Text>
         <Text style={styles.copyright}>© 2026 Tshelo. All rights reserved.</Text>
       </ScrollView>

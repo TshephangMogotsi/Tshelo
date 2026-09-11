@@ -205,10 +205,9 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           <SettingsRow icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
         </View>
 
-        {/* ── Support ───────────────────────────── */}
-        <Text style={styles.sectionLabel}>Support</Text>
+        {/* ── Information ───────────────────────── */}
+        <Text style={styles.sectionLabel}>Information</Text>
         <View style={styles.section}>
-          <SettingsRow icon="help-circle-outline"        label="Help & Support" onPress={() => navigation.navigate('Support')} />
           <SettingsRow icon="information-circle-outline" label="About & Legal"  onPress={() => navigation.navigate('AboutLegal')} />
         </View>
 

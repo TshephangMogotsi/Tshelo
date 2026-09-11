@@ -136,12 +136,6 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
         </ScrollView>
 
-        <TouchableOpacity
-          style={styles.recoverLink}
-          onPress={() => navigation.navigate('Support')}
-        >
-          <Text style={[styles.recoverText, { color: mutedCol }]}>Can't access your number? Get help</Text>
-        </TouchableOpacity>
       </KeyboardAvoidingView>
 
       <CountryPickerModal
@@ -264,10 +258,4 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 14, color: colors.textSecondary },
   footerLink: { fontSize: 14, fontWeight: '700', color: colors.primaryMid },
-  recoverLink: { alignItems: 'center', paddingVertical: 16 },
-  recoverText: {
-    fontSize: 14,
-    color: '#4A4A4A',
-    textDecorationLine: 'underline',
-  },
 })
