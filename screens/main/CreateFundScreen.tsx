@@ -14,7 +14,7 @@ import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { normalizeMapsUrl } from '../../lib/maps'
 import { TOKEN_FEATURE_PRICES } from '../../lib/tokenPricing'
 import { eventInvitationUrl } from '../../lib/fundLinks'
-import { HomeItem } from './home/helpers'
+import { activeFundItems, HomeItem } from './home/helpers'
 import { loadHomeItems } from './home/loadHomeItems'
 import {
   CUSTOM_EVENT_EMOJIS,
@@ -39,6 +39,7 @@ import EventFundTypeStep from './createFund/EventFundTypeStep'
 import EventFundDetailsStep from './createFund/EventFundDetailsStep'
 import EventFundOrganisersStep from './createFund/EventFundOrganisersStep'
 import EventFundBudgetStep from './createFund/EventFundBudgetStep'
+import FundQuickActionSheet, { type FundQuickAction } from './createFund/FundQuickActionSheet'
 import { useFundPermissions } from '../../lib/useFundPermissions'
 
 type Props = {
@@ -83,10 +84,11 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [eventVenueMapLink, setEventVenueMapLink] = useState('')
   const [isCreatingFund, setIsCreatingFund] = useState(false)
   const [isPrivate,      setIsPrivate]      = useState(false)
-  const [firstFundItem,  setFirstFundItem]  = useState<HomeItem | null>(null)
+  const [availableFundItems, setAvailableFundItems] = useState<HomeItem[]>([])
+  const [fundQuickAction, setFundQuickAction] = useState<FundQuickAction | null>(null)
+  const firstFundItem = availableFundItems[0] ?? null
   const {
     can: canUseFundAction,
-    isLoading: fundPermissionsLoading,
   } = useFundPermissions(firstFundItem?.fundId)
 
   useFocusEffect(
@@ -96,9 +98,11 @@ export default function CreateFundScreen({ navigation }: Props) {
         loadHomeItems(userId)
           .then(items => {
             if (!active) return
-            setFirstFundItem(items.find(i => i.kind !== 'event' && i.status.toLowerCase() === 'active') ?? null)
+            setAvailableFundItems(activeFundItems(items))
           })
-          .catch(() => { if (active) setFirstFundItem(null) })
+          .catch(() => { if (active) setAvailableFundItems([]) })
+      } else {
+        setAvailableFundItems([])
       }
       return () => { active = false }
     }, [userId])
@@ -171,6 +175,15 @@ export default function CreateFundScreen({ navigation }: Props) {
       return
     }
 
+    if (id === 'contribution' || id === 'expense') {
+      if (availableFundItems.length === 0) {
+        Alert.alert('No active fund yet', 'Create a fund below, or join one with an invite code, to get started.')
+        return
+      }
+      setFundQuickAction(id)
+      return
+    }
+
     const fund = firstFundItem
     if (!fund?.fundId) {
       Alert.alert('No active fund yet', 'Create a fund below, or join one with an invite code, to get started.')
@@ -179,37 +192,33 @@ export default function CreateFundScreen({ navigation }: Props) {
     const fundId = fund.fundId
 
     switch (id) {
-      case 'contribution':
-        navigation.navigate('RecordContribution', {
-          fundId,
-          fundTitle:    fund.title,
-          currencyCode: fund.currency_code,
-          initialMode: canUseFundAction('record_contributions') ? 'received' : 'pledge',
-        })
-        break
-      case 'expense':
-        if (fundPermissionsLoading) {
-          Alert.alert('Checking fund access', 'Please wait a moment while Tshelo checks your expense permissions.')
-          return
-        }
-        if (!canUseFundAction('record_expenses')) {
-          Alert.alert(
-            'Expense access required',
-            'You need expense permissions for this fund before you can record an expense.',
-          )
-          return
-        }
-        navigation.navigate('RecordExpense', {
-          fundId,
-          fundTitle:    fund.title,
-          currencyCode: fund.currency_code,
-        })
-        break
       case 'members':
         if (!canUseFundAction('manage_members')) return
         navigation.navigate('FundDetail', { fundId })
         break
     }
+  }
+
+  function handleFundQuickActionSelect(fund: HomeItem) {
+    const action = fundQuickAction
+    if (!action || !fund.fundId) return
+    setFundQuickAction(null)
+
+    if (action === 'contribution') {
+      navigation.navigate('RecordContribution', {
+        fundId: fund.fundId,
+        fundTitle: fund.title,
+        currencyCode: fund.currency_code,
+        initialMode: 'received',
+      })
+      return
+    }
+
+    navigation.navigate('RecordExpense', {
+      fundId: fund.fundId,
+      fundTitle: fund.title,
+      currencyCode: fund.currency_code,
+    })
   }
 
   const isValid = name.trim().length >= 3
@@ -533,18 +542,26 @@ export default function CreateFundScreen({ navigation }: Props) {
 
   if (!createOption) {
     return (
-      <CreateOptionChooser
-        onSelect={setCreateOption}
-        onQuickAction={handleQuickAction}
-        onBack={handleBack}
-        visibleQuickActions={new Set<QuickActionId>([
-          'joinFund',
-          'joinEvent',
-          'contribution',
-          'expense',
-          ...(canUseFundAction('manage_members') ? ['members' as const] : []),
-        ])}
-      />
+      <>
+        <CreateOptionChooser
+          onSelect={setCreateOption}
+          onQuickAction={handleQuickAction}
+          onBack={handleBack}
+          visibleQuickActions={new Set<QuickActionId>([
+            'joinFund',
+            'joinEvent',
+            'contribution',
+            'expense',
+            ...(canUseFundAction('manage_members') ? ['members' as const] : []),
+          ])}
+        />
+        <FundQuickActionSheet
+          action={fundQuickAction}
+          funds={availableFundItems}
+          onClose={() => setFundQuickAction(null)}
+          onSelect={handleFundQuickActionSelect}
+        />
+      </>
     )
   }
 

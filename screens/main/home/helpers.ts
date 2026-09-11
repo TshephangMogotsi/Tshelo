@@ -91,3 +91,11 @@ export function matchesHomeStatus(item: HomeItem, filter: HomeStatusFilter) {
   if (filter === 'closed') return status === 'closed' || status === 'completed'
   return status === filter
 }
+
+export function activeFundItems(items: HomeItem[]) {
+  return items.filter(item =>
+    item.kind !== 'event'
+    && Boolean(item.fundId)
+    && item.status.trim().toLowerCase() === 'active'
+  )
+}

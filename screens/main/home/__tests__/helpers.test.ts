@@ -1,4 +1,4 @@
-import { HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
+import { activeFundItems, HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
 
 describe('formatMoney', () => {
   it('uses the P symbol for BWP', () => {
@@ -108,5 +108,39 @@ describe('matchesHomeStatus', () => {
     expect(matchesHomeStatus(item, 'closed')).toBe(false)
     expect(matchesHomeStatus({ ...item, status: 'Closed' }, 'closed')).toBe(true)
     expect(matchesHomeStatus({ ...item, status: 'completed' }, 'closed')).toBe(true)
+  })
+})
+
+describe('activeFundItems', () => {
+  const base = {
+    id: 'item',
+    fundId: 'fund-id',
+    kind: 'fund' as const,
+    title: 'Family Fund',
+    status: 'active',
+    goal_amount: 0,
+    budget_amount: null,
+    budget_currency_code: 'BWP',
+    total_contributions: 0,
+    balance: 0,
+    member_count: 1,
+    guest_count: 0,
+    role: 'owner' as const,
+    event_date: '',
+    venue_name: '',
+    category: 'Fund',
+    emoji: '💜',
+    currency_code: 'BWP',
+    created_at: '2026-09-11T08:00:00Z',
+  }
+
+  it('keeps active Funds and Event + Funds while excluding event-only and closed items', () => {
+    const fund = base
+    const eventFund = { ...base, id: 'event-fund', kind: 'eventFund' as const, eventId: 'event-id' }
+    const eventOnly = { ...base, id: 'event', kind: 'event' as const, fundId: undefined, eventId: 'event-id' }
+    const closed = { ...base, id: 'closed', status: 'closed' }
+
+    expect(activeFundItems([eventOnly, fund, closed, eventFund]).map(item => item.id))
+      .toEqual(['item', 'event-fund'])
   })
 })
