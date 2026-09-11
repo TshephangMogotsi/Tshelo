@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ActivityIndicator, Alert } from 'react-native'
+  AccessibilityInfo, ActivityIndicator, Alert, Animated, Easing, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -26,6 +26,44 @@ const FEATURES = [
 export default function RegistrationSuccessScreen({ navigation }: Props) {
   const { refreshProfile } = useAuth()
   const [loading, setLoading] = useState(false)
+  const pulse = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | undefined
+    let mounted = true
+
+    function updateAnimation(reduceMotion: boolean) {
+      animation?.stop()
+      pulse.setValue(0)
+      if (reduceMotion || !mounted) return
+
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, {
+            toValue: 1,
+            duration: 1400,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay(250),
+        ]),
+      )
+      animation.start()
+    }
+
+    void AccessibilityInfo.isReduceMotionEnabled().then(updateAnimation)
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', updateAnimation)
+
+    return () => {
+      mounted = false
+      animation?.stop()
+      subscription.remove()
+    }
+  }, [pulse])
+
+  const haloScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.28] })
+  const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.38, 0] })
+  const circleScale = pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.04, 1] })
 
   async function handleGetStarted() {
     setLoading(true)
@@ -56,11 +94,16 @@ export default function RegistrationSuccessScreen({ navigation }: Props) {
 
       <View style={styles.container}>
         <View style={styles.celebrationWrap}>
-          <Text style={styles.confetti}>🎉</Text>
-          <View style={styles.celebrationCircle}>
+          <Animated.View
+            testID="success-pulse"
+            style={[
+              styles.pulseHalo,
+              { opacity: haloOpacity, transform: [{ scale: haloScale }] },
+            ]}
+          />
+          <Animated.View style={[styles.celebrationCircle, { transform: [{ scale: circleScale }] }]}>
             <Ionicons name="checkmark" size={42} color="#16A34A" />
-          </View>
-          <Text style={styles.sparkle}>✨</Text>
+          </Animated.View>
         </View>
 
         <Text style={styles.heading}>You're all set!</Text>
@@ -110,10 +153,17 @@ const styles = StyleSheet.create({
   },
   celebrationWrap: {
     width: 140,
-    height: 124,
+    height: 140,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
+  },
+  pulseHalo: {
+    position: 'absolute',
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    backgroundColor: '#86EFAC',
   },
   celebrationCircle: {
     width: 116,
@@ -122,20 +172,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#D2F8E4',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  confetti: {
-    position: 'absolute',
-    left: 8,
-    top: 8,
-    fontSize: 22,
-    zIndex: 1,
-  },
-  sparkle: {
-    position: 'absolute',
-    right: 2,
-    top: 38,
-    fontSize: 22,
-    zIndex: 1,
   },
   heading: {
     fontSize: 28,

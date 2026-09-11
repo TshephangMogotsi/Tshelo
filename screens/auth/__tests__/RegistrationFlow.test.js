@@ -221,6 +221,10 @@ it('allows users to continue without adding a bank account', async () => {
 
 it('marks registration complete only when the user taps Lets Go', async () => {
   await act(async () => { tree = create(React.createElement(RegistrationSuccessScreen, { navigation })) })
+  const visibleText = tree.root.findAllByType(Text).map(text => text.props.children)
+  expect(visibleText).not.toContain('🎉')
+  expect(visibleText).not.toContain('✨')
+  expect(tree.root.findByProps({ testID: 'success-pulse' })).toBeDefined()
   expect(api.users.updateMe).not.toHaveBeenCalled()
   await act(async () => button("Let's Go!").props.onPress())
   expect(api.users.updateMe).toHaveBeenCalledWith({
