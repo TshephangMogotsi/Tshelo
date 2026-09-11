@@ -67,15 +67,16 @@ it('uses accessible icons instead of emoji choices', () => {
   expect(tree.root.findByType('FlowHeader').props.step).toBe('Step 2 of 5')
 })
 
-it('asks for a custom event name and offers a fund icon when Other is selected', () => {
+it('puts the fund icon picker inside the custom event type field', () => {
   const other = EVENT_TYPES.find(item => item.id === 'other')
   renderStep({ eventType: other, isOtherEvent: true })
 
   expect(renderedText()).toContain('Custom event type')
-  expect(renderedText()).toContain('Fund icon')
+  expect(renderedText()).not.toContain('Fund icon')
   expect(renderedText()).not.toContain('Choose an emoji')
   expect(tree.root.findByProps({ placeholder: 'Name your event type' })).toBeDefined()
-  expect(tree.root.findByProps({ accessibilityLabel: 'Choose fund icon. Current selection General' })).toBeDefined()
+  const iconButton = tree.root.findByProps({ accessibilityLabel: 'Choose fund icon. Current selection General' })
+  expect(iconButton.props.accessibilityHint).toBe('Opens the fund icon picker')
 })
 
 it('saves a chosen fund icon and closes the picker', () => {

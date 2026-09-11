@@ -83,40 +83,32 @@ export default function EventFundTypeStep({
           {isOtherEvent ? (
             <View style={styles.customEventPanel}>
               <Text style={styles.customEventLabel}>Custom event type</Text>
-              <TextInput
-                style={styles.customEventInput}
-                placeholder="Name your event type"
-                placeholderTextColor={colors.textMuted}
-                value={customEventType}
-                onChangeText={onCustomEventTypeChange}
-                maxLength={32}
-                autoCapitalize="words"
-                returnKeyType="done"
-              />
-
-              <Text style={styles.customFundIconLabel}>
-                Fund icon <Text style={styles.optional}>(optional)</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.customIconButton}
-                activeOpacity={0.8}
-                onPress={() => setShowFundIconPicker(true)}
-                accessibilityRole="button"
-                accessibilityLabel={`Choose fund icon. Current selection ${selectedFundIcon.label}`}
-              >
-                <View style={styles.customIconPreview}>
+              <View style={styles.customEventInputRow}>
+                <TextInput
+                  style={styles.customEventInput}
+                  placeholder="Name your event type"
+                  placeholderTextColor={colors.textMuted}
+                  value={customEventType}
+                  onChangeText={onCustomEventTypeChange}
+                  maxLength={32}
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.trailingIconButton}
+                  activeOpacity={0.8}
+                  onPress={() => setShowFundIconPicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Choose fund icon. Current selection ${selectedFundIcon.label}`}
+                  accessibilityHint="Opens the fund icon picker"
+                >
                   <Ionicons
                     name={selectedFundIcon.icon ?? 'wallet-outline'}
                     size={22}
                     color={colors.primary}
                   />
-                </View>
-                <View style={styles.customIconCopy}>
-                  <Text style={styles.customIconTitle}>{selectedFundIcon.label}</Text>
-                  <Text style={styles.customIconHint}>Tap to choose a different icon</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : null}
 
@@ -227,62 +219,31 @@ function makeStyles(colors: AppColors) {
       color: colors.textSecondary,
       marginBottom: 8,
     },
-    customEventInput: {
+    customEventInputRow: {
       minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 14,
-      paddingHorizontal: 16,
+    },
+    customEventInput: {
+      flex: 1,
+      paddingLeft: 16,
+      paddingRight: 8,
       paddingVertical: 14,
       fontSize: 16,
       color: colors.textPrimary,
-      marginBottom: 16,
     },
-    customFundIconLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      marginBottom: 8,
-    },
-    optional: {
-      fontWeight: '400',
-      color: colors.textMuted,
-    },
-    customIconButton: {
-      minHeight: 64,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      backgroundColor: colors.background,
-    },
-    customIconPreview: {
+    trailingIconButton: {
       width: 42,
       height: 42,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 12,
       backgroundColor: colors.primaryLight,
-    },
-    customIconCopy: {
-      flex: 1,
-    },
-    customIconTitle: {
-      fontSize: 14,
-      lineHeight: 19,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    customIconHint: {
-      marginTop: 1,
-      fontSize: 12,
-      lineHeight: 16,
-      color: colors.textMuted,
+      marginRight: 6,
     },
     continueButton: {
       flexDirection: 'row',
