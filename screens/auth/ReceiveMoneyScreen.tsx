@@ -116,7 +116,7 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
                   key={item.id}
                   style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, index > 0 && styles.detailDivider]}
                 >
-                  <ProviderLogo provider={item.provider} size={30} />
+                  <ProviderLogo provider={item.provider} width={44} />
                   <View>
                     <Text style={styles.detailLabel}>{PROVIDER_LABELS[item.provider]}</Text>
                     <Text style={styles.detailValue}>{formatPhone(item.phone)}</Text>
