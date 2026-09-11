@@ -246,28 +246,40 @@ export default function EventBanner({ eventId, manager, canManage, inactive, onV
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <View style={styles.placeholder}>
-            <Ionicons name="image-outline" size={24} color={colors.primary} />
+            <View style={styles.placeholderIcon}>
+              <Ionicons name="image-outline" size={23} color={colors.primary} />
+            </View>
             <View style={styles.placeholderCopy}>
               <Text style={styles.placeholderTitle}>Add an event banner</Text>
               <Text style={styles.placeholderText}>Choose a private event image and set its important point.</Text>
             </View>
+            <TouchableOpacity
+              style={[styles.placeholderAction, manager.busy && styles.disabled]}
+              onPress={() => setEditorMode('choose')}
+              disabled={manager.busy}
+              accessibilityRole="button"
+              accessibilityLabel="Choose event banner"
+            >
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+              <Text style={styles.placeholderActionText}>Choose image</Text>
+            </TouchableOpacity>
           </View>
         )}
         {banner ? <View style={styles.scrim} pointerEvents="none" /> : null}
-        <View style={styles.bannerActions}>
-          {banner ? (
+        {banner ? (
+          <View style={styles.bannerActions}>
             <TouchableOpacity style={styles.bannerAction} onPress={() => onViewFull(banner)} accessibilityLabel="View full banner image">
               <Ionicons name="expand-outline" size={17} color="#FFFFFF" />
               <Text style={styles.bannerActionText}>View full</Text>
             </TouchableOpacity>
-          ) : null}
-          {canManage ? (
-            <TouchableOpacity style={styles.bannerAction} onPress={() => setEditorMode('choose')} disabled={manager.busy} accessibilityLabel={banner ? 'Change event banner' : 'Choose event banner'}>
-              <Ionicons name={banner ? 'create-outline' : 'add'} size={17} color={banner ? '#FFFFFF' : colors.primary} />
-              <Text style={[styles.bannerActionText, !banner && { color: colors.primary }]}>{banner ? 'Change' : 'Choose image'}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
+            {canManage ? (
+              <TouchableOpacity style={styles.bannerAction} onPress={() => setEditorMode('choose')} disabled={manager.busy} accessibilityLabel="Change event banner">
+                <Ionicons name="create-outline" size={17} color="#FFFFFF" />
+                <Text style={styles.bannerActionText}>Change</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
       </View>
       {banner && canManage ? (
         <View style={styles.manageRow}>
@@ -349,17 +361,20 @@ export default function EventBanner({ eventId, manager, canManage, inactive, onV
 const makeStyles = (colors: AppColors) => StyleSheet.create({
   wrap: { marginBottom: 10 },
   banner: {
-    aspectRatio: 4,
-    minHeight: 76,
+    width: '100%',
+    height: 104,
     overflow: 'hidden',
     borderRadius: 14,
     backgroundColor: '#352D42',
     justifyContent: 'center',
   },
-  placeholder: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, backgroundColor: '#F8F6FC' },
-  placeholderCopy: { flex: 1 },
-  placeholderTitle: { fontFamily: fonts.inter.bold, fontSize: 12, color: colors.textPrimary },
-  placeholderText: { marginTop: 2, fontFamily: fonts.inter.regular, fontSize: 9, lineHeight: 13, color: colors.textSecondary },
+  placeholder: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: '#F8F6FC' },
+  placeholderIcon: { width: 38, height: 38, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: colors.primaryLight },
+  placeholderCopy: { flex: 1, minWidth: 0 },
+  placeholderTitle: { fontFamily: fonts.inter.bold, fontSize: 13, color: colors.textPrimary },
+  placeholderText: { marginTop: 3, fontFamily: fonts.inter.regular, fontSize: 10, lineHeight: 14, color: colors.textSecondary },
+  placeholderAction: { minHeight: 38, flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, borderRadius: 11, backgroundColor: colors.primary },
+  placeholderActionText: { fontFamily: fonts.inter.bold, fontSize: 10, color: '#FFFFFF' },
   failure: { alignItems: 'center', justifyContent: 'center', gap: 3, padding: 8 },
   failureText: { fontFamily: fonts.inter.semiBold, fontSize: 10, color: '#FFFFFF' },
   failureAction: { fontFamily: fonts.inter.bold, fontSize: 10, color: '#DCC9FF' },

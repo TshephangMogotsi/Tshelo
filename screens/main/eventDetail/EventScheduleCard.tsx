@@ -102,6 +102,9 @@ export default function EventScheduleCard({ eventId, schedule, canManage, onUpda
   const [error, setError] = useState<string | null>(null)
   const source = scheduleEvent(schedule)
   const deadlineDetails = rsvpDeadlineDetails(source, now)
+  const displayedTime = timeRange(schedule)
+  const displayedDuration = eventDurationLabel(source)
+  const displayedTimeZone = eventTimeZoneLabel(source)
   const metadataSupported = schedule.timeZone !== undefined
 
   useEffect(() => {
@@ -219,26 +222,30 @@ export default function EventScheduleCard({ eventId, schedule, canManage, onUpda
           ) : null}
         </View>
         <View style={styles.metrics}>
-          <View style={styles.metric}>
-            <Ionicons name="time-outline" size={14} color={colors.primary} />
+          <View style={styles.metric} accessible accessibilityLabel={`Time, ${displayedTime}`}>
+            <Ionicons name="time-outline" size={16} color={colors.primary} />
             <Text style={styles.metricLabel}>Time</Text>
-            <Text style={styles.metricValue} numberOfLines={1}>{timeRange(schedule)}</Text>
+            <Text style={styles.metricValue} numberOfLines={2}>{displayedTime}</Text>
           </View>
-          <View style={styles.metric}>
-            <Ionicons name="hourglass-outline" size={14} color={colors.primary} />
+          <View style={styles.metric} accessible accessibilityLabel={`Duration, ${displayedDuration}`}>
+            <Ionicons name="hourglass-outline" size={16} color={colors.primary} />
             <Text style={styles.metricLabel}>Duration</Text>
-            <Text style={styles.metricValue} numberOfLines={1}>{eventDurationLabel(source)}</Text>
+            <Text style={styles.metricValue} numberOfLines={2}>{displayedDuration}</Text>
           </View>
-          <View style={styles.metric}>
-            <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
-            <Text style={styles.metricLabel}>RSVP</Text>
-            <Text style={styles.metricValue} numberOfLines={1}>{deadlineDetails.date}</Text>
+          <View
+            style={[styles.metric, styles.metricWide]}
+            accessible
+            accessibilityLabel={`RSVP deadline, ${deadlineDetails.date}. ${deadlineDetails.countdown}`}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
+            <Text style={styles.metricLabel}>RSVP deadline</Text>
+            <Text style={styles.metricValue}>{deadlineDetails.date}</Text>
+            <Text style={styles.metricDetail}>{deadlineDetails.countdown}</Text>
           </View>
         </View>
         <View style={styles.zoneRow}>
-          <Ionicons name="globe-outline" size={13} color={colors.textMuted} />
-          <Text style={styles.zone} numberOfLines={1}>{eventTimeZoneLabel(source)}</Text>
-          <Text style={styles.deadlineCountdown} numberOfLines={1}>{deadlineDetails.countdown}</Text>
+          <Ionicons name="globe-outline" size={14} color={colors.textMuted} />
+          <Text style={styles.zone} numberOfLines={2}>{displayedTimeZone}</Text>
         </View>
       </View>
 
@@ -321,19 +328,20 @@ export default function EventScheduleCard({ eventId, schedule, canManage, onUpda
 }
 
 const makeStyles = (colors: AppColors) => StyleSheet.create({
-  card: { marginBottom: 10, padding: 11, borderRadius: 14, borderWidth: 1, borderColor: '#DED8E8', backgroundColor: '#F8F6FC' },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 9 },
+  card: { marginBottom: 10, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#DED8E8', backgroundColor: '#F8F6FC' },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   headerCopy: { flex: 1 },
-  eyebrow: { fontFamily: fonts.inter.black, fontSize: 8, letterSpacing: 0.55, color: colors.primary },
-  countdown: { marginTop: 2, fontFamily: fonts.inter.extraBold, fontSize: 13, color: colors.textPrimary },
-  editButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FFFFFF' },
-  metrics: { flexDirection: 'row', gap: 6 },
-  metric: { flex: 1, minWidth: 0, padding: 7, borderRadius: 9, backgroundColor: '#FFFFFF' },
-  metricLabel: { marginTop: 3, fontFamily: fonts.inter.regular, fontSize: 8, color: colors.textMuted },
-  metricValue: { marginTop: 1, fontFamily: fonts.inter.bold, fontSize: 9, color: colors.textPrimary },
-  zoneRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
-  zone: { flexShrink: 1, fontFamily: fonts.inter.regular, fontSize: 8, color: colors.textSecondary },
-  deadlineCountdown: { flex: 1, textAlign: 'right', fontFamily: fonts.inter.semiBold, fontSize: 8, color: colors.primary },
+  eyebrow: { fontFamily: fonts.inter.black, fontSize: 9, letterSpacing: 0.65, color: colors.primary },
+  countdown: { marginTop: 3, fontFamily: fonts.inter.extraBold, fontSize: 16, color: colors.textPrimary },
+  editButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF' },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  metric: { minHeight: 72, flexGrow: 1, flexBasis: '46%', minWidth: 120, padding: 11, borderRadius: 12, backgroundColor: '#FFFFFF' },
+  metricWide: { flexBasis: '100%' },
+  metricLabel: { marginTop: 5, fontFamily: fonts.inter.regular, fontSize: 9, color: colors.textMuted },
+  metricValue: { marginTop: 2, fontFamily: fonts.inter.bold, fontSize: 11, lineHeight: 15, color: colors.textPrimary },
+  metricDetail: { marginTop: 2, fontFamily: fonts.inter.semiBold, fontSize: 9, color: colors.primary },
+  zoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 11, paddingTop: 11, borderTopWidth: 1, borderTopColor: '#E8E3EF' },
+  zone: { flex: 1, fontFamily: fonts.inter.regular, fontSize: 9, lineHeight: 13, color: colors.textSecondary },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(13,13,13,0.46)' },
   dismiss: { flex: 1 },
   editor: { maxHeight: '90%', padding: 20, paddingBottom: 20, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: colors.surface },
