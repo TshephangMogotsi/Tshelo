@@ -13,6 +13,7 @@ import {
   HomeItemKind,
   HomeSortOrder,
   HomeStatusFilter,
+  DEFAULT_HOME_STATUS_FILTER,
   KIND_LABELS,
   initials,
   matchesHomeStatus,
@@ -36,7 +37,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [isLoading,      setIsLoading]      = useState(false)
   const [loadError,      setLoadError]      = useState<string | null>(null)
   const [kindFilter,     setKindFilter]     = useState<'all' | HomeItemKind>('all')
-  const [statusFilter,   setStatusFilter]   = useState<HomeStatusFilter>('all')
+  const [statusFilter,   setStatusFilter]   = useState<HomeStatusFilter>(DEFAULT_HOME_STATUS_FILTER)
   const [sortOrder,      setSortOrder]      = useState<HomeSortOrder>('newest')
   const [unreadCount,    setUnreadCount]    = useState(0)
   const [searchOpen,     setSearchOpen]     = useState(false)

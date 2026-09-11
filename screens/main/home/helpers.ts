@@ -6,6 +6,8 @@ export type HomeSortOrder = 'newest' | 'oldest'
 
 export type HomeStatusFilter = 'all' | 'active' | 'closed'
 
+export const DEFAULT_HOME_STATUS_FILTER: HomeStatusFilter = 'active'
+
 export type HomeItem = {
   id:                  string
   fundId?:             string
@@ -87,9 +89,12 @@ export function sortHomeItems(items: HomeItem[], order: HomeSortOrder) {
 
 export function matchesHomeStatus(item: HomeItem, filter: HomeStatusFilter) {
   if (filter === 'all') return true
-  const status = item.status.trim().toLowerCase()
-  if (filter === 'closed') return status === 'closed' || status === 'completed'
-  return status === filter
+  if (filter === 'closed') return isClosedHomeItem(item)
+  return item.status.trim().toLowerCase() === filter
+}
+
+export function isClosedHomeItem(item: HomeItem) {
+  return ['closed', 'completed', 'cancelled'].includes(item.status.trim().toLowerCase())
 }
 
 export function activeFundItems(items: HomeItem[]) {

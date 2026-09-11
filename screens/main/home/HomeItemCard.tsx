@@ -4,7 +4,8 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import { formatFundMemberCount } from '../../../lib/fundMembers'
-import { HomeItem, formatEventDate, formatMoney } from './helpers'
+import { fundIconForEmoji } from '../createFund/constants'
+import { HomeItem, formatEventDate, formatMoney, isClosedHomeItem } from './helpers'
 
 type Props = {
   item: HomeItem
@@ -18,6 +19,8 @@ export default function HomeItemCard({ item, onPress }: Props) {
   const pct     = item.goal_amount > 0 ? Math.round((item.total_contributions / item.goal_amount) * 100) : 0
   const isEvent = item.kind === 'event'
   const isEF    = item.kind === 'eventFund'
+  const isClosed = isClosedHomeItem(item)
+  const fundIcon = fundIconForEmoji(item.emoji)
   const budgetText = item.budget_amount !== null && item.budget_amount > 0
     ? formatMoney(item.budget_amount, item.budget_currency_code)
     : 'Not set'
@@ -28,14 +31,20 @@ export default function HomeItemCard({ item, onPress }: Props) {
         styles.overviewCard,
         isEvent ? styles.eventCard : isEF ? styles.eventFundCard : styles.fundCard,
         isDark && styles.darkCard,
+        isClosed && styles.closedCard,
       ]}
       onPress={onPress}
       activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${item.title}`}
     >
       <View style={styles.cardPanel}>
         <View style={styles.overviewTop}>
           <View style={styles.fundLetterIcon}>
-            <Text style={styles.fundLetterText}>{item.emoji}</Text>
+            {isEvent
+              ? <Text style={styles.eventEmoji}>{item.emoji}</Text>
+              : <Ionicons name={isEF ? 'albums-outline' : fundIcon} size={21} color="#FFFFFF" />
+            }
           </View>
           <View style={styles.overviewInfo}>
             <Text style={styles.overviewTitle} numberOfLines={1}>{item.title}</Text>
@@ -112,7 +121,7 @@ export default function HomeItemCard({ item, onPress }: Props) {
             ? `${item.guest_count} invited`
             : `${formatMoney(item.total_contributions, item.currency_code)} contributed · ${formatFundMemberCount(item.member_count)}`}
         </Text>
-        <Text style={styles.overviewAction}>
+        <Text style={[styles.overviewAction, isClosed && styles.overviewActionClosed]}>
           {isEvent ? 'View event' : `${pct}%`}
         </Text>
       </View>
@@ -138,6 +147,12 @@ function makeStyles(colors: AppColors) {
     eventCard: { backgroundColor: '#FFF0C2', borderColor: '#F5D977' },
     eventFundCard: { backgroundColor: '#FFD8D0', borderColor: '#FFBCAF' },
     darkCard: { backgroundColor: colors.primaryLight, borderColor: colors.border },
+    closedCard: {
+      backgroundColor: colors.disabled,
+      borderColor: colors.disabled,
+      shadowColor: colors.textMuted,
+      shadowOpacity: 0.06,
+    },
     cardPanel: {
       backgroundColor: colors.surface,
       borderRadius: 19,
@@ -164,10 +179,8 @@ function makeStyles(colors: AppColors) {
       justifyContent: 'center',
       backgroundColor: colors.primary,
     },
-    fundLetterText: {
+    eventEmoji: {
       fontSize: 19,
-      fontWeight: '900',
-      color: '#FFFFFF',
     },
     overviewInfo: {
       flex: 1,
@@ -299,6 +312,9 @@ function makeStyles(colors: AppColors) {
       fontWeight: '900',
       color: colors.primary,
       letterSpacing: 0.3,
+    },
+    overviewActionClosed: {
+      color: colors.disabledText,
     },
     fundAmountsRow: {
       flexDirection: 'row',

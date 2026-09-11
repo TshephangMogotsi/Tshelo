@@ -1,4 +1,8 @@
-import { activeFundItems, HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
+import { activeFundItems, DEFAULT_HOME_STATUS_FILTER, HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
+
+it('defaults the Home list to active items', () => {
+  expect(DEFAULT_HOME_STATUS_FILTER).toBe('active')
+})
 
 describe('formatMoney', () => {
   it('uses the P symbol for BWP', () => {
@@ -108,6 +112,7 @@ describe('matchesHomeStatus', () => {
     expect(matchesHomeStatus(item, 'closed')).toBe(false)
     expect(matchesHomeStatus({ ...item, status: 'Closed' }, 'closed')).toBe(true)
     expect(matchesHomeStatus({ ...item, status: 'completed' }, 'closed')).toBe(true)
+    expect(matchesHomeStatus({ ...item, status: 'cancelled' }, 'closed')).toBe(true)
   })
 })
 

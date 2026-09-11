@@ -64,9 +64,16 @@ export const OTHER_FUND_ICON_OPTIONS: EmojiOption[] = [
 ]
 
 const OTHER_FUND_ICON_IDS = new Set(OTHER_FUND_ICON_OPTIONS.map(option => option.id))
+const FUND_ICON_BY_EMOJI = new Map(
+  [...EMOJI_OPTIONS, ...OTHER_FUND_ICON_OPTIONS].map(option => [option.emoji, option.icon] as const)
+)
 
 export function isOtherFundIcon(id: string) {
   return OTHER_FUND_ICON_IDS.has(id)
+}
+
+export function fundIconForEmoji(emoji: string): keyof typeof Ionicons.glyphMap {
+  return FUND_ICON_BY_EMOJI.get(emoji) ?? 'wallet-outline'
 }
 
 export const CUSTOM_EVENT_EMOJIS = ['🎉', '✨', '💜', '🙏']
