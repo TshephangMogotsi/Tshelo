@@ -9,7 +9,9 @@ import {
 
 describe('invitation links', () => {
   it('builds canonical HTTPS event and fund links', () => {
-    expect(invitationUrl('event', 'evt-a1b2c3d4')).toBe(`${INVITATION_WEB_ORIGIN}/invite/event/EVT-A1B2C3D4`)
+    const eventSharePayload = invitationUrl('event', 'evt-a1b2c3d4')
+    expect(eventSharePayload).toBe(`${INVITATION_WEB_ORIGIN}/invite/event/EVT-A1B2C3D4`)
+    expect(parseInvitationUrl(eventSharePayload)).toEqual({ kind: 'event', code: 'EVT-A1B2C3D4' })
     expect(invitationUrl('fund', 'fnd-a1b2c3d4')).toBe(`${INVITATION_WEB_ORIGIN}/invite/fund/FND-A1B2C3D4`)
   })
 

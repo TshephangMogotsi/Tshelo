@@ -284,8 +284,28 @@ Mobile parity checklist:
   organiser, guest, linked-fund-member and delegated-admin permission boundary.
 
 Website regression coverage checks the hierarchy, preview content, safe external
-map link, organiser actions, attendee RSVP action and Files-tab navigation. Native
-implementation and device smoke testing remain pending and were not started.
+map link, organiser actions, attendee RSVP action and Files-tab navigation.
+
+The native hierarchy was implemented locally on 2026-09-11. The existing
+workspace response now drives the banner-first phone stack, with the compact
+schedule followed by latest/pinned update, budget, attendance, location and
+gallery cards. The gallery requests no more than four private low-data previews,
+does not fall back to original objects, and opens the existing full viewer or
+Files tab. Guest initials are generated from event guest names only. Invitation
+code and sharing controls now live in the event identity area for authorised
+managers, while attendees receive the existing RSVP action. Native event sharing,
+including the post-creation action, now sends only the canonical invitation URL.
+Completed and cancelled events expose no invitation, announcement, banner/file,
+budget-editing or completion actions from this screen; existing leave/delete
+rules are unchanged.
+
+TypeScript and the full native/shared Jest run passed after the change (68 suites,
+447 tests). Component coverage checks card order/actions, up-to-five confirmed
+guest initials, the four-image cap, signed thumbnail use, no original-image
+fallback, retry behaviour and empty/read-only states. Shared invitation coverage
+verifies that the exact native payload parses back into the event join route.
+Physical-device visual, external Maps, share-target and RSVP smoke testing remains
+pending and is not claimed here.
 
 ## WEB-004 — Low-data event images
 

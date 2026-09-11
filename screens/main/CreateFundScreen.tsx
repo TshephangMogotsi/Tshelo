@@ -634,7 +634,7 @@ export default function CreateFundScreen({ navigation }: Props) {
               return
             }
             await Share.share({
-              message: `You're invited to ${eventName.trim() || `${selectedEventLabel} Event`}. RSVP here: ${eventInvitationUrl(createdEvent.share_code)}`,
+              message: eventInvitationUrl(createdEvent.share_code),
             })
           }}
           onDone={() => navigation.popToTop()}

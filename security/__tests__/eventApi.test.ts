@@ -174,4 +174,14 @@ describe('event API slice', () => {
     expect(guestView).toContain('Filter by RSVP status')
     expect(guestView).toContain('Allowed plus-ones')
   })
+
+  it('shares native event invitations as the canonical URL payload only', () => {
+    const eventDetail = read('screens/main/EventDetailScreen.tsx')
+    const eventCreation = read('screens/main/CreateFundScreen.tsx')
+
+    expect(eventDetail).toContain("const shareMessage = event?.rsvpLink ?? ''")
+    expect(eventCreation).toContain('message: eventInvitationUrl(createdEvent.share_code)')
+    expect(eventDetail).not.toContain("You're invited to ${event.title}")
+    expect(eventCreation).not.toContain('RSVP here: ${eventInvitationUrl')
+  })
 })

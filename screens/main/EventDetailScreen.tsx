@@ -43,6 +43,7 @@ import { buildCalendarEventDetails } from './eventDetail/calendar'
 import { parseEstimatedSpend, summarizeEventGuests } from './eventDetail/eventOnly'
 import EventFilesPanel from './eventDetail/EventFilesPanel'
 import EventBanner from './eventDetail/EventBanner'
+import EventOverviewCards from './eventDetail/EventOverviewCards'
 import EventScheduleCard from './eventDetail/EventScheduleCard'
 import EventRsvpCard from './eventDetail/EventRsvpCard'
 import { sortEventAnnouncements } from './eventDetail/announcements'
@@ -107,6 +108,7 @@ type EventView = {
   timeZone?: string
   rsvpDeadline?: string | null
   venue: string
+  venueAddress: string | null
   venueMapLink: string | null
   venueSearchText: string
   confirmed: number
@@ -302,7 +304,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         const guests: EventGuest[] = eventWorkspace.guests.map(mapEventGuest)
         const count = (status: GuestStatus) => guests.filter(guest => guest.status === status).length
         const budgetAmount = eventWorkspace.budget ? Number(eventWorkspace.budget.total_budget) : null
-        const shareCode = row.share_code?.trim() || null
+        const shareCode = row.share_code?.trim() || row.event_code?.trim() || null
         const venueName = row.venue_name?.trim() || ''
         const venueAddress = row.venue_address?.trim() || ''
         const venueNameMapLink = normalizeMapsUrl(venueName)
@@ -333,6 +335,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           timeZone: row.time_zone,
           rsvpDeadline: row.rsvp_deadline,
           venue,
+          venueAddress: venueAddress && !venueAddressMapLink ? venueAddress : null,
           venueMapLink,
           venueSearchText: venueAddressMapLink ? venueName : venueAddress || venueName,
           confirmed: count('confirmed'),
@@ -389,12 +392,12 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     return () => { active = false; controller.abort() }
   }, [eventId, navigation, replaceFiles]))
 
-  const shareMessage = event ? `You're invited to ${event.title}. ${event.rsvpLink}` : ''
+  const shareMessage = event?.rsvpLink ?? ''
 
-  function copyEventInvite() {
-    if (!event) return
-    Clipboard.setString(event.rsvpLink)
-    Alert.alert('Copied', event.shareCode ? 'Event invite link copied.' : 'Event invite copied.')
+  function copyEventInviteCode() {
+    if (!event?.shareCode) return
+    Clipboard.setString(event.shareCode)
+    Alert.alert('Copied', 'Event invitation code copied.')
   }
 
   async function addToCalendar() {
@@ -806,7 +809,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   }
 
   function openCloseEvent() {
-    if (!event || event.linkedFundId || !isEventAdmin || event.status === 'completed') return
+    if (!event || event.linkedFundId || !isEventAdmin || event.status !== 'active') return
     setEstimatedSpend(event.estimatedSpendAmount == null ? '' : String(event.estimatedSpendAmount))
     setShowCloseEvent(true)
   }
@@ -895,7 +898,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     }
     if (isEventAdmin) {
       options.push({ text: 'Manage guest list', onPress: () => navigation.navigate('GuestList', { eventId }) })
-      if (event.status !== 'completed') {
+      if (event.status === 'active') {
         options.push(
           { text: 'New announcement', onPress: () => setShowAnnouncementComposer(true) },
           { text: 'Invite guests', onPress: () => setShowShareModal(true) },
@@ -903,7 +906,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
       }
     }
     if (!event.linkedFundId && event.creatorId === userId) {
-      if (event.status !== 'completed') {
+      if (event.status === 'active') {
         options.push({ text: 'Close event', onPress: openCloseEvent })
       }
       options.push({ text: isDeletingEvent ? 'Deleting event…' : 'Delete event', style: 'destructive', onPress: confirmDeleteEvent })
@@ -985,6 +988,8 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const remaining = Math.max(totalBudget - totalSpent, 0)
   const pinnedAnnouncement = announcements.find(item => item.isPinned) ?? null
   const sortedAnnouncements = sortEventAnnouncements(announcements)
+  const latestOverviewAnnouncement = pinnedAnnouncement ?? sortedAnnouncements[0] ?? null
+  const visibleEventFiles = eventFiles.files.filter(file => !eventFiles.removals.some(item => item.file.id === file.id))
   const hasOverflowActions = !event.linkedFundId
     || canLeaveEvent
     || Boolean(fund?.ownerId === userId && !isFundReadOnly(fund.status))
@@ -1046,7 +1051,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
               {fund && <Text style={styles.eventFundEyebrow}>EVENT + FUND</Text>}
               <Text style={styles.eventTitle} numberOfLines={2}>{event.title}</Text>
             </View>
-            {event.status === 'completed' && <Text style={styles.completedBadge}>COMPLETED</Text>}
+            {event.status !== 'active' && <Text style={styles.completedBadge}>{event.status.toUpperCase()}</Text>}
           </View>
 
           <View style={styles.detailCard}>
@@ -1095,6 +1100,44 @@ export default function EventDetailScreen({ navigation, route }: Props) {
             />
             <MetricCard label="Date" value={event.date} styles={styles} wide />
           </View>
+          {event.status === 'active' && canManageGuests && event.shareCode ? (
+            <View style={styles.eventContextActions}>
+              <TouchableOpacity
+                style={styles.eventInviteCode}
+                onPress={copyEventInviteCode}
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                accessibilityLabel={`Copy event invitation code ${event.shareCode}`}
+              >
+                <View style={styles.eventInviteCodeCopy}>
+                  <Text style={styles.eventInviteCodeLabel}>INVITATION CODE</Text>
+                  <Text style={styles.eventInviteCodeValue} numberOfLines={1}>{event.shareCode}</Text>
+                </View>
+                <Ionicons name="copy-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.eventShareButton}
+                onPress={() => setShowShareModal(true)}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel="Share event invitation"
+              >
+                <Ionicons name="share-social-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.eventShareButtonText}>Share invite</Text>
+              </TouchableOpacity>
+            </View>
+          ) : event.status === 'active' && !canManageGuests ? (
+            <TouchableOpacity
+              style={styles.eventRsvpButton}
+              onPress={() => setActiveTab('guests')}
+              activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel="Open your event RSVP"
+            >
+              <Ionicons name="checkmark-circle-outline" size={17} color="#FFFFFF" />
+              <Text style={styles.eventShareButtonText}>View or update RSVP</Text>
+            </TouchableOpacity>
+          ) : null}
           </View>
         </View>
       </Animated.View>
@@ -1136,18 +1179,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
             ) : null}
             <View style={[styles.eventWorkspaceControlsRow, eventWorkspaceExpanded && styles.eventWorkspaceControlsRowExpanded]}>
               <View style={styles.eventWorkspaceHeading}>
-                {canManageGuests && event.status !== 'completed' ? (
-                  <TouchableOpacity
-                    style={styles.eventWorkspaceInviteLink}
-                    onPress={() => setShowShareModal(true)}
-                    activeOpacity={0.72}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open event invite details"
-                  >
-                    <Ionicons name="copy-outline" size={17} color={colors.primary} />
-                    <Text style={styles.eventWorkspaceEyebrow}>Copy Event Invite</Text>
-                  </TouchableOpacity>
-                ) : null}
+                <Text style={styles.eventWorkspaceEyebrow}>EVENT WORKSPACE</Text>
               </View>
               <View style={styles.eventWorkspaceActions}>
                 <TouchableOpacity
@@ -1230,30 +1262,37 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   rsvpDeadline: metadata.rsvpDeadline,
                 } : current)}
               />
-              {pinnedAnnouncement ? (
-                <TouchableOpacity
-                  style={styles.pinnedOverview}
-                  onPress={() => setActiveTab('announcements')}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open pinned update: ${pinnedAnnouncement.title}`}
-                >
-                  <View style={styles.pinnedOverviewIcon}>
-                    <Ionicons name="pin" size={15} color={colors.primary} />
-                  </View>
-                  <View style={styles.pinnedOverviewCopy}>
-                    <Text style={styles.pinnedOverviewLabel}>PINNED UPDATE</Text>
-                    <Text style={styles.pinnedOverviewTitle} numberOfLines={1}>{pinnedAnnouncement.title}</Text>
-                    <Text style={styles.pinnedOverviewBody} numberOfLines={2}>{pinnedAnnouncement.body}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.overviewUpdatesLink} onPress={() => setActiveTab('announcements')}>
-                  <Ionicons name="notifications-outline" size={17} color={colors.primary} />
-                  <Text style={styles.overviewUpdatesText}>{announcements.length ? 'View event updates' : 'No event updates yet'}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                </TouchableOpacity>
-              )}
+              <EventOverviewCards
+                eventId={eventId}
+                latestAnnouncement={latestOverviewAnnouncement ? {
+                  title: latestOverviewAnnouncement.title,
+                  body: latestOverviewAnnouncement.body,
+                  isPinned: latestOverviewAnnouncement.isPinned,
+                  authorName: latestOverviewAnnouncement.authorName,
+                  createdAt: latestOverviewAnnouncement.createdAt,
+                  attachmentCount: latestOverviewAnnouncement.attachments.length,
+                } : null}
+                plannedBudget={event.budgetAmount === null ? 'Not set' : formatEventMoney(event.budgetAmount, event.budgetCurrency)}
+                hasBudget={event.budgetAmount !== null}
+                linkedFund={fund ? {
+                  raised: formatEventMoney(totalIn, event.budgetCurrency),
+                  available: formatEventMoney(totalIn - totalSpent, event.budgetCurrency),
+                } : undefined}
+                canOpenBudget={Boolean(fund) || (canManageEventBudget && event.status === 'active')}
+                attendance={guestSummary}
+                guests={eventGuests}
+                venue={event.venue}
+                venueAddress={event.venueAddress}
+                hasVenue={event.venue !== 'Venue to be confirmed'}
+                files={visibleEventFiles}
+                previewBusy={attachmentActionPath !== null}
+                onOpenUpdates={() => setActiveTab('announcements')}
+                onOpenBudget={() => fund ? setActiveTab('budget') : navigation.navigate('EventBudget', { eventId })}
+                onOpenGuests={() => setActiveTab('guests')}
+                onOpenLocation={confirmOpenEventLocation}
+                onOpenFiles={() => setActiveTab('files')}
+                onPreview={(items, file) => { void previewEventFile(items, file) }}
+              />
             </View>
           ) : activeTab === 'guests' ? (
             <>
@@ -1277,35 +1316,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   }}
                 />
               ) : null}
-              {canManageGuests && (
-                <View style={styles.tabInviteCard}>
-                  <View style={styles.tabInviteHeader}>
-                    <View style={styles.tabInviteIcon}>
-                      <Ionicons name="ticket-outline" size={20} color={colors.primary} />
-                    </View>
-                    <View style={styles.tabInviteCopy}>
-                      <Text style={styles.tabInviteEyebrow}>EVENT INVITE</Text>
-                      <Text style={styles.tabInviteTitle}>Invite event guests</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.tabInviteHelp}>
-                    This code joins the event only. It does not give access to the contribution fund or fund management.
-                  </Text>
-                  <View style={styles.tabInviteCodeRow}>
-                    <Text style={styles.tabInviteCode} numberOfLines={1}>{event.shareCode ?? 'Invite unavailable'}</Text>
-                    {event.status !== 'completed' && event.shareCode ? (
-                      <View style={styles.tabInviteActions}>
-                        <TouchableOpacity style={styles.tabInviteButton} onPress={copyEventInvite} accessibilityLabel="Copy event invite">
-                          <Ionicons name="copy-outline" size={18} color={INK} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.tabInviteButton} onPress={() => setShowShareModal(true)} accessibilityLabel="Share event invite">
-                          <Ionicons name="share-social" size={18} color={INK} />
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              )}
               {!isEventOnly && canManageGuests ? (
                 <TouchableOpacity
                   style={styles.newAnnouncementButton}
@@ -1321,7 +1331,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   <Ionicons name="people-outline" size={26} color={MUTED} />
                   <Text style={styles.emptyTitle}>No guests yet</Text>
                   <Text style={styles.emptyText}>Share the event invite to start building your guest list.</Text>
-                  {canManageGuests && event.status !== 'completed' && (
+                  {canManageGuests && event.status === 'active' && (
                     <TouchableOpacity style={styles.emptyAction} onPress={() => setShowShareModal(true)}>
                       <Text style={styles.emptyActionText}>Invite guests</Text>
                     </TouchableOpacity>
@@ -1352,7 +1362,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
             </>
           ) : activeTab === 'announcements' ? (
             <View style={styles.announcementList}>
-              {canPostAnnouncements && event.status !== 'completed' && (
+              {canPostAnnouncements && event.status === 'active' && (
                 <TouchableOpacity style={styles.newAnnouncementButton} onPress={() => openAnnouncementComposer()} activeOpacity={0.84}>
                   <Ionicons name="add" size={17} color="#FFFFFF" />
                   <Text style={styles.newAnnouncementButtonText}>Create announcement</Text>
@@ -1494,7 +1504,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                 </View>
               </View>
 
-              {canManageEventBudget && (!fund || !isFundReadOnly(fund.status)) ? (
+              {canManageEventBudget && event.status === 'active' && (!fund || !isFundReadOnly(fund.status)) ? (
                 <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('EventBudget', { eventId })}>
                   <Ionicons name="create-outline" size={17} color="#FFFFFF" />
                   <Text style={styles.primaryButtonText}>{event.budgetAmount ? 'Edit event budget' : 'Set event budget'}</Text>
@@ -1920,23 +1930,14 @@ function makeStyles(colors: AppColors) {
       letterSpacing: 0.35,
     },
     detailCard: { padding: 14, borderRadius: 16, backgroundColor: '#FFFFFF' },
-    pinnedOverview: {
-      minHeight: 68,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 10,
-      padding: 10,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#CDB6F8',
-      backgroundColor: '#F6F0FF',
-    },
-    pinnedOverviewIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FFFFFF' },
-    pinnedOverviewCopy: { flex: 1, minWidth: 0 },
-    pinnedOverviewLabel: { fontSize: 7, fontFamily: fonts.inter.black, letterSpacing: 0.55, color: colors.primary },
-    pinnedOverviewTitle: { marginTop: 2, fontSize: 11, fontFamily: fonts.inter.extraBold, color: INK },
-    pinnedOverviewBody: { marginTop: 2, fontSize: 9, lineHeight: 12, fontFamily: fonts.inter.regular, color: '#52525B' },
+    eventContextActions: { flexDirection: 'row', alignItems: 'stretch', gap: 7, marginTop: 9 },
+    eventInviteCode: { flex: 1, minWidth: 0, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: '#F7F7F8' },
+    eventInviteCodeCopy: { flex: 1, minWidth: 0 },
+    eventInviteCodeLabel: { fontSize: 7, fontFamily: fonts.inter.black, letterSpacing: 0.45, color: colors.primary },
+    eventInviteCodeValue: { marginTop: 2, fontSize: 10, fontFamily: fonts.inter.bold, color: INK, letterSpacing: 0.3 },
+    eventShareButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primary },
+    eventRsvpButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 9, borderRadius: 10, backgroundColor: colors.primary },
+    eventShareButtonText: { fontSize: 10, fontFamily: fonts.inter.bold, color: '#FFFFFF' },
     rsvpSummaryHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -2032,7 +2033,6 @@ function makeStyles(colors: AppColors) {
       letterSpacing: 0.1,
       color: colors.primary,
     },
-    eventWorkspaceInviteLink: { alignSelf: 'flex-start', minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7 },
     eventWorkspaceActions: { flexDirection: 'row', gap: 7, marginLeft: 10 },
     eventWorkspaceButton: {
       width: 34,
@@ -2059,46 +2059,6 @@ function makeStyles(colors: AppColors) {
     sheetContent: { flex: 1 },
     sheetContentInner: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40 },
     nativeOverview: { gap: 2 },
-    overviewUpdatesLink: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, borderRadius: 13, borderWidth: 1, borderColor: BORDER, backgroundColor: '#F7F7F8' },
-    overviewUpdatesText: { flex: 1, fontSize: 11, fontFamily: fonts.inter.bold, color: INK },
-    tabInviteCard: {
-      padding: 14,
-      marginBottom: 14,
-      borderRadius: 16,
-      backgroundColor: '#F7F7F8',
-      borderWidth: 1,
-      borderColor: BORDER,
-    },
-    tabInviteHeader: { flexDirection: 'row', alignItems: 'center' },
-    tabInviteIcon: {
-      width: 38,
-      height: 38,
-      marginRight: 10,
-      borderRadius: 11,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: EVENT_HEADER_PURPLE,
-    },
-    tabInviteCopy: { flex: 1, minWidth: 0 },
-    tabInviteEyebrow: { fontSize: 8, fontFamily: fonts.inter.black, color: colors.primary, letterSpacing: 0.55 },
-    tabInviteTitle: { marginTop: 2, fontSize: 13, fontFamily: fonts.inter.extraBold, color: INK },
-    tabInviteHelp: { marginTop: 10, fontSize: 10, lineHeight: 15, fontFamily: fonts.inter.regular, color: '#71717A' },
-    tabInviteCodeRow: {
-      minHeight: 44,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginTop: 11,
-      paddingLeft: 12,
-      paddingRight: 6,
-      borderRadius: 12,
-      backgroundColor: '#FFFFFF',
-      borderWidth: 1,
-      borderColor: BORDER,
-    },
-    tabInviteCode: { flex: 1, minWidth: 0, fontSize: 12, fontFamily: fonts.inter.bold, color: INK, letterSpacing: 0.3 },
-    tabInviteActions: { flexDirection: 'row', gap: 5 },
-    tabInviteButton: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: EVENT_HEADER_PURPLE },
     guestCard: {
       minHeight: 64,
       flexDirection: 'row',
