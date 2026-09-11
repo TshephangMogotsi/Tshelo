@@ -30,6 +30,15 @@ test('consumer paths resolve only the pinned patched decoder and UUID', () => {
   assert.equal(xcodeRequire('uuid/package.json').version, '11.1.1')
 })
 
+test('no locked js-yaml copy is in the vulnerable 3.x range', () => {
+  const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
+  const copies = Object.entries(lock.packages).filter(([key]) => key.endsWith('/node_modules/js-yaml') || key === 'node_modules/js-yaml')
+  assert.ok(copies.length > 0, 'js-yaml missing from the lockfile')
+  for (const [key, pkg] of copies) {
+    assert.ok(pkg.version === '3.15.2' || pkg.version.startsWith('4.'), `${key}: ${pkg.version}`)
+  }
+})
+
 test('query-string consumes the patched ESM decoder from CommonJS', () => {
   assert.equal(typeof queryRequire('decode-uri-component').default, 'function')
   assert.deepEqual({ ...queryString.parse('name=Tshelo+event&plus=%2B&note=%E2%9C%93&empty=&flag&tag=a&tag=b') }, {
