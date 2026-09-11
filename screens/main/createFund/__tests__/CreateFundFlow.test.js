@@ -79,3 +79,18 @@ it('starts Event and Fund with the shared home-currency step before event type',
   act(() => tree.root.findByType('EventFundTypeStep').props.onBack())
   expect(tree.root.findByType('CurrencyStep')).toBeDefined()
 })
+
+it('keeps a custom Event Only icon separate from the Event and Fund icon', () => {
+  act(() => tree.root.findByType('CreateOptionChooser').props.onSelect('event'))
+
+  let eventTypeStep = tree.root.findByType('EventTypeStep')
+  expect(eventTypeStep.props.selectedEventIcon.id).toBe('general')
+  act(() => eventTypeStep.props.onSelectEventIcon(OTHER_FUND_ICON_OPTIONS[0]))
+  expect(tree.root.findByType('EventTypeStep').props.selectedEventIcon.id).toBe('health')
+
+  act(() => tree.root.findByType('EventTypeStep').props.onBack())
+  act(() => tree.root.findByType('CreateOptionChooser').props.onSelect('eventFund'))
+  act(() => tree.root.findByType('CurrencyStep').props.onContinue())
+
+  expect(tree.root.findByType('EventFundTypeStep').props.selectedFundIcon.id).toBe('general')
+})

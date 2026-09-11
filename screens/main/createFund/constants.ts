@@ -68,6 +68,11 @@ export const OTHER_FUND_ICON_OPTIONS: EmojiOption[] = [
   { id: 'arts',        label: 'Arts',        emoji: '🎵', icon: 'musical-notes-outline' },
 ]
 
+export const CUSTOM_TYPE_ICON_OPTIONS: EmojiOption[] = [
+  ...EMOJI_OPTIONS.filter(option => option.id !== 'other'),
+  ...OTHER_FUND_ICON_OPTIONS,
+]
+
 const OTHER_FUND_ICON_IDS = new Set(OTHER_FUND_ICON_OPTIONS.map(option => option.id))
 const FUND_ICON_BY_EMOJI = new Map(
   [...EMOJI_OPTIONS, ...OTHER_FUND_ICON_OPTIONS].map(option => [option.emoji, option.icon] as const)

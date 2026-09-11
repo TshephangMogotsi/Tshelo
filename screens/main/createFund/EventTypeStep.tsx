@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import FlowHeader from './FlowHeader'
+import FundIconPickerSheet from './FundIconPickerSheet'
 import {
   BRAND_LAVENDER,
   BRAND_PURPLE,
   BRAND_PURPLE_DARK,
+  CUSTOM_TYPE_ICON_OPTIONS,
+  EmojiOption,
   EVENT_TYPES,
   EventTypeOption,
 } from './constants'
@@ -18,6 +22,8 @@ type Props = {
   isOtherEvent: boolean
   customEventType: string
   onCustomEventTypeChange: (text: string) => void
+  selectedEventIcon: EmojiOption
+  onSelectEventIcon: (icon: EmojiOption) => void
   isStepValid: boolean
   onContinue: () => void
   onBack: () => void
@@ -29,12 +35,15 @@ export default function EventTypeStep({
   isOtherEvent,
   customEventType,
   onCustomEventTypeChange,
+  selectedEventIcon,
+  onSelectEventIcon,
   isStepValid,
   onContinue,
   onBack,
 }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
+  const [showEventIconPicker, setShowEventIconPicker] = useState(false)
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -77,18 +86,48 @@ export default function EventTypeStep({
         {isOtherEvent ? (
           <View style={styles.customEventPanel}>
             <Text style={styles.customEventLabel}>Custom event type</Text>
-            <TextInput
-              style={styles.customEventInput}
-              placeholder="Name your event type"
-              placeholderTextColor={colors.textMuted}
-              value={customEventType}
-              onChangeText={onCustomEventTypeChange}
-              maxLength={32}
-              autoCapitalize="words"
-              returnKeyType="done"
-            />
+            <View style={styles.customEventInputRow}>
+              <TextInput
+                style={styles.customEventInput}
+                placeholder="Name your event type"
+                placeholderTextColor={colors.textMuted}
+                value={customEventType}
+                onChangeText={onCustomEventTypeChange}
+                maxLength={32}
+                autoCapitalize="words"
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={styles.trailingIconButton}
+                activeOpacity={0.8}
+                onPress={() => setShowEventIconPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Choose event icon. Current selection ${selectedEventIcon.label}`}
+                accessibilityHint="Opens the event icon picker"
+              >
+                <Ionicons
+                  name={selectedEventIcon.icon ?? 'shapes-outline'}
+                  size={22}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
+
+        <FundIconPickerSheet
+          visible={showEventIconPicker}
+          selectedId={selectedEventIcon.id}
+          options={CUSTOM_TYPE_ICON_OPTIONS}
+          title="Choose an event icon"
+          subtitle="Choose an icon that best represents this event."
+          accessibilityNoun="event"
+          onSelect={item => {
+            onSelectEventIcon(item)
+            setShowEventIconPicker(false)
+          }}
+          onClose={() => setShowEventIconPicker(false)}
+        />
 
         <TouchableOpacity
           style={[styles.eventContinueButton, !isStepValid && styles.eventContinueDisabled]}
@@ -182,16 +221,31 @@ function makeStyles(colors: AppColors) {
       color: colors.textSecondary,
       marginBottom: 8,
     },
-    customEventInput: {
+    customEventInputRow: {
       minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 14,
-      paddingHorizontal: 16,
+    },
+    customEventInput: {
+      flex: 1,
+      paddingLeft: 16,
+      paddingRight: 8,
       paddingVertical: 14,
       fontSize: 16,
       color: colors.textPrimary,
+    },
+    trailingIconButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: colors.primaryLight,
+      marginRight: 6,
     },
     eventContinueButton: {
       flexDirection: 'row',

@@ -9,10 +9,10 @@ import FundIconPickerSheet from './FundIconPickerSheet'
 import {
   BRAND_LAVENDER,
   BRAND_PURPLE,
+  CUSTOM_TYPE_ICON_OPTIONS,
   EVENT_TYPES,
   EmojiOption,
   EventTypeOption,
-  isOtherFundIcon,
 } from './constants'
 
 type Props = {
@@ -114,7 +114,9 @@ export default function EventFundTypeStep({
 
           <FundIconPickerSheet
             visible={showFundIconPicker}
-            selectedId={isOtherFundIcon(selectedFundIcon.id) ? selectedFundIcon.id : null}
+            selectedId={selectedFundIcon.id}
+            options={CUSTOM_TYPE_ICON_OPTIONS}
+            title="Choose a fund icon"
             onSelect={item => {
               onSelectFundIcon(item)
               setShowFundIconPicker(false)

@@ -9,11 +9,24 @@ import { OTHER_FUND_ICON_OPTIONS, type EmojiOption } from './constants'
 type Props = {
   visible: boolean
   selectedId: string | null
+  options?: EmojiOption[]
+  title?: string
+  subtitle?: string
+  accessibilityNoun?: 'fund' | 'event'
   onSelect: (item: EmojiOption) => void
   onClose: () => void
 }
 
-export default function FundIconPickerSheet({ visible, selectedId, onSelect, onClose }: Props) {
+export default function FundIconPickerSheet({
+  visible,
+  selectedId,
+  options = OTHER_FUND_ICON_OPTIONS,
+  title = 'More fund icons',
+  subtitle = 'Choose an icon that best represents this fund.',
+  accessibilityNoun = 'fund',
+  onSelect,
+  onClose,
+}: Props) {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const styles = makeStyles(colors)
@@ -32,21 +45,21 @@ export default function FundIconPickerSheet({ visible, selectedId, onSelect, onC
           <View style={styles.handle} />
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={styles.title}>More fund icons</Text>
-              <Text style={styles.subtitle}>Choose an icon that best represents this fund.</Text>
+              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}
               accessibilityRole="button"
-              accessibilityLabel="Close fund icon picker"
+              accessibilityLabel={`Close ${accessibilityNoun} icon picker`}
             >
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <FlatList
-            data={OTHER_FUND_ICON_OPTIONS}
+            data={options}
             keyExtractor={item => item.id}
             numColumns={3}
             showsVerticalScrollIndicator={false}
@@ -60,7 +73,7 @@ export default function FundIconPickerSheet({ visible, selectedId, onSelect, onC
                   activeOpacity={0.8}
                   onPress={() => onSelect(item)}
                   accessibilityRole="radio"
-                  accessibilityLabel={`${item.label} fund icon`}
+                  accessibilityLabel={`${item.label} ${accessibilityNoun} icon`}
                   accessibilityState={{ checked: active }}
                 >
                   <Ionicons

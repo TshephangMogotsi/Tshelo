@@ -59,6 +59,7 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [currency,       setCurrency]       = useState<FundCurrency>(() => homeCurrency)
   const [currencyDone,   setCurrencyDone]   = useState(false)
   const [selectedEmoji,  setSelectedEmoji]  = useState(EMOJI_OPTIONS[0])
+  const [customEventIcon, setCustomEventIcon] = useState(EMOJI_OPTIONS[0])
   const [eventType,      setEventType]      = useState(EVENT_TYPES[0])
   const [customEventType, setCustomEventType] = useState('')
   const [eventStep,      setEventStep]      = useState<1 | 2 | 3>(1)
@@ -227,7 +228,7 @@ export default function CreateFundScreen({ navigation }: Props) {
     && eventVenueMapLinkValid
   const isOtherEvent = eventType.id === 'other'
   const selectedEventLabel = isOtherEvent ? customEventType.trim() || 'Other' : eventType.label
-  const selectedEventEmoji = eventType.emoji
+  const selectedEventEmoji = isOtherEvent ? customEventIcon.emoji : eventType.emoji
   const eventTypeStepValid = !isOtherEvent || customEventType.trim().length >= 2
   const selectedCurrency = FUND_CURRENCIES.find(item => item.id === currency) ?? {
     id: currency,
@@ -720,6 +721,8 @@ export default function CreateFundScreen({ navigation }: Props) {
         isOtherEvent={isOtherEvent}
         customEventType={customEventType}
         onCustomEventTypeChange={setCustomEventType}
+        selectedEventIcon={customEventIcon}
+        onSelectEventIcon={setCustomEventIcon}
         isStepValid={eventTypeStepValid}
         onContinue={() => setEventStep(2)}
         onBack={handleBack}
