@@ -35,7 +35,6 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
   const {
     fundName,
     category,
-    emoji,
     goalBWP,
     currencyCode,
     currencySymbol,
@@ -94,19 +93,11 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Success icon ───────────────────────── */}
-        <View style={styles.iconWrap}>
-          <View style={styles.iconGlow} />
-          <View style={styles.iconCircle}>
-            <Ionicons name="wallet" size={32} color="#FFFFFF" />
-          </View>
-          <Text style={[styles.sparkle, { top: 12,  left: 22,  fontSize: 18 }]}>✦</Text>
-          <Text style={[styles.sparkle, { top: 6,   right: 20, fontSize: 24 }]}>✦</Text>
-          <Text style={[styles.sparkle, { bottom: 18, left: 30, fontSize: 13 }]}>✦</Text>
-        </View>
-
         {/* ── Heading ────────────────────────────── */}
-        <Text style={styles.heading}>Fund Created!</Text>
+        <View style={styles.headingRow} accessibilityLabel="Fund created successfully">
+          <Ionicons name="checkmark-circle" size={28} color={colors.success} />
+          <Text style={styles.heading} accessibilityRole="header">Fund Created!</Text>
+        </View>
         <Text style={styles.subheading}>
           {fundName} is ready to receive contributions
         </Text>
@@ -114,9 +105,6 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
         {/* ── Fund summary card ──────────────────── */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryTop}>
-            <View style={styles.fundIconCircle}>
-              <Text style={styles.fundEmoji}>{emoji}</Text>
-            </View>
             <View style={styles.fundNameWrap}>
               <Text style={styles.fundName}>{fundName}</Text>
               <View style={styles.categoryTag}>
@@ -146,7 +134,16 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
             <>
               <View style={styles.summaryDivider} />
               <Text style={styles.codeLabel}>INVITE CODE</Text>
-              <Text style={styles.codeValue}>{shareCode}</Text>
+              <Text
+                style={styles.codeValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+                selectable
+                accessibilityLabel={`Invite code ${shareCode}`}
+              >
+                {shareCode}
+              </Text>
               <Text style={styles.codeHint}>Share this code with anyone you want to invite</Text>
             </>
           ) : null}
@@ -196,53 +193,24 @@ function makeStyles(colors: AppColors) {
     scroll: {
       flexGrow: 1,
       paddingHorizontal: 24,
-      paddingTop: 40,
+      paddingTop: 28,
       paddingBottom: 48,
       alignItems: 'center',
     },
 
-    // ── Success icon ───────────────────────────────────────────
-    iconWrap: {
-      width: 140,
-      height: 140,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 24,
-    },
-    iconGlow: {
-      position: 'absolute',
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: '#22C55E',
-      opacity: 0.18,
-    },
-    iconCircle: {
-      width: 88,
-      height: 88,
-      borderRadius: 44,
-      backgroundColor: '#22C55E',
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#22C55E',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.35,
-      shadowRadius: 12,
-      elevation: 8,
-    },
-    sparkle: {
-      position: 'absolute',
-      color: '#F59E0B',
-      fontWeight: '900',
-    },
-
     // ── Heading ────────────────────────────────────────────────
+    headingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
     heading: {
       fontSize: 28,
       fontFamily: fonts.display.bold,
       fontWeight: '800',
       color: colors.textPrimary,
-      marginBottom: 8,
       textAlign: 'center',
     },
     subheading: {
@@ -264,20 +232,8 @@ function makeStyles(colors: AppColors) {
       marginBottom: 28,
     },
     summaryTop: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
       marginBottom: 16,
     },
-    fundIconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: colors.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    fundEmoji: { fontSize: 20 },
     fundNameWrap: {
       flex: 1,
     },
@@ -313,9 +269,11 @@ function makeStyles(colors: AppColors) {
       marginBottom: 6,
     },
     codeValue: {
-      fontSize: 22,
-      fontWeight: '900',
-      letterSpacing: 3,
+      width: '100%',
+      fontSize: 18,
+      lineHeight: 24,
+      fontFamily: fonts.inter.extraBold,
+      letterSpacing: 1.2,
       color: colors.primary,
       marginBottom: 4,
     },
