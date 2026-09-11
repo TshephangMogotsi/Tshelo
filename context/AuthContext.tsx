@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useState, useEffect, ReactNode 
 import { supabase } from '../lib/supabase'
 import { api } from '../lib/api'
 import { unregisterPushToken } from '../lib/pushNotifications'
+import { findSignupCountry } from '../lib/countries'
 
 export type SecuritySessionDetails = {
   phone: string
@@ -14,6 +15,8 @@ type AuthContextType = {
   profileCompleted: boolean
   userId: string | null
   userName: string
+  countryCode: string | null
+  preferredCurrency: string | null
   tokenBalance: number
   trustScore: number
   refreshProfile: () => Promise<void>
@@ -29,6 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileCompleted, setProfileCompleted] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [userName, setUserName] = useState('')
+  const [countryCode, setCountryCode] = useState<string | null>(null)
+  const [preferredCurrency, setPreferredCurrency] = useState<string | null>(null)
   const [tokenBalance, setTokenBalance] = useState(0)
   const [trustScore, setTrustScore] = useState(0)
 
@@ -43,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ])
       setProfileCompleted(profile.profile_completed)
       setUserName(profile.name ?? '')
+      setCountryCode(profile.country_code ?? null)
+      setPreferredCurrency(
+        profile.preferred_currency
+          ?? findSignupCountry(profile.country_code ?? '')?.currency
+          ?? null
+      )
       setTokenBalance(profile.token_balance ?? 0)
       setTrustScore(profile.trust_score ?? 0)
     } catch {
@@ -66,6 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileCompleted(false)
         setUserId(null)
         setUserName('')
+        setCountryCode(null)
+        setPreferredCurrency(null)
         setTokenBalance(0)
         setTrustScore(0)
       }
@@ -103,6 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileCompleted(false)
     setUserId(null)
     setUserName('')
+    setCountryCode(null)
+    setPreferredCurrency(null)
     setTokenBalance(0)
     setTrustScore(0)
   }, [])
@@ -113,6 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileCompleted,
       userId,
       userName,
+      countryCode,
+      preferredCurrency,
       tokenBalance,
       trustScore,
       refreshProfile,

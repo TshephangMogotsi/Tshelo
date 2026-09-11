@@ -108,6 +108,8 @@ export default function OTPScreen({ navigation, route }: Props) {
       try {
         await api.users.updateMe({
           name: registration.name,
+          country_code: registration.countryCode,
+          preferred_currency: registration.currency,
           terms_accepted_at: now,
           terms_version: '1.0',
           privacy_accepted_at: now,

@@ -68,6 +68,8 @@ it('keeps registration incomplete after OTP and opens bank details', async () =>
       mode: 'register',
       registration: {
         name: 'Kefilwe Moeti',
+        countryCode: 'ZM',
+        currency: 'ZMW',
         provider: 'orange_money',
         bank: { bankName: '', branchCode: '', accountNumber: '', accountType: 'savings' },
       },
@@ -81,6 +83,8 @@ it('keeps registration incomplete after OTP and opens bank details', async () =>
   const update = api.users.updateMe.mock.calls[0][0]
   expect(update).toMatchObject({
     name: 'Kefilwe Moeti',
+    country_code: 'ZM',
+    preferred_currency: 'ZMW',
     terms_version: '1.0',
     privacy_version: '1.0',
     data_processing_consent: true,

@@ -71,6 +71,8 @@ export default function RegisterScreen({ navigation, route }: Props) {
       mode: 'register',
       registration: {
         name:     name.trim(),
+        countryCode,
+        currency,
         provider: 'orange_money',
         bank:     { bankName: '', branchCode: '', accountNumber: '', accountType: 'savings' },
       },

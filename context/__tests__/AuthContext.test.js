@@ -19,6 +19,7 @@ const React = require('react')
 const { act, create } = require('react-test-renderer')
 const { AuthProvider, useAuth } = require('../AuthContext')
 const { supabase } = require('../../lib/supabase')
+const { api } = require('../../lib/api')
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -79,4 +80,25 @@ it('revokes other sessions without signing out the current one', async () => {
   await auth.signOutOtherSessions()
 
   expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: 'others' })
+})
+
+it('derives the home currency from the account country when no preference is saved', async () => {
+  supabase.auth.getSession.mockResolvedValueOnce({
+    data: { session: { user: { id: 'user-1' } } },
+    error: null,
+  })
+  api.events.syncOrganiserInvites.mockResolvedValue(undefined)
+  api.users.me.mockResolvedValue({
+    profile_completed: true,
+    name: 'Kefilwe',
+    country_code: 'ZM',
+    preferred_currency: null,
+    token_balance: 0,
+    trust_score: 5,
+  })
+
+  await renderProvider()
+
+  expect(auth.countryCode).toBe('ZM')
+  expect(auth.preferredCurrency).toBe('ZMW')
 })

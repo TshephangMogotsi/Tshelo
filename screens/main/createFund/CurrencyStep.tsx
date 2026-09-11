@@ -20,6 +20,8 @@ const CURRENCY_COUNTRIES = countries.reduce<Record<string, string[]>>((result, c
   return result
 }, {})
 
+const CORE_CURRENCY_IDS = ['BWP', 'ZAR', 'USD']
+
 function editDistance(a: string, b: string) {
   const row = Array.from({ length: b.length + 1 }, (_, index) => index)
   for (let i = 1; i <= a.length; i += 1) {
@@ -43,12 +45,13 @@ function matchesSearch(value: string, query: string) {
 
 type Props = {
   currency: FundCurrency
+  homeCurrency: FundCurrency
   onSelectCurrency: (currency: FundCurrency) => void
   onContinue: () => void
   onBack: () => void
 }
 
-export default function CurrencyStep({ currency, onSelectCurrency, onContinue, onBack }: Props) {
+export default function CurrencyStep({ currency, homeCurrency, onSelectCurrency, onContinue, onBack }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
   const [search, setSearch] = useState('')
@@ -56,8 +59,20 @@ export default function CurrencyStep({ currency, onSelectCurrency, onContinue, o
   const normalizedSearch = search.trim().toUpperCase()
   const selectedKnown = FUND_CURRENCIES.find(item => item.id === currency)
   const customSelected = !selectedKnown && /^[A-Z]{3}$/.test(currency)
-  const primaryCurrencies = FUND_CURRENCIES.filter(item => ['BWP', 'ZAR', 'USD'].includes(item.id))
-  const otherCurrencies = FUND_CURRENCIES.filter(item => !['BWP', 'ZAR', 'USD'].includes(item.id))
+  const { primaryCurrencies, otherCurrencies } = useMemo(() => {
+    const primary = FUND_CURRENCIES.filter(item => (
+      item.id === homeCurrency || CORE_CURRENCY_IDS.includes(item.id)
+    )).sort((a, b) => {
+      if (a.id === homeCurrency) return -1
+      if (b.id === homeCurrency) return 1
+      return CORE_CURRENCY_IDS.indexOf(a.id) - CORE_CURRENCY_IDS.indexOf(b.id)
+    })
+    const primaryIds = new Set(primary.map(item => item.id))
+    return {
+      primaryCurrencies: primary,
+      otherCurrencies: FUND_CURRENCIES.filter(item => !primaryIds.has(item.id)),
+    }
+  }, [homeCurrency])
 
   const filteredCurrencies = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -66,7 +81,7 @@ export default function CurrencyStep({ currency, onSelectCurrency, onContinue, o
       const searchTerms = [item.code, item.name, ...(CURRENCY_COUNTRIES[item.code] ?? [])]
       return searchTerms.some(term => matchesSearch(term, query))
     })
-  }, [search])
+  }, [otherCurrencies, search])
 
   const canUseCustom = /^[A-Z]{3}$/.test(normalizedSearch)
     && !FUND_CURRENCIES.some(item => item.id === normalizedSearch)
@@ -89,7 +104,7 @@ export default function CurrencyStep({ currency, onSelectCurrency, onContinue, o
 
       <View style={styles.intro}>
         <Text style={styles.title}>Choose currency</Text>
-        <Text style={styles.subtitle}>Choose Pula, Rand or USD, or search for another currency.</Text>
+        <Text style={styles.subtitle}>Your home currency is selected. Choose another currency if needed.</Text>
       </View>
 
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -99,7 +114,7 @@ export default function CurrencyStep({ currency, onSelectCurrency, onContinue, o
             code={item.code}
             name={item.name}
             symbol={item.symbol}
-            helper={item.helper}
+            isHome={item.id === homeCurrency}
             active={currency === item.id}
             styles={styles}
             onPress={() => onSelectCurrency(item.id)}
@@ -178,11 +193,11 @@ export default function CurrencyStep({ currency, onSelectCurrency, onContinue, o
   )
 }
 
-function CurrencyRow({ code, name, symbol, helper, active, styles, onPress }: {
+function CurrencyRow({ code, name, symbol, isHome = false, active, styles, onPress }: {
   code: string
   name: string
   symbol: string
-  helper?: string
+  isHome?: boolean
   active: boolean
   styles: ReturnType<typeof makeStyles>
   onPress: () => void
@@ -191,7 +206,7 @@ function CurrencyRow({ code, name, symbol, helper, active, styles, onPress }: {
     <TouchableOpacity style={[styles.currencyRow, active && styles.currencyRowActive]} onPress={onPress} activeOpacity={0.82}>
       <View style={[styles.symbolBox, active && styles.symbolBoxActive]}><Text style={[styles.symbolText, active && styles.symbolTextActive]}>{symbol}</Text></View>
       <View style={styles.rowCopy}>
-        <View style={styles.codeLine}><Text style={styles.rowCode}>{code}</Text>{helper ? <Text style={styles.homeBadge}>HOME</Text> : null}</View>
+        <View style={styles.codeLine}><Text style={styles.rowCode}>{code}</Text>{isHome ? <Text style={styles.homeBadge}>HOME</Text> : null}</View>
         <Text style={styles.rowName}>{name}</Text>
       </View>
       <View style={[styles.checkCircle, active && styles.checkCircleActive]}>{active && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}</View>

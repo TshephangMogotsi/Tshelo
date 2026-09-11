@@ -145,7 +145,6 @@ type FundCurrencyOption = {
   id: FundCurrency
   code: string
   name: string
-  helper?: string
   symbol: string
 }
 
@@ -159,7 +158,7 @@ for (const country of countries) {
 }
 
 const primaryCurrencyOverrides: Record<string, Partial<FundCurrencyOption>> = {
-  BWP: { name: 'Pula', symbol: 'P', helper: 'Your home currency' },
+  BWP: { name: 'Pula', symbol: 'P' },
   ZAR: { name: 'Rand', symbol: 'R' },
   USD: { name: 'US dollar', symbol: '$' },
 }
@@ -176,3 +175,8 @@ export const FUND_CURRENCIES: FundCurrencyOption[] = [...currencyByCode.values()
   if (aIndex !== -1 || bIndex !== -1) return (aIndex === -1 ? primaryOrder.length : aIndex) - (bIndex === -1 ? primaryOrder.length : bIndex)
   return a.name.localeCompare(b.name)
 })
+
+export function resolveFundCurrency(preferredCurrency?: string | null): FundCurrency {
+  const normalized = preferredCurrency?.trim().toUpperCase()
+  return normalized && FUND_CURRENCIES.some(item => item.id === normalized) ? normalized : 'BWP'
+}

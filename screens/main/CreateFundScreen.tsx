@@ -26,6 +26,7 @@ import {
   FundCurrency,
   PickedOrganiser,
   QuickActionId,
+  resolveFundCurrency,
 } from './createFund/constants'
 import { formatDateISO, formatTimeISO, getInitials, parseAmount, sanitizeAmountInput } from './createFund/format'
 import CreateOptionChooser from './createFund/CreateOptionChooser'
@@ -48,14 +49,15 @@ type Props = {
 }
 
 export default function CreateFundScreen({ navigation }: Props) {
-  const { userId, tokenBalance, refreshProfile } = useAuth()
+  const { userId, tokenBalance, preferredCurrency, refreshProfile } = useAuth()
   const requireOnline = useRequireOnline()
+  const homeCurrency = resolveFundCurrency(preferredCurrency)
 
   const [name,           setName]           = useState('')
   const [goalBWP,        setGoalBWP]        = useState('')
   const [targetDate,     setTargetDate]     = useState<Date | null>(null)
   const [createOption,   setCreateOption]   = useState<CreateOption | null>(null)
-  const [currency,       setCurrency]       = useState<FundCurrency>('BWP')
+  const [currency,       setCurrency]       = useState<FundCurrency>(() => homeCurrency)
   const [currencyDone,   setCurrencyDone]   = useState(false)
   const [selectedEmoji,  setSelectedEmoji]  = useState(EMOJI_OPTIONS[0])
   const [eventType,      setEventType]      = useState(EVENT_TYPES[0])
@@ -737,6 +739,7 @@ export default function CreateFundScreen({ navigation }: Props) {
     return (
       <CurrencyStep
         currency={currency}
+        homeCurrency={homeCurrency}
         onSelectCurrency={setCurrency}
         onContinue={() => setCurrencyDone(true)}
         onBack={handleBack}

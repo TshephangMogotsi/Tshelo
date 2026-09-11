@@ -20,6 +20,8 @@ export type BankAccount = {
 
 export type RegistrationData = {
   name:     string
+  countryCode: string
+  currency: string
   provider: 'orange_money' | 'myzaka' | 'smega'
   bank:     BankDetails
 }
