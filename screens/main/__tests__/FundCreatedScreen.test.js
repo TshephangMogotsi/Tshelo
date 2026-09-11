@@ -6,20 +6,22 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
-const { Text } = require('react-native')
+const { StyleSheet, Text, TouchableOpacity } = require('react-native')
 const FundCreatedScreen = require('../FundCreatedScreen').default
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 let tree
+let navigation
 
 beforeEach(() => {
+  navigation = {
+    reset: jest.fn(),
+    popToTop: jest.fn(),
+  }
   act(() => {
     tree = create(React.createElement(FundCreatedScreen, {
-      navigation: {
-        reset: jest.fn(),
-        popToTop: jest.fn(),
-      },
+      navigation,
       route: {
         params: {
           fundName: 'Test Fund',
@@ -70,5 +72,23 @@ it('keeps a long invite code on one responsive selectable line', () => {
 
 it('keeps the sharing screen focused by omitting the message preview', () => {
   expect(textContent()).not.toContain('Message preview')
-  expect(textContent()).toContain("I'll invite people later")
+  expect(textContent()).not.toContain("I'll invite people later")
+})
+
+it('provides a full-width action that opens the created fund', () => {
+  const button = tree.root.findAllByType(TouchableOpacity).find(node => (
+    node.props.accessibilityLabel === 'View Fund'
+  ))
+
+  expect(button).toBeDefined()
+  expect(StyleSheet.flatten(button.props.style)).toMatchObject({ width: '100%' })
+
+  act(() => button.props.onPress())
+  expect(navigation.reset).toHaveBeenCalledWith({
+    index: 1,
+    routes: [
+      { name: 'Tabs' },
+      { name: 'FundDetail', params: { fundId: 'fund-id' } },
+    ],
+  })
 })

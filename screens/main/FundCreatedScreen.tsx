@@ -168,9 +168,15 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* ── Skip ───────────────────────────────── */}
-        <TouchableOpacity onPress={handleDone} activeOpacity={0.7} style={styles.skipBtn}>
-          <Text style={styles.skipText}>I'll invite people later</Text>
+        <TouchableOpacity
+          onPress={handleDone}
+          activeOpacity={0.8}
+          style={styles.viewFundBtn}
+          accessibilityRole="button"
+          accessibilityLabel="View Fund"
+        >
+          <Text style={styles.viewFundText}>View Fund</Text>
+          <Ionicons name="arrow-forward" size={17} color={colors.primary} />
         </TouchableOpacity>
 
       </ScrollView>
@@ -342,14 +348,22 @@ function makeStyles(colors: AppColors) {
       color: colors.textPrimary,
     },
 
-    // ── Skip ───────────────────────────────────────────────────
-    skipBtn: {
-      paddingVertical: 8,
+    viewFundBtn: {
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderRadius: 16,
     },
-    skipText: {
-      fontSize: 14,
-      color: colors.textMuted,
-      textAlign: 'center',
+    viewFundText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.primary,
     },
   })
 }
