@@ -1,6 +1,6 @@
 # Phase 8 — Public-launch hardening and handoff
 
-Status date: 10 September 2026
+Status date: 11 September 2026
 
 Update — 10 September 2026: the public Terms and Privacy pages are live, and
 registration/Settings links are configured. Native event banners, low-data
@@ -9,16 +9,25 @@ implemented locally; the linked database is current through
 `20260909140000_event_banner_focal_points.sql`. Signed physical-device testing,
 distribution artifacts and store-console actions remain.
 
-Update — 11 September 2026: Expo EAS successfully produced both Android beta
-artifacts from commit `4e03ef8` with the same project fingerprint
-`1bcb8f652015f16455caebfa94d4219db07a9d7a` and Expo-managed keystore:
+Update — 11 September 2026: the initial version-code 2/3 artifacts from commit
+`4e03ef8` were superseded before distribution after physical-flow review found
+that OTP completion could race the root navigator and skip the remaining
+registration screens. Do not distribute EAS builds
+`90013fa8-8de7-4663-aa79-081b4b520eeb` or
+`3635f749-85d0-46da-ab41-ecf45bed81b5`.
 
-- Production Play AAB, version code 2: EAS build
-  `90013fa8-8de7-4663-aa79-081b4b520eeb`, 73,663,018 bytes, SHA-256
-  `8fd097ca4efa8e93609bdb923edde6d35f9237ebe06710f1b11653a557baa9a6`.
-- Internal-distribution APK, version code 3: EAS build
-  `3635f749-85d0-46da-ab41-ecf45bed81b5`, 110,026,756 bytes, SHA-256
-  `ff8ae509d17184f7cedb0d588d6be07e2db718fab005539481bbf9e77749cc1d`.
+Commit `4e8db56` keeps registration incomplete after OTP, persists confirmed
+payment details, and marks the profile complete only from the final success
+screen. The full verification suite passes with a three-case registration-flow
+regression. Expo EAS produced these approved replacements with the same managed
+keystore:
+
+- Production Play AAB, version code 4: EAS build
+  `3b9e29a9-9da3-48ff-91d4-c78df40d6ddf`, 73,663,461 bytes, SHA-256
+  `aa8090673ed5bb0beded78eccd18c2ebee1868039470981b60cce2736b9631db`.
+- Internal-distribution APK, version code 5: EAS build
+  `d669632d-41d5-4d81-86f8-77486c8dce8a`, 110,027,608 bytes, SHA-256
+  `3d841cff78a09a50555fcc75f8cfa5476731d0a12c2af8f212fbfcbf3cb2d764`.
 
 Both downloaded archives passed integrity checks. The AAB contains its signing
 manifest/certificate records. Physical-device installation and the user-owned
@@ -45,7 +54,8 @@ External release actions and the product/legal decisions listed below must be co
 - Built the iOS simulator Release configuration successfully and generated the production Hermes bundle.
 - Installed and launched the iOS Release build successfully on an iPhone 17 simulator.
 - Exported the Android production JavaScript/Hermes bundle successfully: 1,296 modules and 54 assets.
-- Confirmed all local and linked Supabase migrations match through `20260812180000`.
+- Confirmed all local and linked Supabase migrations match through
+  `20260909140000_event_banner_focal_points.sql`.
 - Published the Terms of Service and Privacy Policy on public HTTPS pages and
   wired the registration consent and Settings links to them.
 
