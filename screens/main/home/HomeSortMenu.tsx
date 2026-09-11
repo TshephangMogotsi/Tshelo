@@ -14,6 +14,7 @@ import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import {
   HOME_SORT_LABELS,
+  HOME_STATUS_FILTER_ORDER,
   HomeItemKind,
   HomeSortOrder,
   HomeStatusFilter,
@@ -35,15 +36,16 @@ type Anchor = {
   right: number
 }
 
-const STATUS_OPTIONS: {
-  value: HomeStatusFilter
+const STATUS_OPTION_META: Record<HomeStatusFilter, {
   label: string
   icon: keyof typeof Ionicons.glyphMap
-}[] = [
-  { value: 'all', label: 'All', icon: 'apps-outline' },
-  { value: 'active', label: 'Active', icon: 'play-circle-outline' },
-  { value: 'closed', label: 'Closed', icon: 'checkmark-circle-outline' },
-]
+}> = {
+  active: { label: 'Active', icon: 'play-circle-outline' },
+  all: { label: 'All', icon: 'apps-outline' },
+  closed: { label: 'Closed', icon: 'checkmark-circle-outline' },
+}
+
+const STATUS_OPTIONS = HOME_STATUS_FILTER_ORDER.map(value => ({ value, ...STATUS_OPTION_META[value] }))
 
 const SORT_OPTIONS: {
   value: HomeSortOrder

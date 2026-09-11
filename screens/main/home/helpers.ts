@@ -7,6 +7,7 @@ export type HomeSortOrder = 'newest' | 'oldest'
 export type HomeStatusFilter = 'all' | 'active' | 'closed'
 
 export const DEFAULT_HOME_STATUS_FILTER: HomeStatusFilter = 'active'
+export const HOME_STATUS_FILTER_ORDER: readonly HomeStatusFilter[] = ['active', 'all', 'closed']
 
 export type HomeItem = {
   id:                  string
