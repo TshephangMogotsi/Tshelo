@@ -44,6 +44,10 @@ function button(label) {
   ))
 }
 
+function input(placeholder) {
+  return tree.root.findAllByType(TextInput).find(item => item.props.placeholder === placeholder)
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   api.users.updateMe.mockResolvedValue({})
@@ -150,6 +154,58 @@ it('confirms before removing a saved bank account', async () => {
   await act(async () => actions.find(action => action.text === 'Remove').onPress())
   expect(button('Remove First National Bank account ending 3543')).toBeUndefined()
   alert.mockRestore()
+})
+
+it('keeps optional bank fields hidden until the user chooses to add an account', async () => {
+  const route = {
+    params: {
+      name: 'Kefilwe Moeti',
+      registeredPhone: '+26771234567',
+      bankAccounts: [],
+      mobileMoneyNumbers: [],
+    },
+  }
+  await act(async () => { tree = create(React.createElement(BankDetailsScreen, { navigation, route })) })
+
+  expect(input('e.g. 62012345678')).toBeUndefined()
+  expect(tree.root.findAllByType(Text).some(text => text.props.children === 'Optional')).toBe(true)
+
+  await act(async () => button('Add Bank Account').props.onPress())
+  expect(input('e.g. 62012345678')).toBeDefined()
+
+  await act(async () => button('Select bank').props.onPress())
+  const bankOption = tree.root.findAllByType(TouchableOpacity).find(item => {
+    const labels = item.findAllByType(Text).map(text => text.props.children)
+    return labels.length === 1 && labels[0] === 'First National Bank'
+  })
+  await act(async () => bankOption.props.onPress())
+  await act(async () => input('e.g. 62012345678').props.onChangeText('62012343543'))
+  await act(async () => button('Save Account').props.onPress())
+
+  expect(input('e.g. 62012345678')).toBeUndefined()
+  expect(button('Remove First National Bank account ending 3543')).toBeDefined()
+})
+
+it('allows users to continue without adding a bank account', async () => {
+  const route = {
+    params: {
+      name: 'Kefilwe Moeti',
+      registeredPhone: '+26771234567',
+      bankAccounts: [],
+      mobileMoneyNumbers: [],
+    },
+  }
+  await act(async () => { tree = create(React.createElement(BankDetailsScreen, { navigation, route })) })
+  await act(async () => button('Continue').props.onPress())
+
+  expect(navigation.navigate).toHaveBeenCalledWith('ReceiveMoney', {
+    name: 'Kefilwe Moeti',
+    registeredPhone: '+26771234567',
+    bankName: undefined,
+    accountNumber: undefined,
+    bankAccounts: [],
+    mobileMoneyNumbers: [],
+  })
 })
 
 it('marks registration complete only when the user taps Lets Go', async () => {

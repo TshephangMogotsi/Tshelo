@@ -44,11 +44,13 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
   const textCol   = isDark ? '#F2F2F7' : '#1A1A2E'
   const mutedCol  = isDark ? '#8A8A9A' : '#9A9A9A'
   const borderCol = isDark ? '#3A3A5C' : '#E5E7EB'
+  const nestedInputBg = isDark ? '#232533' : '#F7F7F8'
 
   const [selectedBank,    setSelectedBank]    = useState<Bank | null>(null)
   const [accountNumber,   setAccountNumber]   = useState('')
   const [branchCode,      setBranchCode]      = useState('')
   const [bankAccounts,    setBankAccounts]    = useState<BankAccount[]>([])
+  const [showBankForm,    setShowBankForm]    = useState(Boolean(route.params?.bankName || route.params?.accountNumber))
   const [showBankPicker,  setShowBankPicker]  = useState(false)
   const [mobileNumber,    setMobileNumber]    = useState('')
   const [mobileMoneyNumbers, setMobileMoneyNumbers] = useState<MobileMoneyNumber[]>([])
@@ -62,9 +64,16 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
     if (route.params?.bankName) {
       const bank = BANKS.find(b => b.name === route.params?.bankName) ?? { name: route.params.bankName, branchCode: route.params.branchCode ?? '' }
       setSelectedBank(bank)
+      setShowBankForm(true)
     }
-    if (route.params?.branchCode !== undefined) setBranchCode(route.params.branchCode)
-    if (route.params?.accountNumber !== undefined) setAccountNumber(route.params.accountNumber)
+    if (route.params?.branchCode !== undefined) {
+      setBranchCode(route.params.branchCode)
+      setShowBankForm(true)
+    }
+    if (route.params?.accountNumber !== undefined) {
+      setAccountNumber(route.params.accountNumber)
+      setShowBankForm(true)
+    }
     if (route.params?.bankAccounts) setBankAccounts(route.params.bankAccounts)
     if (route.params?.mobileMoneyNumbers) {
       setMobileMoneyNumbers(route.params.mobileMoneyNumbers)
@@ -74,40 +83,27 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
 
   function selectBank(bank: Bank) {
     setSelectedBank(bank)
-    if (bank.branchCode) setBranchCode(bank.branchCode)
+    setBranchCode(bank.branchCode)
     setShowBankPicker(false)
   }
 
-  function handleSave() {
-    const finalBankAccounts = hasBankDetails
-      ? [
-          ...bankAccounts,
-          {
-            id: `${Date.now()}`,
-            bankName: selectedBank?.name ?? '',
-            branchCode,
-            accountNumber,
-          },
-        ]
-      : bankAccounts
-
+  function handleContinue() {
     navigation.navigate('ReceiveMoney', {
       name: route.params?.name,
       registeredPhone,
-      bankName: finalBankAccounts[0]?.bankName,
-      accountNumber: finalBankAccounts[0]?.accountNumber,
-      bankAccounts: finalBankAccounts,
+      bankName: bankAccounts[0]?.bankName,
+      accountNumber: bankAccounts[0]?.accountNumber,
+      bankAccounts,
       mobileMoneyNumbers,
     })
   }
 
-  function handleSkip() {
-    navigation.navigate('ReceiveMoney', {
-      name: route.params?.name,
-      registeredPhone,
-      bankAccounts,
-      mobileMoneyNumbers,
-    })
+  function closeBankForm() {
+    setSelectedBank(null)
+    setAccountNumber('')
+    setBranchCode('')
+    setShowBankPicker(false)
+    setShowBankForm(false)
   }
 
   function handleAddBankAccount() {
@@ -124,6 +120,7 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
     setSelectedBank(null)
     setAccountNumber('')
     setBranchCode('')
+    setShowBankForm(false)
   }
 
   function removeBankAccount(account: BankAccount) {
@@ -164,59 +161,21 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Heading ─────────────────────────────── */}
-          <Text style={[styles.heading, { color: textCol }]}>Add Bank Details</Text>
+          <Text style={[styles.heading, { color: textCol }]}>Payment Details</Text>
           <Text style={[styles.subheading, { color: mutedCol }]}>
-            For receiving contributions via bank transfer
+            Choose how you'd like to receive contributions. You can set this up later.
           </Text>
-
-          {/* ── Bank selector ────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: mutedCol }]}>Bank</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectorRow, { backgroundColor: inputBg, borderColor: borderCol }]}
-              onPress={() => setShowBankPicker(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.selectorText, { color: selectedBank ? textCol : mutedCol }]}>
-                {selectedBank ? selectedBank.name : 'Select your bank'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={mutedCol} />
-            </TouchableOpacity>
-          </View>
-
-          {/* ── Account number ───────────────────────── */}
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: mutedCol }]}>Account Number</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, color: textCol }]}
-              placeholder="e.g. 62012345678"
-              placeholderTextColor={mutedCol}
-              value={accountNumber}
-              onChangeText={setAccountNumber}
-              keyboardType="number-pad"
-              returnKeyType="next"
-            />
-          </View>
-
-          {/* ── Branch code ──────────────────────────── */}
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: mutedCol }]}>Branch Code</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: inputBg, borderColor: borderCol, color: textCol }]}
-              placeholder="e.g. 282267"
-              placeholderTextColor={mutedCol}
-              value={branchCode}
-              onChangeText={setBranchCode}
-              keyboardType="number-pad"
-              returnKeyType="done"
-            />
-          </View>
 
           <View style={[styles.accountsCard, { backgroundColor: inputBg, borderColor: borderCol }]}>
             <View style={styles.cardTitleRow}>
-              <View>
-                <Text style={[styles.cardTitle, { color: textCol }]}>Bank Accounts</Text>
-                <Text style={[styles.cardSubtitle, { color: mutedCol }]}>Add multiple accounts for bank transfers</Text>
+              <View style={styles.cardTitleContent}>
+                <View style={styles.cardTitleLine}>
+                  <Text style={[styles.cardTitle, { color: textCol }]}>Bank Accounts</Text>
+                  <View style={styles.optionalBadge}>
+                    <Text style={styles.optionalBadgeText}>Optional</Text>
+                  </View>
+                </View>
+                <Text style={[styles.cardSubtitle, { color: mutedCol }]}>Receive contributions by bank transfer</Text>
               </View>
               <Ionicons name="card-outline" size={20} color="#7439E0" />
             </View>
@@ -230,7 +189,7 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
                 <View style={styles.savedItemActions}>
                   <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
                   <TouchableOpacity
-                    style={styles.removeSavedButton}
+                    style={[styles.removeSavedButton, isDark && styles.removeSavedButtonDark]}
                     onPress={() => removeBankAccount(item)}
                     hitSlop={8}
                     accessibilityRole="button"
@@ -242,16 +201,86 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
               </View>
             ))}
 
-            <TouchableOpacity
-              style={[styles.addMobileButton, hasBankDetails && styles.addMobileButtonActive]}
-              onPress={handleAddBankAccount}
-              activeOpacity={hasBankDetails ? 0.85 : 1}
-            >
-              <Ionicons name="add" size={18} color={hasBankDetails ? '#FFFFFF' : mutedCol} />
-              <Text style={[styles.addMobileButtonText, { color: hasBankDetails ? '#FFFFFF' : mutedCol }]}>
-                Add Bank Account
-              </Text>
-            </TouchableOpacity>
+            {showBankForm ? (
+              <View style={[styles.bankForm, { borderTopColor: borderCol }]}>
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: mutedCol }]}>Bank</Text>
+                  <TouchableOpacity
+                    style={[styles.input, styles.selectorRow, { backgroundColor: nestedInputBg, borderColor: borderCol }]}
+                    onPress={() => setShowBankPicker(true)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select bank"
+                  >
+                    <Text style={[styles.selectorText, { color: selectedBank ? textCol : mutedCol }]}>
+                      {selectedBank ? selectedBank.name : 'Select your bank'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={mutedCol} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: mutedCol }]}>Account Number</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: nestedInputBg, borderColor: borderCol, color: textCol }]}
+                    placeholder="e.g. 62012345678"
+                    placeholderTextColor={mutedCol}
+                    value={accountNumber}
+                    onChangeText={setAccountNumber}
+                    keyboardType="number-pad"
+                    returnKeyType="next"
+                    accessibilityLabel="Bank account number"
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: mutedCol }]}>Branch Code</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: nestedInputBg, borderColor: borderCol, color: textCol }]}
+                    placeholder="e.g. 282267"
+                    placeholderTextColor={mutedCol}
+                    value={branchCode}
+                    onChangeText={setBranchCode}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    accessibilityLabel="Bank branch code"
+                  />
+                </View>
+
+                <View style={styles.bankFormActions}>
+                  <TouchableOpacity
+                    style={[styles.cancelBankButton, { backgroundColor: isDark ? '#232533' : '#F4F4F5' }]}
+                    onPress={closeBankForm}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.cancelBankButtonText, { color: textCol }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBankButton, hasBankDetails && styles.addMobileButtonActive]}
+                    onPress={handleAddBankAccount}
+                    activeOpacity={hasBankDetails ? 0.85 : 1}
+                    disabled={!hasBankDetails}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !hasBankDetails }}
+                  >
+                    <Text style={[styles.addMobileButtonText, { color: hasBankDetails ? '#FFFFFF' : mutedCol }]}>
+                      Save Account
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.addMobileButton, styles.addMobileButtonActive]}
+                onPress={() => setShowBankForm(true)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+                <Text style={[styles.addMobileButtonText, { color: '#FFFFFF' }]}>Add Bank Account</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* ── Mobile money numbers ─────────────────── */}
@@ -278,11 +307,11 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
             ))}
 
             <View style={styles.mobileInputRow}>
-              <View style={[styles.dialBox, { borderColor: borderCol }]}>
+              <View style={[styles.dialBox, { backgroundColor: nestedInputBg, borderColor: borderCol }]}>
                 <Text style={[styles.dialText, { color: textCol }]}>+267</Text>
               </View>
               <TextInput
-                style={[styles.mobileInput, { color: textCol, borderColor: borderCol }]}
+                style={[styles.mobileInput, { backgroundColor: nestedInputBg, color: textCol, borderColor: borderCol }]}
                 placeholder="71 234 567"
                 placeholderTextColor={mutedCol}
                 value={mobileNumber}
@@ -304,20 +333,15 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
 
-          {/* ── Save & Continue ──────────────────────── */}
+          {/* ── Continue ─────────────────────────────── */}
           <TouchableOpacity
             style={[styles.primaryButton, styles.buttonActive]}
-            onPress={handleSave}
+            onPress={handleContinue}
             activeOpacity={0.85}
           >
             <Text style={[styles.primaryButtonText, styles.primaryButtonTextActive]}>
-              Save &amp; Continue
+              Continue
             </Text>
-          </TouchableOpacity>
-
-          {/* ── Skip ────────────────────────────────── */}
-          <TouchableOpacity onPress={handleSkip} activeOpacity={0.7} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Skip for now</Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -413,6 +437,8 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 14,
   },
+  cardTitleContent: { flex: 1 },
+  cardTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -422,6 +448,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
+  optionalBadge: {
+    borderRadius: 999,
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  optionalBadgeText: { color: '#7439E0', fontSize: 10, fontWeight: '800' },
   savedItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,6 +468,7 @@ const styles = StyleSheet.create({
   savedItemCopy: { flex: 1, minWidth: 0 },
   savedItemActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 10 },
   removeSavedButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FEF2F2' },
+  removeSavedButtonDark: { backgroundColor: '#3B1D24' },
   savedItemTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -483,6 +517,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  bankForm: {
+    borderTopWidth: 1,
+    paddingTop: 16,
+  },
+  bankFormActions: { flexDirection: 'row', gap: 10 },
+  cancelBankButton: {
+    minHeight: 48,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBankButtonText: { fontSize: 14, fontWeight: '700' },
+  saveBankButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 24,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   primaryButton: {
     backgroundColor: '#D4D4D8',
@@ -507,9 +562,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   primaryButtonTextActive: { color: '#FFFFFF' },
-
-  skipBtn: { alignItems: 'center', paddingVertical: 4 },
-  skipText: { fontSize: 14, fontWeight: '600', color: '#7439E0' },
 
   // ── Bank picker modal ──────────────────────────────────────
   modalBackdrop: {
