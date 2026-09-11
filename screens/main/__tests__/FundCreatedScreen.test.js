@@ -14,11 +14,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 let tree
 let navigation
 
-beforeEach(() => {
-  navigation = {
-    reset: jest.fn(),
-    popToTop: jest.fn(),
-  }
+function renderScreen(params = {}) {
   act(() => {
     tree = create(React.createElement(FundCreatedScreen, {
       navigation,
@@ -33,10 +29,19 @@ beforeEach(() => {
           targetDate: '2026-10-19',
           shareCode: 'FND-A17430F00F634D8CBA68',
           fundId: 'fund-id',
+          ...params,
         },
       },
     }))
   })
+}
+
+beforeEach(() => {
+  navigation = {
+    reset: jest.fn(),
+    popToTop: jest.fn(),
+  }
+  renderScreen()
 })
 
 afterEach(() => {
@@ -125,4 +130,38 @@ it('copies the invite link from the Copy Link action', () => {
 
   expect(copy).toHaveBeenCalledWith('https://app.tshelo.com/invite/fund/FND-A17430F00F634D8CBA68')
   expect(navigation.reset).not.toHaveBeenCalled()
+})
+
+it('adapts the cleaned success screen for an Event + Fund and opens its event workspace', () => {
+  act(() => tree.unmount())
+  renderScreen({
+    fundName: 'Wedding Fund',
+    category: 'Wedding',
+    creationKind: 'eventFund',
+    eventId: 'event-id',
+  })
+
+  expect(textContent()).toContain('Event + Fund Created!')
+  expect(textContent()).toContain('Wedding Fund is ready for planning and contributions')
+  expect(textContent()).toContain('Invite contributors')
+  expect(textContent()).not.toContain('💜')
+
+  const button = tree.root.findAllByType(TouchableOpacity).find(node => (
+    node.props.accessibilityLabel === 'View Event and Fund'
+  ))
+
+  expect(button).toBeDefined()
+  expect(StyleSheet.flatten(button.props.style)).toMatchObject({
+    width: '100%',
+    backgroundColor: '#7B2FFF',
+  })
+
+  act(() => button.props.onPress())
+  expect(navigation.reset).toHaveBeenCalledWith({
+    index: 1,
+    routes: [
+      { name: 'Tabs' },
+      { name: 'EventDetail', params: { eventId: 'event-id' } },
+    ],
+  })
 })

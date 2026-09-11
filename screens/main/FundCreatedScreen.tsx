@@ -41,12 +41,16 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
     targetDate,
     shareCode,
     fundId,
+    creationKind = 'fund',
+    eventId,
   } = route.params
+  const isEventFund = creationKind === 'eventFund'
   const currencyPrefix = currencySymbol ?? (currencyCode === 'BWP' ? 'P' : currencyCode) ?? 'P'
 
-  const fundCode   = shareCode ?? '—'
   const inviteLink = shareCode ? fundPreviewUrl(shareCode) : 'https://app.tshelo.com'
-  const message    = `Dumelang! 🙏 I've created a fund for *${fundName}* on Tshelo. Join here to contribute and see all payments transparently:\n\n${inviteLink}`
+  const message    = isEventFund
+    ? `Dumelang! I've created *${fundName}*, an event contribution fund on Tshelo. Join here to contribute and see all payments transparently:\n\n${inviteLink}`
+    : `Dumelang! 🙏 I've created a fund for *${fundName}* on Tshelo. Join here to contribute and see all payments transparently:\n\n${inviteLink}`
 
   async function handleWhatsApp() {
     const url = `whatsapp://send?text=${encodeURIComponent(message)}`
@@ -67,7 +71,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
   function handleCopyCode() {
     if (!shareCode) return
     Clipboard.setString(shareCode)
-    Alert.alert('Copied', 'Fund invite code copied.')
+    Alert.alert('Copied', `${isEventFund ? 'Event + Fund' : 'Fund'} invite code copied.`)
   }
 
   function handleCopyLink() {
@@ -76,6 +80,16 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
   }
 
   function handleDone() {
+    if (isEventFund && eventId) {
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'Tabs' as any },
+          { name: 'EventDetail', params: { eventId } },
+        ],
+      })
+      return
+    }
     if (fundId) {
       navigation.reset({
         index: 1,
@@ -98,12 +112,25 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Heading ────────────────────────────── */}
-        <View style={styles.headingRow} accessibilityLabel="Fund created successfully">
+        <View
+          style={styles.headingRow}
+          accessibilityLabel={`${isEventFund ? 'Event and fund' : 'Fund'} created successfully`}
+        >
           <Ionicons name="checkmark-circle" size={28} color={colors.success} />
-          <Text style={styles.heading} accessibilityRole="header">Fund Created!</Text>
+          <Text
+            style={styles.heading}
+            accessibilityRole="header"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+          >
+            {isEventFund ? 'Event + Fund Created!' : 'Fund Created!'}
+          </Text>
         </View>
         <Text style={styles.subheading}>
-          {fundName} is ready to receive contributions
+          {isEventFund
+            ? `${fundName} is ready for planning and contributions`
+            : `${fundName} is ready to receive contributions`}
         </Text>
 
         {/* ── Fund summary card ──────────────────── */}
@@ -144,7 +171,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
                   onPress={handleCopyCode}
                   activeOpacity={0.75}
                   accessibilityRole="button"
-                  accessibilityLabel="Copy fund invite code"
+                  accessibilityLabel={`Copy ${isEventFund ? 'event and fund' : 'fund'} invite code`}
                 >
                   <Ionicons name="copy-outline" size={14} color={colors.primary} />
                   <Text style={styles.codeCopyText}>Copy code</Text>
@@ -166,7 +193,9 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
         </View>
 
         {/* ── Invite section ─────────────────────── */}
-        <Text style={styles.inviteTitle}>Invite family &amp; friends</Text>
+        <Text style={styles.inviteTitle}>
+          {isEventFund ? 'Invite contributors' : 'Invite family & friends'}
+        </Text>
 
         <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp} activeOpacity={0.85}>
           <Ionicons name="logo-whatsapp" size={22} color="#FFFFFF" />
@@ -189,9 +218,9 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
           activeOpacity={0.8}
           style={styles.viewFundBtn}
           accessibilityRole="button"
-          accessibilityLabel="View Fund"
+          accessibilityLabel={isEventFund ? 'View Event and Fund' : 'View Fund'}
         >
-          <Text style={styles.viewFundText}>View Fund</Text>
+          <Text style={styles.viewFundText}>{isEventFund ? 'View Event + Fund' : 'View Fund'}</Text>
           <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
         </TouchableOpacity>
 
@@ -213,6 +242,7 @@ function makeStyles(colors: AppColors) {
 
     // ── Heading ────────────────────────────────────────────────
     headingRow: {
+      width: '100%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -220,6 +250,7 @@ function makeStyles(colors: AppColors) {
       marginBottom: 8,
     },
     heading: {
+      flexShrink: 1,
       fontSize: 28,
       fontFamily: fonts.display.bold,
       fontWeight: '800',

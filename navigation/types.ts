@@ -133,5 +133,16 @@ export type MainStackParamList = {
   RichAuntieCelebration: { awardId: string; recipientView?: boolean }
   RichAuntieStatus:    undefined
   Rewards:             undefined
-  FundCreated:         { fundName: string; category: string; emoji: string; goalBWP?: string; currencyCode?: string; currencySymbol?: string; targetDate?: string; shareCode?: string; fundId?: string }
+  FundCreated:         {
+    fundName: string
+    category: string
+    goalBWP?: string
+    currencyCode?: string
+    currencySymbol?: string
+    targetDate?: string
+    shareCode?: string
+    fundId?: string
+    creationKind?: 'fund' | 'eventFund'
+    eventId?: string
+  }
 }

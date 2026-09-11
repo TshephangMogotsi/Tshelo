@@ -400,7 +400,6 @@ export default function CreateFundScreen({ navigation }: Props) {
       navigation.replace('FundCreated', {
         fundName:   name.trim(),
         category:   selectedEmoji.label,
-        emoji:      selectedEmoji.emoji,
         goalBWP:    goalBWP || undefined,
         currencyCode: selectedCurrency.code,
         currencySymbol: selectedCurrency.symbol,
@@ -484,13 +483,14 @@ export default function CreateFundScreen({ navigation }: Props) {
       navigation.replace('FundCreated', {
         fundName:   fundTitle,
         category:   selectedEventLabel,
-        emoji:      selectedEventEmoji,
         goalBWP:    `${fundGoalAmount}`,
         currencyCode: selectedCurrency.code,
         currencySymbol: selectedCurrency.symbol,
         targetDate: formatDateISO(eventDate),
         shareCode:  created.fund_code ?? undefined,
         fundId:     created.fund_id,
+        creationKind: 'eventFund',
+        eventId:    created.event_id,
       })
     } catch (error) {
       Alert.alert('Could not create event fund', toApiUiError(error).message)
