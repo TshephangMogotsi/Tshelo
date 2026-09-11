@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Linking, Share, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Linking, Clipboard, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -64,11 +64,15 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
     handleDone()
   }
 
-  async function handleCopyLink() {
-    try {
-      await Share.share({ message: inviteLink })
-    } catch (_) {}
-    handleDone()
+  function handleCopyCode() {
+    if (!shareCode) return
+    Clipboard.setString(shareCode)
+    Alert.alert('Copied', 'Fund invite code copied.')
+  }
+
+  function handleCopyLink() {
+    Clipboard.setString(inviteLink)
+    Alert.alert('Copied', 'Fund invite link copied.')
   }
 
   function handleDone() {
@@ -133,7 +137,19 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
           {shareCode ? (
             <>
               <View style={styles.summaryDivider} />
-              <Text style={styles.codeLabel}>INVITE CODE</Text>
+              <View style={styles.codeHeader}>
+                <Text style={styles.codeLabel}>INVITE CODE</Text>
+                <TouchableOpacity
+                  style={styles.codeCopyBtn}
+                  onPress={handleCopyCode}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy fund invite code"
+                >
+                  <Ionicons name="copy-outline" size={14} color={colors.primary} />
+                  <Text style={styles.codeCopyText}>Copy code</Text>
+                </TouchableOpacity>
+              </View>
               <Text
                 style={styles.codeValue}
                 numberOfLines={1}
@@ -176,7 +192,7 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
           accessibilityLabel="View Fund"
         >
           <Text style={styles.viewFundText}>View Fund</Text>
-          <Ionicons name="arrow-forward" size={17} color={colors.primary} />
+          <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
         </TouchableOpacity>
 
       </ScrollView>
@@ -263,7 +279,26 @@ function makeStyles(colors: AppColors) {
       fontWeight: '700',
       letterSpacing: 1,
       color: colors.textMuted,
+    },
+    codeHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: 6,
+    },
+    codeCopyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      minHeight: 32,
+      paddingHorizontal: 9,
+      borderRadius: 10,
+      backgroundColor: colors.primaryLight,
+    },
+    codeCopyText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.primary,
     },
     codeValue: {
       width: '100%',
@@ -355,15 +390,13 @@ function makeStyles(colors: AppColors) {
       justifyContent: 'center',
       gap: 8,
       paddingVertical: 14,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.primary,
+      backgroundColor: colors.primary,
       borderRadius: 16,
     },
     viewFundText: {
       fontSize: 15,
       fontWeight: '700',
-      color: colors.primary,
+      color: '#FFFFFF',
     },
   })
 }

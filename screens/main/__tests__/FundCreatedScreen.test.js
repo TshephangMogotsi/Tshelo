@@ -6,7 +6,7 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
-const { StyleSheet, Text, TouchableOpacity } = require('react-native')
+const { Alert, Clipboard, StyleSheet, Text, TouchableOpacity } = require('react-native')
 const FundCreatedScreen = require('../FundCreatedScreen').default
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -42,6 +42,7 @@ beforeEach(() => {
 afterEach(() => {
   if (tree) act(() => tree.unmount())
   tree = null
+  jest.restoreAllMocks()
 })
 
 function textContent() {
@@ -81,7 +82,12 @@ it('provides a full-width action that opens the created fund', () => {
   ))
 
   expect(button).toBeDefined()
-  expect(StyleSheet.flatten(button.props.style)).toMatchObject({ width: '100%' })
+  expect(StyleSheet.flatten(button.props.style)).toMatchObject({
+    width: '100%',
+    backgroundColor: '#7B2FFF',
+  })
+  const arrow = button.findAllByType('Icon').find(node => node.props.name === 'arrow-forward')
+  expect(arrow.props.color).toBe('#FFFFFF')
 
   act(() => button.props.onPress())
   expect(navigation.reset).toHaveBeenCalledWith({
@@ -91,4 +97,32 @@ it('provides a full-width action that opens the created fund', () => {
       { name: 'FundDetail', params: { fundId: 'fund-id' } },
     ],
   })
+})
+
+it('copies the invite code without leaving the success screen', () => {
+  const copy = jest.spyOn(Clipboard, 'setString').mockImplementation(() => {})
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  const button = tree.root.findAllByType(TouchableOpacity).find(node => (
+    node.props.accessibilityLabel === 'Copy fund invite code'
+  ))
+
+  expect(button).toBeDefined()
+  act(() => button.props.onPress())
+
+  expect(copy).toHaveBeenCalledWith('FND-A17430F00F634D8CBA68')
+  expect(alert).toHaveBeenCalledWith('Copied', 'Fund invite code copied.')
+  expect(navigation.reset).not.toHaveBeenCalled()
+})
+
+it('copies the invite link from the Copy Link action', () => {
+  const copy = jest.spyOn(Clipboard, 'setString').mockImplementation(() => {})
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  const button = tree.root.findAllByType(TouchableOpacity).find(node => (
+    node.findAllByType(Text).some(text => text.props.children === 'Copy Link')
+  ))
+
+  act(() => button.props.onPress())
+
+  expect(copy).toHaveBeenCalledWith('https://app.tshelo.com/invite/fund/FND-A17430F00F634D8CBA68')
+  expect(navigation.reset).not.toHaveBeenCalled()
 })
