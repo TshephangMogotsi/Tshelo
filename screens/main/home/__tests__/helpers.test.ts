@@ -1,8 +1,12 @@
-import { activeFundItems, DEFAULT_HOME_STATUS_FILTER, HOME_STATUS_FILTER_ORDER, HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
+import { activeFundItems, countHomeFilters, DEFAULT_HOME_STATUS_FILTER, HOME_STATUS_FILTER_ORDER, HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
 
 it('defaults the Home list to active items', () => {
   expect(DEFAULT_HOME_STATUS_FILTER).toBe('active')
   expect(HOME_STATUS_FILTER_ORDER).toEqual(['active', 'all', 'closed'])
+  expect(countHomeFilters('active', 'all')).toBe(0)
+  expect(countHomeFilters('all', 'all')).toBe(1)
+  expect(countHomeFilters('closed', 'all')).toBe(1)
+  expect(countHomeFilters('active', 'fund')).toBe(1)
 })
 
 describe('formatMoney', () => {

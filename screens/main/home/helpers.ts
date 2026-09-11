@@ -9,6 +9,13 @@ export type HomeStatusFilter = 'all' | 'active' | 'closed'
 export const DEFAULT_HOME_STATUS_FILTER: HomeStatusFilter = 'active'
 export const HOME_STATUS_FILTER_ORDER: readonly HomeStatusFilter[] = ['active', 'all', 'closed']
 
+export function countHomeFilters(
+  statusFilter: HomeStatusFilter,
+  kindFilter: 'all' | HomeItemKind,
+) {
+  return Number(statusFilter !== DEFAULT_HOME_STATUS_FILTER) + Number(kindFilter !== 'all')
+}
+
 export type HomeItem = {
   id:                  string
   fundId?:             string

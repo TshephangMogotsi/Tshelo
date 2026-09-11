@@ -13,6 +13,8 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import {
+  countHomeFilters,
+  DEFAULT_HOME_STATUS_FILTER,
   HOME_SORT_LABELS,
   HOME_STATUS_FILTER_ORDER,
   HomeItemKind,
@@ -71,7 +73,7 @@ export default function HomeSortMenu({
   const [visible, setVisible] = useState(false)
   const [anchor, setAnchor] = useState<Anchor>({ top: 0, right: 20 })
 
-  const filterCount = Number(statusFilter !== 'all') + Number(kindFilter !== 'all')
+  const filterCount = countHomeFilters(statusFilter, kindFilter)
   const menuMaxHeight = Math.max(300, windowHeight - anchor.top - 24)
 
   function openMenu() {
@@ -85,7 +87,7 @@ export default function HomeSortMenu({
   }
 
   function clearFilters() {
-    onStatusChange('all')
+    onStatusChange(DEFAULT_HOME_STATUS_FILTER)
     onKindChange('all')
   }
 
