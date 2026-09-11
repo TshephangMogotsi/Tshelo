@@ -109,7 +109,7 @@ export type MainStackParamList = {
   TokenPurchase:       undefined
   Security:            undefined
   Support:             undefined
-  Settings:            undefined
+  AboutLegal:          undefined
   Notifications:       undefined
   MemberDetails:       {
     fundId: string

@@ -209,8 +209,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <Text style={styles.sectionLabel}>Support</Text>
         <View style={styles.section}>
           <SettingsRow icon="help-circle-outline"        label="Help & Support" onPress={() => navigation.navigate('Support')} />
-          <SettingsRow icon="settings-outline"           label="App Settings"   onPress={() => navigation.navigate('Settings')} />
-          <SettingsRow icon="information-circle-outline" label="About Tshelo"   onPress={() => {}} />
+          <SettingsRow icon="information-circle-outline" label="About & Legal"  onPress={() => navigation.navigate('AboutLegal')} />
         </View>
 
         {/* ── Sign out ──────────────────────────── */}
