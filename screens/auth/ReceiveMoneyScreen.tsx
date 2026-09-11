@@ -149,8 +149,15 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        <TouchableOpacity style={styles.confirmRow} onPress={() => setConfirmed(v => !v)} activeOpacity={0.8} disabled={saving}>
-          <View style={[styles.checkbox, confirmed && styles.checkboxChecked]}>
+        <TouchableOpacity
+          style={styles.confirmRow}
+          onPress={() => setConfirmed(v => !v)}
+          activeOpacity={0.8}
+          disabled={saving}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: confirmed, disabled: saving }}
+        >
+          <View testID="confirmation-checkbox" style={[styles.checkbox, confirmed && styles.checkboxChecked]}>
             {confirmed && <Ionicons name="checkmark" size={17} color="#FFFFFF" />}
           </View>
           <Text style={[styles.confirmText, { color: textCol }]}>
@@ -285,12 +292,15 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: '#7B52F0',
+    backgroundColor: '#D1D5DB',
+    borderWidth: 1,
+    borderColor: '#C4C7CE',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
     backgroundColor: '#6F4DE8',
+    borderColor: '#6F4DE8',
   },
   confirmText: {
     flex: 1,

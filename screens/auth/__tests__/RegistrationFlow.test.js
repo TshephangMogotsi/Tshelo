@@ -24,7 +24,7 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
-const { Alert, Text, TextInput, TouchableOpacity } = require('react-native')
+const { Alert, StyleSheet, Text, TextInput, TouchableOpacity } = require('react-native')
 const BankDetailsScreen = require('../BankDetailsScreen').default
 const OTPScreen = require('../OTPScreen').default
 const ReceiveMoneyScreen = require('../ReceiveMoneyScreen').default
@@ -114,10 +114,18 @@ it('persists confirmed payment details before showing registration success', asy
   expect(tree.root.findAllByType(Text).some(text => text.props.children === 'Mobile Money')).toBe(true)
   expect(tree.root.findAllByType(Text).some(text => text.props.children === 'Verified ✓')).toBe(true)
   expect(tree.root.findByType('ProviderLogo').props.width).toBe(44)
+  expect(StyleSheet.flatten(tree.root.findByProps({ testID: 'confirmation-checkbox' }).props.style)).toMatchObject({
+    backgroundColor: '#D1D5DB',
+    borderColor: '#C4C7CE',
+  })
   const confirmation = tree.root.findAllByType(TouchableOpacity).find(item => (
     item.findAllByType(Text).some(text => String(text.props.children).startsWith('I confirm'))
   ))
   await act(async () => confirmation.props.onPress())
+  expect(StyleSheet.flatten(tree.root.findByProps({ testID: 'confirmation-checkbox' }).props.style)).toMatchObject({
+    backgroundColor: '#6F4DE8',
+    borderColor: '#6F4DE8',
+  })
   await act(async () => button('Confirm & Continue').props.onPress())
 
   expect(api.users.updateMe).toHaveBeenCalledWith({
