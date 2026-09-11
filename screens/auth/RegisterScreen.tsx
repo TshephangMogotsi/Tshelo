@@ -11,19 +11,16 @@ import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../context/ThemeContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { openLegalDocument } from '../../lib/legalDocuments'
+import {
+  internationalPhone,
+  isValidNationalPhone,
+  nationalPhoneDigits,
+  phoneInputConfig,
+} from '../../lib/phoneNumbers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
   route:      RouteProp<AuthStackParamList, 'Register'>
-}
-
-const PHONE_CONFIG: Record<string, { placeholder: string; digits: number }> = {
-  BW: { placeholder: '71 234 567',   digits: 8 },
-  ZA: { placeholder: '82 123 4567',  digits: 9 },
-  ZW: { placeholder: '77 123 4567',  digits: 9 },
-  ZM: { placeholder: '97 123 4567',  digits: 9 },
-  KE: { placeholder: '71 234 5678',  digits: 9 },
-  GH: { placeholder: '24 123 4567',  digits: 9 },
 }
 
 export default function RegisterScreen({ navigation, route }: Props) {
@@ -32,7 +29,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
   const currency     = route.params?.currency     ?? 'BWP'
   const dialCode     = route.params?.dialCode     ?? '+267'
 
-  const phoneConfig  = PHONE_CONFIG[countryCode] ?? PHONE_CONFIG['BW']
+  const phoneConfig  = phoneInputConfig(countryCode, dialCode)
 
   const { isDark } = useTheme()
   const requireOnline = useRequireOnline()
@@ -51,17 +48,17 @@ export default function RegisterScreen({ navigation, route }: Props) {
 
   const phoneRef = useRef<TextInput>(null)
 
-  const cleanPhone = phone.replace(/\D/g, '')
+  const cleanPhone = nationalPhoneDigits(phone)
 
   const isValid =
     name.trim().length >= 2 &&
-    cleanPhone.length >= phoneConfig.digits &&
+    isValidNationalPhone(cleanPhone, phoneConfig) &&
     consent
 
   async function handleContinue() {
     if (!isValid) return
     if (!requireOnline()) return
-    const fullPhone = `${dialCode}${cleanPhone}`
+    const fullPhone = internationalPhone(dialCode, cleanPhone)
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
@@ -146,7 +143,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
                 onChangeText={setPhone}
                 onFocus={() => setPhoneFocused(true)}
                 onBlur={() => setPhoneFocused(false)}
-                maxLength={phoneConfig.digits + 2}
+                maxLength={phoneConfig.maxDigits + 4}
                 returnKeyType="done"
               />
             </View>
@@ -165,6 +162,9 @@ export default function RegisterScreen({ navigation, route }: Props) {
             style={[styles.consentRow, { backgroundColor: inputBg, borderColor: borderCol }]}
             onPress={() => setConsent(v => !v)}
             activeOpacity={0.8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: consent }}
+            accessibilityLabel="Agree to the Terms of Service and Privacy Policy"
           >
             <View style={[styles.checkbox, { borderColor: consent ? '#7439E0' : borderCol }, consent && styles.checkboxChecked]}>
               {consent && <Ionicons name="checkmark" size={13} color="#fff" />}

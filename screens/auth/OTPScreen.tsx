@@ -16,6 +16,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import { detectProviderOrUnknown as detectProvider } from '../../lib/providers'
+import { maskedInternationalPhone } from '../../lib/phoneNumbers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OTP'>
@@ -160,7 +161,7 @@ export default function OTPScreen({ navigation, route }: Props) {
   const mutedCol = isDark ? '#8A8A9A' : colors.textMuted
   const borderCol = isDark ? '#3A3A5C' : colors.border
 
-  const maskedPhone = phone.replace(/(\+267)(\d{2})(\d+)(\d{2})/, '$1 $2****$4')
+  const maskedPhone = maskedInternationalPhone(phone)
   const timer = `${String(Math.floor(countdown / 60)).padStart(2, '0')}:${String(countdown % 60).padStart(2, '0')}`
 
   return (

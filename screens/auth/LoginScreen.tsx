@@ -10,6 +10,14 @@ import { fonts } from '../../theme/typography'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../context/ThemeContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
+import CountryPickerModal from '../../components/CountryPickerModal'
+import { findSignupCountry } from '../../lib/countries'
+import {
+  internationalPhone,
+  isValidNationalPhone,
+  nationalPhoneDigits,
+  phoneInputConfig,
+} from '../../lib/phoneNumbers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>
@@ -27,14 +35,17 @@ export default function LoginScreen({ navigation }: Props) {
   const [phone, setPhone] = useState('')
   const [focused, setFocused] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [selectedCountry, setSelectedCountry] = useState(() => findSignupCountry('BW')!)
 
-  const cleanedPhone = phone.replace(/\D/g, '')
-  const isValid = cleanedPhone.length === 8
+  const cleanedPhone = nationalPhoneDigits(phone)
+  const phoneConfig = phoneInputConfig(selectedCountry.code, selectedCountry.dialCode)
+  const isValid = isValidNationalPhone(cleanedPhone, phoneConfig)
 
   async function handleSendOTP() {
     if (!isValid) return
     if (!requireOnline()) return
-    const fullPhone = `+267${cleanedPhone}`
+    const fullPhone = internationalPhone(selectedCountry.dialCode, cleanedPhone)
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
@@ -75,27 +86,33 @@ export default function LoginScreen({ navigation }: Props) {
           <View style={styles.form}>
             <Text style={[styles.label, { color: textCol }]}>Phone Number</Text>
             <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: focused ? colors.primary : borderCol }]}>
-              <View style={styles.countryCode}>
-                <Text style={styles.countryFlag}>🇧🇼</Text>
-                <Text style={[styles.countryCodeText, { color: textCol }]}>+267</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.countryCode}
+                onPress={() => setPickerOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Change country, currently ${selectedCountry.name} ${selectedCountry.dialCode}`}
+              >
+                <Text style={styles.countryFlag}>{selectedCountry.flag}</Text>
+                <Text style={[styles.countryCodeText, { color: textCol }]}>{selectedCountry.dialCode}</Text>
+                <Ionicons name="chevron-down" size={14} color={mutedCol} />
+              </TouchableOpacity>
               <View style={[styles.divider, { backgroundColor: borderCol }]} />
               <TextInput
                 style={[styles.phoneInput, { color: textCol }]}
-                placeholder="71 000 000"
+                placeholder={phoneConfig.placeholder}
                 placeholderTextColor={mutedCol}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
-                maxLength={9}
+                maxLength={phoneConfig.maxDigits + 4}
                 returnKeyType="done"
                 onSubmitEditing={handleSendOTP}
               />
             </View>
             <Text style={[styles.hint, { color: mutedCol }]}>
-              We'll send a one time code to verify its you
+              Enter the number without {selectedCountry.dialCode}. We’ll send a one-time code to verify it’s you.
             </Text>
           </View>
 
@@ -113,7 +130,7 @@ export default function LoginScreen({ navigation }: Props) {
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: textCol }]}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.replace('Register')}>
+            <TouchableOpacity onPress={() => navigation.replace('CountrySelect')}>
               <Text style={styles.footerLink}>Create One</Text>
             </TouchableOpacity>
           </View>
@@ -126,6 +143,17 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={[styles.recoverText, { color: mutedCol }]}>Can't access your number? Get help</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
+
+      <CountryPickerModal
+        visible={pickerOpen}
+        selectedCode={selectedCountry.code}
+        onSelect={country => {
+          setSelectedCountry(country)
+          setPhone('')
+          setPickerOpen(false)
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </SafeAreaView>
   )
 }

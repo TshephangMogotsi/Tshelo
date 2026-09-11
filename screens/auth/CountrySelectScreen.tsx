@@ -2,33 +2,18 @@ import { useState } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
 import { useTheme } from '../../context/ThemeContext'
 import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
+import CountryPickerModal from '../../components/CountryPickerModal'
+import { FEATURED_SIGNUP_COUNTRIES, findSignupCountry } from '../../lib/countries'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'CountrySelect'>
 }
-
-type Country = {
-  code:         string
-  name:         string
-  currency:     string
-  currencyName: string
-  flag:         string
-  dialCode:     string
-}
-
-const COUNTRIES: Country[] = [
-  { code: 'BW', name: 'Botswana',     currency: 'BWP', currencyName: 'Pula',     flag: '🇧🇼', dialCode: '+267' },
-  { code: 'ZA', name: 'South Africa', currency: 'ZAR', currencyName: 'Rand',     flag: '🇿🇦', dialCode: '+27'  },
-  { code: 'ZW', name: 'Zimbabwe',     currency: 'USD', currencyName: 'Dollar',   flag: '🇿🇼', dialCode: '+263' },
-  { code: 'ZM', name: 'Zambia',       currency: 'ZMW', currencyName: 'Kwacha',   flag: '🇿🇲', dialCode: '+260' },
-  { code: 'KE', name: 'Kenya',        currency: 'KES', currencyName: 'Shilling', flag: '🇰🇪', dialCode: '+254' },
-  { code: 'GH', name: 'Ghana',        currency: 'GHS', currencyName: 'Cedi',     flag: '🇬🇭', dialCode: '+233' },
-]
 
 const CARD_SIZE = (Dimensions.get('window').width - 48 - 12) / 2
 
@@ -37,8 +22,10 @@ export default function CountrySelectScreen({ navigation }: Props) {
   const styles = makeStyles(colors)
 
   const [selected, setSelected] = useState<string>('BW')
+  const [pickerOpen, setPickerOpen] = useState(false)
 
-  const selectedCountry = COUNTRIES.find(c => c.code === selected)!
+  const selectedCountry = findSignupCountry(selected) ?? FEATURED_SIGNUP_COUNTRIES[0]
+  const selectedIsOther = !FEATURED_SIGNUP_COUNTRIES.some(country => country.code === selected)
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -56,8 +43,8 @@ export default function CountrySelectScreen({ navigation }: Props) {
         <Text style={styles.sectionLabel}>WHERE ARE YOU BASED?</Text>
 
         {/* ── Country grid ────────────────────────── */}
-        <View style={styles.grid}>
-          {COUNTRIES.map(country => {
+        <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="Featured countries">
+          {FEATURED_SIGNUP_COUNTRIES.map(country => {
             const active = selected === country.code
             return (
               <TouchableOpacity
@@ -65,6 +52,9 @@ export default function CountrySelectScreen({ navigation }: Props) {
                 style={[styles.card, active && styles.cardActive]}
                 onPress={() => setSelected(country.code)}
                 activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={`${country.name}, ${country.currency}`}
               >
                 <View style={[styles.codeBadge, active && styles.codeBadgeActive]}>
                   <Text style={[styles.codeText, active && styles.codeTextActive]}>
@@ -81,6 +71,28 @@ export default function CountrySelectScreen({ navigation }: Props) {
             )
           })}
         </View>
+
+        <TouchableOpacity
+          style={[styles.otherCountry, selectedIsOther && styles.otherCountryActive]}
+          onPress={() => setPickerOpen(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Choose another country"
+          accessibilityHint="Opens a searchable country list"
+        >
+          <View style={[styles.otherIcon, selectedIsOther && styles.otherIconActive]}>
+            <Ionicons name="globe-outline" size={21} color={selectedIsOther ? '#FFFFFF' : colors.primary} />
+          </View>
+          <View style={styles.otherCopy}>
+            <Text style={styles.otherTitle}>{selectedIsOther ? selectedCountry.name : 'Another country'}</Text>
+            <Text style={[styles.otherSubtitle, selectedIsOther && styles.otherSubtitleActive]}>
+              {selectedIsOther
+                ? `${selectedCountry.dialCode} · ${selectedCountry.currency} (${selectedCountry.currencyName})`
+                : 'Search the full country list'}
+            </Text>
+          </View>
+          <Ionicons name={selectedIsOther ? 'checkmark-circle' : 'chevron-forward'} size={21} color={colors.primary} />
+        </TouchableOpacity>
 
         {/* ── Continue ────────────────────────────── */}
         <TouchableOpacity
@@ -105,6 +117,16 @@ export default function CountrySelectScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <CountryPickerModal
+        visible={pickerOpen}
+        selectedCode={selected}
+        onSelect={country => {
+          setSelected(country.code)
+          setPickerOpen(false)
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </SafeAreaView>
   )
 }
@@ -144,7 +166,7 @@ function makeStyles(colors: AppColors) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 12,
-      marginBottom: 32,
+      marginBottom: 12,
     },
     card: {
       width: CARD_SIZE,
@@ -197,6 +219,48 @@ function makeStyles(colors: AppColors) {
       textAlign: 'center',
     },
     currencyTextActive: {
+      color: colors.primary,
+    },
+    otherCountry: {
+      minHeight: 74,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 28,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    otherCountryActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    otherIcon: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: colors.primaryLight,
+    },
+    otherIconActive: {
+      backgroundColor: colors.primary,
+    },
+    otherCopy: { flex: 1, minWidth: 0 },
+    otherTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    otherSubtitle: {
+      marginTop: 3,
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+    otherSubtitleActive: {
       color: colors.primary,
     },
 
