@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
+  Animated,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -47,29 +48,59 @@ export default function EventFundBudgetStep({
   const styles = makeStyles(colors)
   const [goalTrackWidth, setGoalTrackWidth] = useState(0)
   const [percentInput, setPercentInput] = useState(String(fundGoalPercent))
+  const [displayGoalPercent, setDisplayGoalPercent] = useState(fundGoalPercent)
+  const animatedGoalPosition = useRef(new Animated.Value(0)).current
+  const pendingGoalPercent = useRef(fundGoalPercent)
+  const isDraggingGoal = useRef(false)
 
   const budgetAmount = parseAmount(eventBudget)
-  const fundGoalAmount = Math.round(budgetAmount * fundGoalPercent / 100)
+  const fundGoalAmount = Math.round(budgetAmount * displayGoalPercent / 100)
   const organiserAmount = Math.max(budgetAmount - fundGoalAmount, 0)
   const canCreateEventFund = budgetAmount > 0 && eventName.trim().length >= 3
 
   useEffect(() => {
+    if (isDraggingGoal.current) return
     setPercentInput(String(fundGoalPercent))
-  }, [fundGoalPercent])
+    setDisplayGoalPercent(fundGoalPercent)
+    pendingGoalPercent.current = fundGoalPercent
+    if (goalTrackWidth > 0) {
+      animatedGoalPosition.setValue(goalTrackWidth * fundGoalPercent / 100)
+    }
+  }, [animatedGoalPosition, fundGoalPercent, goalTrackWidth])
 
   function formatAmount(amount: number) {
     return `${currencySymbol}${amount.toLocaleString('en-BW', { maximumFractionDigits: 0 })}`
   }
 
-  function updateGoalFromTouch(event: GestureResponderEvent) {
+  function previewGoalFromTouch(event: GestureResponderEvent) {
     if (goalTrackWidth <= 0) return
-    const raw = Math.round((event.nativeEvent.locationX / goalTrackWidth) * 100 / 5) * 5
-    updateGoalPercent(Math.min(100, Math.max(5, raw)))
+    const rawPosition = Math.min(goalTrackWidth, Math.max(goalTrackWidth * 0.05, event.nativeEvent.locationX))
+    const rawPercent = (rawPosition / goalTrackWidth) * 100
+    const steppedPercent = Math.round(rawPercent / 5) * 5
+    const previousSteppedPercent = pendingGoalPercent.current
+
+    animatedGoalPosition.setValue(rawPosition)
+    pendingGoalPercent.current = steppedPercent
+    if (steppedPercent !== previousSteppedPercent) {
+      setDisplayGoalPercent(steppedPercent)
+      setPercentInput(String(steppedPercent))
+    }
+  }
+
+  function finishGoalDrag() {
+    if (!isDraggingGoal.current) return
+    isDraggingGoal.current = false
+    updateGoalPercent(pendingGoalPercent.current)
   }
 
   function updateGoalPercent(value: number) {
     const normalized = Math.min(100, Math.max(5, Math.round(value)))
+    pendingGoalPercent.current = normalized
+    setDisplayGoalPercent(normalized)
     setPercentInput(String(normalized))
+    if (goalTrackWidth > 0) {
+      animatedGoalPosition.setValue(goalTrackWidth * normalized / 100)
+    }
     onFundGoalPercentChange(normalized)
   }
 
@@ -82,6 +113,11 @@ export default function EventFundBudgetStep({
     }
     setPercentInput(digits)
     if (digits && parsed >= 5 && parsed <= 100) {
+      pendingGoalPercent.current = parsed
+      setDisplayGoalPercent(parsed)
+      if (goalTrackWidth > 0) {
+        animatedGoalPosition.setValue(goalTrackWidth * parsed / 100)
+      }
       onFundGoalPercentChange(parsed)
     }
   }
@@ -188,25 +224,38 @@ export default function EventFundBudgetStep({
 
             <View
               style={styles.sliderTouchArea}
-              onLayout={event => setGoalTrackWidth(event.nativeEvent.layout.width)}
+              onLayout={event => {
+                const width = event.nativeEvent.layout.width
+                setGoalTrackWidth(width)
+                animatedGoalPosition.setValue(width * displayGoalPercent / 100)
+              }}
               onStartShouldSetResponder={() => true}
               onMoveShouldSetResponder={() => true}
-              onResponderGrant={updateGoalFromTouch}
-              onResponderMove={updateGoalFromTouch}
+              onResponderGrant={event => {
+                isDraggingGoal.current = true
+                previewGoalFromTouch(event)
+              }}
+              onResponderMove={previewGoalFromTouch}
+              onResponderRelease={finishGoalDrag}
+              onResponderTerminate={finishGoalDrag}
+              onResponderTerminationRequest={() => false}
               accessible
               accessibilityRole="adjustable"
               accessibilityLabel="Fund goal percentage"
-              accessibilityValue={{ min: 5, max: 100, now: fundGoalPercent, text: `${fundGoalPercent}%` }}
+              accessibilityValue={{ min: 5, max: 100, now: displayGoalPercent, text: `${displayGoalPercent}%` }}
               accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
               onAccessibilityAction={event => {
                 const change = event.nativeEvent.actionName === 'increment' ? 5 : -5
-                updateGoalPercent(fundGoalPercent + change)
+                updateGoalPercent(displayGoalPercent + change)
               }}
             >
               <View style={styles.sliderTrack}>
-                <View style={[styles.sliderFill, { width: `${fundGoalPercent}%` as any }]} />
+                <Animated.View style={[styles.sliderFill, { width: animatedGoalPosition }]} />
               </View>
-              <View style={[styles.sliderThumb, { left: `${fundGoalPercent}%` as any }]} />
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.sliderThumb, { transform: [{ translateX: animatedGoalPosition }] }]}
+              />
             </View>
             <View style={styles.sliderLabels}>
               <Text style={styles.sliderLabel}>5%</Text>
@@ -352,9 +401,9 @@ function makeStyles(colors: AppColors) {
     sliderThumb: {
       position: 'absolute',
       top: 7,
+      left: -10,
       width: 20,
       height: 20,
-      marginLeft: -10,
       borderRadius: 10,
       backgroundColor: colors.surface,
       borderWidth: 3,
