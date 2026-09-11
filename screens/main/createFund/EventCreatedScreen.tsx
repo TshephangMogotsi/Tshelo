@@ -1,21 +1,20 @@
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native'
+import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
+import { fonts } from '../../../theme/typography'
 import { formatEventDateDisplay } from './format'
-import { BRAND_PURPLE } from './constants'
 
 type Props = {
   eventName: string
-  eventEmoji: string
   eventDate: Date | null
   eventVenue: string
   onShare: () => void
-  onDone: () => void
+  onViewEvent: () => void
 }
 
-export default function EventCreatedScreen({ eventName, eventEmoji, eventDate, eventVenue, onShare, onDone }: Props) {
+export default function EventCreatedScreen({ eventName, eventDate, eventVenue, onShare, onViewEvent }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
 
@@ -23,199 +22,201 @@ export default function EventCreatedScreen({ eventName, eventEmoji, eventDate, e
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
-      <View style={styles.eventCreatedScreen}>
-        <View style={styles.eventCreatedConfetti}>
-          <Text style={styles.confettiLeft}>🎉</Text>
-          <Text style={styles.confettiMiddle}>🎊</Text>
-          <Text style={styles.confettiRight}>✨</Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.headingRow} accessibilityLabel="Event created successfully">
+          <Ionicons name="checkmark-circle" size={28} color={colors.success} />
+          <Text
+            style={styles.heading}
+            accessibilityRole="header"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            Event Created!
+          </Text>
         </View>
+        <Text style={styles.subheading}>{eventName} is ready for guests</Text>
 
-        <View style={styles.eventCreatedIconCircle}>
-          <Ionicons name="checkmark" size={36} color="#16A34A" />
-        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.eventName}>{eventName}</Text>
+          <View style={styles.divider} />
 
-        <Text style={styles.eventCreatedTitle}>Event Created!</Text>
-
-        <View style={styles.eventCreatedCard}>
-          <Text style={styles.eventCreatedEmoji}>{eventEmoji}</Text>
-          <View style={styles.eventCreatedCardBody}>
-            <Text style={styles.eventCreatedName}>{eventName}</Text>
-            <View style={styles.eventCreatedMetaRow}>
-              <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
-              <Text style={styles.eventCreatedMeta}>
-                {eventDate ? formatEventDateDisplay(eventDate) : 'Date to be confirmed'}
+          <View style={styles.detailRow}>
+            <View style={styles.detailIcon}>
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.detailCopy}>
+              <Text style={styles.detailLabel}>DATE</Text>
+              <Text style={styles.detailValue}>
+                {eventDate ? formatEventDateDisplay(eventDate) : 'To be confirmed'}
               </Text>
             </View>
-            <View style={styles.eventCreatedMetaRow}>
-              <Ionicons name="location-outline" size={15} color={colors.textMuted} />
-              <Text style={styles.eventCreatedMeta}>
-                {eventVenue.trim() || 'Venue to be confirmed'}
-              </Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <View style={styles.detailIcon}>
+              <Ionicons name="location-outline" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.detailCopy}>
+              <Text style={styles.detailLabel}>VENUE</Text>
+              <Text style={styles.detailValue}>{eventVenue.trim() || 'To be confirmed'}</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.eventCreatedInviteText}>Now invite your guests!</Text>
-
+        <Text style={styles.inviteTitle}>Invite your guests</Text>
         <TouchableOpacity
-          style={styles.shareRsvpButton}
-          activeOpacity={0.86}
+          style={styles.shareButton}
+          activeOpacity={0.8}
           onPress={onShare}
+          accessibilityRole="button"
+          accessibilityLabel="Share RSVP link"
         >
-          <Ionicons name="link-outline" size={22} color="#FFFFFF" />
-          <Text style={styles.shareRsvpButtonText}>Share RSVP{'\n'}Link</Text>
+          <Ionicons name="share-outline" size={19} color={colors.primary} />
+          <Text style={styles.shareButtonText}>Share RSVP Link</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.eventCreatedDoneButton}
-          activeOpacity={0.78}
-          onPress={onDone}
+          style={styles.viewEventButton}
+          activeOpacity={0.82}
+          onPress={onViewEvent}
+          accessibilityRole="button"
+          accessibilityLabel="View Event"
         >
-          <Text style={styles.eventCreatedDoneText}>Done</Text>
+          <Text style={styles.viewEventText}>View Event</Text>
+          <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: colors.background },
-    eventCreatedScreen: {
+    safe: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 28,
-      paddingVertical: 36,
       backgroundColor: colors.background,
     },
-    eventCreatedConfetti: {
-      width: 190,
-      height: 74,
-      position: 'relative',
+    scroll: {
+      flexGrow: 1,
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      paddingTop: 28,
+      paddingBottom: 48,
+    },
+    headingRow: {
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
       marginBottom: 8,
     },
-    confettiLeft: {
-      position: 'absolute',
-      left: 12,
-      top: 8,
-      fontSize: 24,
-    },
-    confettiMiddle: {
-      position: 'absolute',
-      left: 84,
-      top: 38,
-      fontSize: 17,
-    },
-    confettiRight: {
-      position: 'absolute',
-      right: 10,
-      top: 12,
-      fontSize: 22,
-    },
-    eventCreatedIconCircle: {
-      width: 106,
-      height: 106,
-      borderRadius: 53,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#D1FAE5',
-      marginBottom: 28,
-    },
-    eventCreatedTitle: {
-      fontSize: 29,
-      lineHeight: 36,
-      fontWeight: '900',
-      color: colors.textPrimary,
-      marginBottom: 26,
-    },
-    eventCreatedCard: {
-      width: '100%',
-      maxWidth: 280,
-      minHeight: 150,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: 22,
-      paddingVertical: 18,
-      marginBottom: 28,
-    },
-    eventCreatedEmoji: {
-      width: 58,
-      fontSize: 40,
-      textAlign: 'center',
-    },
-    eventCreatedCardBody: {
-      flex: 1,
-    },
-    eventCreatedName: {
-      fontSize: 20,
-      lineHeight: 26,
-      fontWeight: '900',
-      color: colors.textPrimary,
-      marginBottom: 12,
-    },
-    eventCreatedMetaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 4,
-    },
-    eventCreatedMeta: {
-      flex: 1,
-      fontSize: 14,
-      lineHeight: 19,
-      color: colors.textMuted,
-    },
-    eventCreatedInviteText: {
-      fontSize: 19,
-      lineHeight: 26,
-      fontWeight: '700',
-      color: colors.textMuted,
-      marginBottom: 20,
-    },
-    shareRsvpButton: {
-      width: '100%',
-      maxWidth: 280,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 10,
-      backgroundColor: BRAND_PURPLE,
-      borderRadius: 28,
-      paddingHorizontal: 24,
-      paddingVertical: 17,
-    },
-    shareRsvpButtonText: {
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: '700',
-      color: '#FFFFFF',
-      textAlign: 'center',
-    },
-    eventCreatedDoneButton: {
-      width: '100%',
-      maxWidth: 280,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 28,
-      paddingHorizontal: 24,
-      paddingVertical: 15,
-      marginTop: 14,
-      backgroundColor: colors.surface,
-    },
-    eventCreatedDoneText: {
-      fontSize: 16,
-      lineHeight: 22,
+    heading: {
+      flexShrink: 1,
+      fontSize: 28,
+      fontFamily: fonts.display.bold,
       fontWeight: '800',
       color: colors.textPrimary,
       textAlign: 'center',
+    },
+    subheading: {
+      marginBottom: 28,
+      fontSize: 14,
+      lineHeight: 21,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    summaryCard: {
+      width: '100%',
+      marginBottom: 28,
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    eventName: {
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    divider: {
+      height: 1,
+      marginVertical: 16,
+      backgroundColor: colors.border,
+    },
+    detailRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 8,
+    },
+    detailIcon: {
+      width: 38,
+      height: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 11,
+      backgroundColor: colors.primaryLight,
+    },
+    detailCopy: {
+      flex: 1,
+    },
+    detailLabel: {
+      marginBottom: 2,
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.8,
+      color: colors.textMuted,
+    },
+    detailValue: {
+      fontSize: 14,
+      lineHeight: 19,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    inviteTitle: {
+      alignSelf: 'flex-start',
+      marginBottom: 14,
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    shareButton: {
+      width: '100%',
+      minHeight: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 9,
+      marginBottom: 12,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+    },
+    shareButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    viewEventButton: {
+      width: '100%',
+      minHeight: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+    },
+    viewEventText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#FFFFFF',
     },
   })
 }

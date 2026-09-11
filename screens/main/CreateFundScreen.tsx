@@ -658,7 +658,6 @@ export default function CreateFundScreen({ navigation }: Props) {
       return (
         <EventCreatedScreen
           eventName={eventName.trim() || `${selectedEventLabel} Event`}
-          eventEmoji={selectedEventEmoji}
           eventDate={eventDate}
           eventVenue={eventVenue}
           onShare={async () => {
@@ -670,7 +669,19 @@ export default function CreateFundScreen({ navigation }: Props) {
               message: eventInvitationUrl(createdEvent.share_code),
             })
           }}
-          onDone={() => navigation.popToTop()}
+          onViewEvent={() => {
+            if (!createdEvent?.id) {
+              navigation.popToTop()
+              return
+            }
+            navigation.reset({
+              index: 1,
+              routes: [
+                { name: 'Tabs' as any },
+                { name: 'EventDetail', params: { eventId: createdEvent.id } },
+              ],
+            })
+          }}
         />
       )
     }
