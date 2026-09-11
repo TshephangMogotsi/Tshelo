@@ -9,9 +9,27 @@ implemented locally; the linked database is current through
 `20260909140000_event_banner_focal_points.sql`. Signed physical-device testing,
 distribution artifacts and store-console actions remain.
 
+Update — 11 September 2026: Expo EAS successfully produced both Android beta
+artifacts from commit `4e03ef8` with the same project fingerprint
+`1bcb8f652015f16455caebfa94d4219db07a9d7a` and Expo-managed keystore:
+
+- Production Play AAB, version code 2: EAS build
+  `90013fa8-8de7-4663-aa79-081b4b520eeb`, 73,663,018 bytes, SHA-256
+  `8fd097ca4efa8e93609bdb923edde6d35f9237ebe06710f1b11653a557baa9a6`.
+- Internal-distribution APK, version code 3: EAS build
+  `3635f749-85d0-46da-ab41-ecf45bed81b5`, 110,026,756 bytes, SHA-256
+  `ff8ae509d17184f7cedb0d588d6be07e2db718fab005539481bbf9e77749cc1d`.
+
+Both downloaded archives passed integrity checks. The AAB contains its signing
+manifest/certificate records. Physical-device installation and the user-owned
+device smoke checklist remain pending; no simulator was used.
+
 ## Outcome
 
-Phase 8 engineering hardening is complete. The current iOS Release build compiles, installs, launches, and reaches the signed-in Overview screen. The linked Supabase project is current through migration `20260812180000`.
+Phase 8 engineering hardening is complete. The current iOS Release build compiles,
+installs, launches, and reaches the signed-in Overview screen. The linked Supabase
+project is current through migration
+`20260909140000_event_banner_focal_points.sql`.
 
 External release actions and the product/legal decisions listed below must be completed before public store submission. No App Store or Play Store submission was made in this phase.
 
@@ -47,10 +65,16 @@ External release actions and the product/legal decisions listed below must be co
 
 ### Signed distribution builds
 
-- Install JDK 17 or repair `JAVA_HOME` before producing the Android AAB. The current configured path, `/Applications/Android Studio.app/Contents/jbr/Contents/Home`, does not exist on this machine.
-- Run an Android native Release/AAB build after the JDK is available. The Android application bundle was not produced in Phase 8; only its production JS/Hermes bundle was verified.
-- Verify Apple distribution certificates/profiles and Google Play signing credentials in EAS.
-- Run signed production builds with the `production` EAS profile, then test each artifact on a physical device before submission.
+- [x] Produce a signed Android production AAB with the EAS production profile.
+- [x] Produce a signed internal-distribution APK for direct Android device smoke testing.
+- Install JDK 17/Android platform tools only if local USB builds or ADB installation
+  are required. Cloud EAS signing does not depend on the missing local toolchain.
+- Verify Apple distribution certificates/profiles and Google Play submission
+  credentials in EAS/Play Console.
+- Install the signed APK on a physical Android device and complete the beta smoke
+  checklist before uploading the AAB to the Play internal-testing track.
+- Produce and physically test the signed iOS distribution artifact before its
+  submission.
 
 ## Dependency advisory review
 
@@ -78,6 +102,6 @@ For native artifacts, also run the appropriate signed EAS production build and c
 
 Engineering release candidate: **ready for final stakeholder and account-owner actions**.
 
-Public store submission: **not yet ready** until the Android JDK/AAB gate passes,
-store credentials and metadata are verified, physical-device testing is complete,
-and the client approves the trust-points/reward draft.
+Public store submission: **not yet ready** until store credentials and metadata
+are verified, physical-device testing is complete, and the client approves the
+trust-points/reward draft. The Android signed-artifact gate is complete.
