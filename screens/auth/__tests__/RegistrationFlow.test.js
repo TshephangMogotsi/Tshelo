@@ -24,7 +24,8 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
-const { Text, TextInput, TouchableOpacity } = require('react-native')
+const { Alert, Text, TextInput, TouchableOpacity } = require('react-native')
+const BankDetailsScreen = require('../BankDetailsScreen').default
 const OTPScreen = require('../OTPScreen').default
 const ReceiveMoneyScreen = require('../ReceiveMoneyScreen').default
 const RegistrationSuccessScreen = require('../RegistrationSuccessScreen').default
@@ -38,7 +39,8 @@ const navigation = { navigate: jest.fn(), goBack: jest.fn() }
 
 function button(label) {
   return tree.root.findAllByType(TouchableOpacity).find(item => (
-    item.findAllByType(Text).some(text => text.props.children === label)
+    item.props.accessibilityLabel === label
+      || item.findAllByType(Text).some(text => text.props.children === label)
   ))
 }
 
@@ -52,6 +54,7 @@ beforeEach(() => {
 afterEach(async () => {
   if (tree) await act(async () => tree.unmount())
   tree = null
+  jest.restoreAllMocks()
 })
 
 it('keeps registration incomplete after OTP and opens bank details', async () => {
@@ -118,6 +121,35 @@ it('persists confirmed payment details before showing registration success', asy
     bank_account_number: '62012345678',
   })
   expect(navigation.navigate).toHaveBeenCalledWith('RegistrationSuccess')
+})
+
+it('confirms before removing a saved bank account', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  const route = {
+    params: {
+      name: 'Kefilwe Moeti',
+      registeredPhone: '+26771234567',
+      bankAccounts: [{
+        id: 'bank-1',
+        bankName: 'First National Bank',
+        branchCode: '282267',
+        accountNumber: '62012343543',
+      }],
+      mobileMoneyNumbers: [],
+    },
+  }
+  await act(async () => { tree = create(React.createElement(BankDetailsScreen, { navigation, route })) })
+  await act(async () => button('Remove First National Bank account ending 3543').props.onPress())
+
+  expect(alert).toHaveBeenCalledWith(
+    'Remove bank account?',
+    'First National Bank ending 3543 will be removed from this setup.',
+    expect.any(Array),
+  )
+  const actions = alert.mock.calls[0][2]
+  await act(async () => actions.find(action => action.text === 'Remove').onPress())
+  expect(button('Remove First National Bank account ending 3543')).toBeUndefined()
+  alert.mockRestore()
 })
 
 it('marks registration complete only when the user taps Lets Go', async () => {

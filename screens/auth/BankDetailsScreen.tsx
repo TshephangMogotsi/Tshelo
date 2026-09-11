@@ -126,6 +126,22 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
     setBranchCode('')
   }
 
+  function removeBankAccount(account: BankAccount) {
+    const accountEnding = account.accountNumber.replace(/\D/g, '').slice(-4)
+    Alert.alert(
+      'Remove bank account?',
+      `${account.bankName} ending ${accountEnding} will be removed from this setup.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => setBankAccounts(accounts => accounts.filter(item => item.id !== account.id)),
+        },
+      ],
+    )
+  }
+
   function handleAddMobileMoney() {
     const digits = mobileNumber.replace(/\D/g, '').replace(/^267/, '')
     if (digits.length < 8) return
@@ -207,11 +223,22 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
 
             {bankAccounts.map(item => (
               <View key={item.id} style={[styles.savedItem, { borderColor: borderCol }]}>
-                <View>
+                <View style={styles.savedItemCopy}>
                   <Text style={[styles.savedItemTitle, { color: textCol }]}>{item.bankName}</Text>
                   <Text style={[styles.savedItemMeta, { color: mutedCol }]}>{maskAccount(item.accountNumber)}</Text>
                 </View>
-                <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
+                <View style={styles.savedItemActions}>
+                  <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
+                  <TouchableOpacity
+                    style={styles.removeSavedButton}
+                    onPress={() => removeBankAccount(item)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${item.bankName} account ending ${item.accountNumber.replace(/\D/g, '').slice(-4)}`}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
 
@@ -405,6 +432,9 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     marginBottom: 10,
   },
+  savedItemCopy: { flex: 1, minWidth: 0 },
+  savedItemActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 10 },
+  removeSavedButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FEF2F2' },
   savedItemTitle: {
     fontSize: 15,
     fontWeight: '700',
