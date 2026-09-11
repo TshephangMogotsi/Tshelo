@@ -18,7 +18,6 @@ import { isMapsUrl, mapsSearchUrl } from '../../../lib/maps'
 
 type Props = {
   selectedEventLabel: string
-  selectedEventEmoji: string
   eventName: string
   onEventNameChange: (text: string) => void
   fundName: string
@@ -37,7 +36,6 @@ type Props = {
 
 export default function EventFundDetailsStep({
   selectedEventLabel,
-  selectedEventEmoji,
   eventName,
   onEventNameChange,
   fundName,
@@ -73,7 +71,7 @@ export default function EventFundDetailsStep({
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-      <FlowHeader title="Event + Fund" step="Step 2 of 4" onBack={onBack} />
+      <FlowHeader title="Event + Fund" step="Step 3 of 5" onBack={onBack} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
@@ -81,7 +79,7 @@ export default function EventFundDetailsStep({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.eventFundDetailsTitle}>{selectedEventEmoji} Event details</Text>
+          <Text style={styles.eventFundDetailsTitle}>Event details</Text>
           <Text style={styles.eventFundDetailsSubtitle}>Tell us about your {selectedEventLabel.toLowerCase()}.</Text>
 
           <View style={styles.eventFundDetailsField}>

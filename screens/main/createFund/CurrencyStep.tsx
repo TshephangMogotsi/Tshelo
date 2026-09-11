@@ -46,12 +46,22 @@ function matchesSearch(value: string, query: string) {
 type Props = {
   currency: FundCurrency
   homeCurrency: FundCurrency
+  flowTitle?: string
+  stepLabel?: string
   onSelectCurrency: (currency: FundCurrency) => void
   onContinue: () => void
   onBack: () => void
 }
 
-export default function CurrencyStep({ currency, homeCurrency, onSelectCurrency, onContinue, onBack }: Props) {
+export default function CurrencyStep({
+  currency,
+  homeCurrency,
+  flowTitle = 'Create Fund',
+  stepLabel = 'Step 1 of 2',
+  onSelectCurrency,
+  onContinue,
+  onBack,
+}: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
   const [search, setSearch] = useState('')
@@ -100,7 +110,7 @@ export default function CurrencyStep({ currency, homeCurrency, onSelectCurrency,
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-      <FlowHeader title="Create Fund" step="Step 1 of 2" onBack={onBack} />
+      <FlowHeader title={flowTitle} step={stepLabel} onBack={onBack} />
 
       <View style={styles.intro}>
         <Text style={styles.title}>Choose currency</Text>

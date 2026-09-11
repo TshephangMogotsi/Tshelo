@@ -37,7 +37,7 @@ export default function EventFundOrganisersStep({
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-      <FlowHeader title="Event + Fund" step="Step 3 of 4" onBack={onBack} />
+      <FlowHeader title="Event + Fund" step="Step 4 of 5" onBack={onBack} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView

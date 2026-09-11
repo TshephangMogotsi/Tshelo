@@ -3,6 +3,7 @@ jest.mock('../../../../context/ThemeContext', () => ({
 }))
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
+jest.mock('../FlowHeader', () => 'FlowHeader')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
@@ -49,4 +50,23 @@ it('falls back safely when the profile has no valid currency', () => {
   expect(resolveFundCurrency('zmw')).toBe('ZMW')
   expect(resolveFundCurrency('invalid')).toBe('BWP')
   expect(resolveFundCurrency('XXX')).toBe('BWP')
+})
+
+it('supports the Event and Fund flow header without duplicating the currency UI', () => {
+  act(() => {
+    tree = create(React.createElement(CurrencyStep, {
+      currency: 'BWP',
+      homeCurrency: 'BWP',
+      flowTitle: 'Event + Fund',
+      stepLabel: 'Step 1 of 5',
+      onSelectCurrency: jest.fn(),
+      onContinue: jest.fn(),
+      onBack: jest.fn(),
+    }))
+  })
+
+  expect(tree.root.findByType('FlowHeader').props).toMatchObject({
+    title: 'Event + Fund',
+    step: 'Step 1 of 5',
+  })
 })

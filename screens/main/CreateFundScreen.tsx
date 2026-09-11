@@ -508,15 +508,15 @@ export default function CreateFundScreen({ navigation }: Props) {
       setEventStep(1)
       return
     }
-    if (createOption === 'eventFund' && !currencyDone && eventFundDetailsDone) {
-      if (eventFundOrganisersDone) {
-        setEventFundOrganisersDone(false)
-        return
-      }
+    if (createOption === 'eventFund' && eventFundOrganisersDone) {
+      setEventFundOrganisersDone(false)
+      return
+    }
+    if (createOption === 'eventFund' && eventFundDetailsDone) {
       setEventFundDetailsDone(false)
       return
     }
-    if (createOption === 'eventFund' && !currencyDone && eventFundTypeDone) {
+    if (createOption === 'eventFund' && eventFundTypeDone) {
       setEventFundTypeDone(false)
       return
     }
@@ -567,11 +567,25 @@ export default function CreateFundScreen({ navigation }: Props) {
     )
   }
 
+  if (!currencyDone && (createOption === 'fund' || createOption === 'eventFund')) {
+    const isEventFundFlow = createOption === 'eventFund'
+    return (
+      <CurrencyStep
+        currency={currency}
+        homeCurrency={homeCurrency}
+        flowTitle={isEventFundFlow ? 'Event + Fund' : undefined}
+        stepLabel={isEventFundFlow ? 'Step 1 of 5' : undefined}
+        onSelectCurrency={setCurrency}
+        onContinue={() => setCurrencyDone(true)}
+        onBack={handleBack}
+      />
+    )
+  }
+
   if (createOption === 'eventFund' && eventFundTypeDone && !eventFundDetailsDone) {
     return (
       <EventFundDetailsStep
         selectedEventLabel={selectedEventLabel}
-        selectedEventEmoji={selectedEventEmoji}
         eventName={eventName}
         onEventNameChange={setEventName}
         fundName={name}
@@ -634,19 +648,8 @@ export default function CreateFundScreen({ navigation }: Props) {
         isOtherEvent={isOtherEvent}
         customEventType={customEventType}
         onCustomEventTypeChange={setCustomEventType}
-        customEventEmoji={customEventEmoji}
-        onCustomEventEmojiChange={setCustomEventEmoji}
-        showEmojiDialog={showCustomEmojiDialog}
-        onShowEmojiDialog={setShowCustomEmojiDialog}
-        emojiSearch={emojiSearch}
-        onEmojiSearchChange={setEmojiSearch}
-        emojiCategory={emojiCategory}
-        onEmojiCategoryChange={setEmojiCategory}
         isStepValid={eventTypeStepValid}
-        onContinue={() => {
-          setSelectedEmoji({ id: eventType.id, label: selectedEventLabel, emoji: selectedEventEmoji })
-          setEventFundTypeDone(true)
-        }}
+        onContinue={() => setEventFundTypeDone(true)}
         onBack={handleBack}
       />
     )
@@ -730,18 +733,6 @@ export default function CreateFundScreen({ navigation }: Props) {
         onEmojiCategoryChange={setEmojiCategory}
         isStepValid={eventTypeStepValid}
         onContinue={() => setEventStep(2)}
-        onBack={handleBack}
-      />
-    )
-  }
-
-  if (!currencyDone) {
-    return (
-      <CurrencyStep
-        currency={currency}
-        homeCurrency={homeCurrency}
-        onSelectCurrency={setCurrency}
-        onContinue={() => setCurrencyDone(true)}
         onBack={handleBack}
       />
     )
