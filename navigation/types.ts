@@ -107,6 +107,7 @@ export type MainStackParamList = {
     sponsorUserId?: string
   }
   TokenPurchase:       undefined
+  Security:            undefined
   Support:             undefined
   Settings:            undefined
   Notifications:       undefined

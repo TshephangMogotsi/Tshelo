@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase'
 import { api } from '../lib/api'
 import { unregisterPushToken } from '../lib/pushNotifications'
 
+export type SecuritySessionDetails = {
+  phone: string
+  phoneConfirmedAt: string | null
+  lastSignInAt: string | null
+}
+
 type AuthContextType = {
   isAuthenticated: boolean
   profileCompleted: boolean
@@ -11,6 +17,8 @@ type AuthContextType = {
   tokenBalance: number
   trustScore: number
   refreshProfile: () => Promise<void>
+  loadSecuritySession: () => Promise<SecuritySessionDetails>
+  signOutOtherSessions: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -71,6 +79,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (session) await checkProfile(session.user.id)
   }, [checkProfile])
 
+  const loadSecuritySession = useCallback(async (): Promise<SecuritySessionDetails> => {
+    const { data: { session }, error } = await supabase.auth.getSession()
+    if (error) throw error
+    if (!session) throw new Error('No active session.')
+
+    return {
+      phone: session.user.phone ?? '',
+      phoneConfirmedAt: session.user.phone_confirmed_at ?? null,
+      lastSignInAt: session.user.last_sign_in_at ?? null,
+    }
+  }, [])
+
+  const signOutOtherSessions = useCallback(async () => {
+    const { error } = await supabase.auth.signOut({ scope: 'others' })
+    if (error) throw error
+  }, [])
+
   const signOut = useCallback(async () => {
     await unregisterPushToken()
     await supabase.auth.signOut()
@@ -83,7 +108,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, profileCompleted, userId, userName, tokenBalance, trustScore, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{
+      isAuthenticated,
+      profileCompleted,
+      userId,
+      userName,
+      tokenBalance,
+      trustScore,
+      refreshProfile,
+      loadSecuritySession,
+      signOutOtherSessions,
+      signOut,
+    }}>
       {children}
     </AuthContext.Provider>
   )

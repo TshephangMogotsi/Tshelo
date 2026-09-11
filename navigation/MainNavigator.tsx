@@ -25,6 +25,7 @@ import RecordContributionScreen from '../screens/main/RecordContributionScreen'
 import AssignContributionScreen from '../screens/main/AssignContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
 import TokenPurchaseScreen      from '../screens/main/TokenPurchaseScreen'
+import SecurityScreen           from '../screens/main/SecurityScreen'
 import SettingsScreen           from '../screens/main/SettingsScreen'
 import NotificationsScreen      from '../screens/main/NotificationsScreen'
 import SupportScreen            from '../screens/support/SupportScreen'
@@ -165,6 +166,7 @@ export default function MainNavigator() {
       <Stack.Screen name="AssignContribution" component={AssignContributionScreen}/>
       <Stack.Screen name="RecordExpense"      component={RecordExpenseScreen}     />
       <Stack.Screen name="TokenPurchase"      component={TokenPurchaseScreen}     />
+      <Stack.Screen name="Security"           component={SecurityScreen}          />
       <Stack.Screen name="Settings"           component={SettingsScreen}          />
       <Stack.Screen name="Notifications"      component={NotificationsScreen}     />
       <Stack.Screen name="MemberDetails"      component={MemberDetailsScreen}     />
