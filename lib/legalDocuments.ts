@@ -1,4 +1,5 @@
-import { Alert, Linking } from 'react-native'
+import { Alert } from 'react-native'
+import * as WebBrowser from 'expo-web-browser'
 
 export type LegalDocument = 'terms' | 'privacy'
 
@@ -32,11 +33,20 @@ export async function openLegalDocument(document: LegalDocument): Promise<boolea
     return false
   }
 
-  if (!await Linking.canOpenURL(url)) {
+  try {
+    await WebBrowser.openBrowserAsync(url, {
+      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+      dismissButtonStyle: 'close',
+      controlsColor: '#7B2FFF',
+      toolbarColor: '#F4F2EB',
+      showTitle: true,
+      enableBarCollapsing: false,
+      enableDefaultShareMenuItem: false,
+    })
+  } catch {
     Alert.alert(`Could not open ${title}`, 'Please try again or contact Tshelo support.')
     return false
   }
 
-  await Linking.openURL(url)
   return true
 }
