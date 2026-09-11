@@ -203,7 +203,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
             </View>
           </View>
           <SettingsRow icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
-          <SettingsRow icon="language-outline"      label="Language"      value="English" />
         </View>
 
         {/* ── Support ───────────────────────────── */}
