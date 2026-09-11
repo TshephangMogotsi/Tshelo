@@ -72,7 +72,7 @@ export default function HomeItemCard({ item, onPress }: Props) {
           </View>
         )}
 
-        {isEF && (
+        {(isEvent || isEF) && (
           <View style={styles.eventMetaCard}>
             <View style={styles.eventMetaItem}>
               <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
@@ -82,10 +82,12 @@ export default function HomeItemCard({ item, onPress }: Props) {
               <Ionicons name="location-outline" size={13} color={colors.textMuted} />
               <Text style={[styles.eventMetaText, styles.eventMetaVenueText]} numberOfLines={1}>{item.venue_name || 'Venue TBC'}</Text>
             </View>
-            <View style={styles.eventMetaItem}>
-              <Ionicons name="people-outline" size={13} color={colors.textMuted} />
-              <Text style={styles.eventMetaText} numberOfLines={1}>{item.guest_count}</Text>
-            </View>
+            {isEF ? (
+              <View style={styles.eventMetaItem}>
+                <Ionicons name="people-outline" size={13} color={colors.textMuted} />
+                <Text style={styles.eventMetaText} numberOfLines={1}>{item.guest_count}</Text>
+              </View>
+            ) : null}
           </View>
         )}
 
