@@ -48,15 +48,23 @@ it('previews slider movement locally and commits once when the drag ends', () =>
   slider = tree.root.findByProps({ accessibilityLabel: 'Fund goal percentage' })
   act(() => slider.props.onResponderMove({ nativeEvent: { locationX: 82 } }))
   expect(onFundGoalPercentChange).not.toHaveBeenCalled()
-  expect(tree.root.findByProps({ accessibilityLabel: 'Fund goal percentage' }).props.accessibilityValue.now).toBe(40)
+  expect(tree.root.findByProps({ accessibilityLabel: 'Fund goal percentage' }).props.accessibilityValue.now).toBe(41)
 
   slider = tree.root.findByProps({ accessibilityLabel: 'Fund goal percentage' })
   act(() => slider.props.onResponderRelease())
   expect(onFundGoalPercentChange).toHaveBeenCalledTimes(1)
-  expect(onFundGoalPercentChange).toHaveBeenCalledWith(40)
+  expect(onFundGoalPercentChange).toHaveBeenCalledWith(41)
 })
 
 it('does not allow the parent ScrollView to steal an active slider gesture', () => {
   const slider = tree.root.findByProps({ accessibilityLabel: 'Fund goal percentage' })
   expect(slider.props.onResponderTerminationRequest()).toBe(false)
+})
+
+it('adjusts the percentage by one point for accessibility actions', () => {
+  const slider = tree.root.findByProps({ accessibilityLabel: 'Fund goal percentage' })
+
+  act(() => slider.props.onAccessibilityAction({ nativeEvent: { actionName: 'increment' } }))
+
+  expect(onFundGoalPercentChange).toHaveBeenCalledWith(66)
 })

@@ -76,7 +76,7 @@ export default function EventFundBudgetStep({
     if (goalTrackWidth <= 0) return
     const rawPosition = Math.min(goalTrackWidth, Math.max(goalTrackWidth * 0.05, event.nativeEvent.locationX))
     const rawPercent = (rawPosition / goalTrackWidth) * 100
-    const steppedPercent = Math.round(rawPercent / 5) * 5
+    const steppedPercent = Math.round(rawPercent)
     const previousSteppedPercent = pendingGoalPercent.current
 
     animatedGoalPosition.setValue(rawPosition)
@@ -245,7 +245,7 @@ export default function EventFundBudgetStep({
               accessibilityValue={{ min: 5, max: 100, now: displayGoalPercent, text: `${displayGoalPercent}%` }}
               accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
               onAccessibilityAction={event => {
-                const change = event.nativeEvent.actionName === 'increment' ? 5 : -5
+                const change = event.nativeEvent.actionName === 'increment' ? 1 : -1
                 updateGoalPercent(displayGoalPercent + change)
               }}
             >
