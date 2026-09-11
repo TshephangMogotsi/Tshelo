@@ -67,3 +67,8 @@ it('keeps a long invite code on one responsive selectable line', () => {
   expect(code.props.minimumFontScale).toBe(0.65)
   expect(code.props.selectable).toBe(true)
 })
+
+it('keeps the sharing screen focused by omitting the message preview', () => {
+  expect(textContent()).not.toContain('Message preview')
+  expect(textContent()).toContain("I'll invite people later")
+})

@@ -168,15 +168,6 @@ export default function FundCreatedScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* ── Message preview ────────────────────── */}
-        <View style={styles.previewCard}>
-          <View style={styles.previewHeader}>
-            <Ionicons name="phone-portrait-outline" size={14} color={colors.primary} />
-            <Text style={styles.previewHeaderText}>Message preview</Text>
-          </View>
-          <Text style={styles.previewText}>{message}</Text>
-        </View>
-
         {/* ── Skip ───────────────────────────────── */}
         <TouchableOpacity onPress={handleDone} activeOpacity={0.7} style={styles.skipBtn}>
           <Text style={styles.skipText}>I'll invite people later</Text>
@@ -349,34 +340,6 @@ function makeStyles(colors: AppColors) {
       fontSize: 14,
       fontWeight: '600',
       color: colors.textPrimary,
-    },
-
-    // ── Message preview ────────────────────────────────────────
-    previewCard: {
-      backgroundColor: colors.primaryLight,
-      borderRadius: 14,
-      padding: 14,
-      width: '100%',
-      marginBottom: 32,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    previewHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 8,
-    },
-    previewHeaderText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.primary,
-    },
-    previewText: {
-      fontSize: 13,
-      color: colors.primary,
-      lineHeight: 20,
-      fontStyle: 'italic',
     },
 
     // ── Skip ───────────────────────────────────────────────────
