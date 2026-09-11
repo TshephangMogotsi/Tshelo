@@ -84,7 +84,10 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [isCreatingFund, setIsCreatingFund] = useState(false)
   const [isPrivate,      setIsPrivate]      = useState(false)
   const [firstFundItem,  setFirstFundItem]  = useState<HomeItem | null>(null)
-  const { can: canUseFundAction } = useFundPermissions(firstFundItem?.fundId)
+  const {
+    can: canUseFundAction,
+    isLoading: fundPermissionsLoading,
+  } = useFundPermissions(firstFundItem?.fundId)
 
   useFocusEffect(
     useCallback(() => {
@@ -185,7 +188,17 @@ export default function CreateFundScreen({ navigation }: Props) {
         })
         break
       case 'expense':
-        if (!canUseFundAction('record_expenses')) return
+        if (fundPermissionsLoading) {
+          Alert.alert('Checking fund access', 'Please wait a moment while Tshelo checks your expense permissions.')
+          return
+        }
+        if (!canUseFundAction('record_expenses')) {
+          Alert.alert(
+            'Expense access required',
+            'You need expense permissions for this fund before you can record an expense.',
+          )
+          return
+        }
         navigation.navigate('RecordExpense', {
           fundId,
           fundTitle:    fund.title,
@@ -528,7 +541,7 @@ export default function CreateFundScreen({ navigation }: Props) {
           'joinFund',
           'joinEvent',
           'contribution',
-          ...(canUseFundAction('record_expenses') ? ['expense' as const] : []),
+          'expense',
           ...(canUseFundAction('manage_members') ? ['members' as const] : []),
         ])}
       />

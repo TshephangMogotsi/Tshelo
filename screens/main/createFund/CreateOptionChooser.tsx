@@ -50,6 +50,8 @@ export default function CreateOptionChooser({ onSelect, onQuickAction, onBack, v
               style={styles.railItem}
               activeOpacity={0.8}
               onPress={() => onQuickAction(action.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`${action.title} ${action.subtitle}`}
             >
               <View style={styles.railIconWrap}>
                 <Ionicons name={action.icon} size={24} color={colors.primary} />
