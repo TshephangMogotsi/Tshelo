@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView } from 'react-native'
+  ActivityIndicator, Alert, View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -9,8 +9,11 @@ import { AuthStackParamList, BankAccount, MobileMoneyNumber } from '../../naviga
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
+import { useRequireOnline } from '../../context/ConnectivityContext'
 import ProviderLogo from '../../components/ProviderLogo'
-import { PROVIDER_LABELS, detectProviderOrUnknown as detectProvider } from '../../lib/providers'
+import { api } from '../../lib/api'
+import { toApiUiError } from '../../lib/apiScreen'
+import { PROVIDER_LABELS, detectProvider, detectProviderOrUnknown } from '../../lib/providers'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ReceiveMoney'>
@@ -43,7 +46,9 @@ function makeBankAccounts(params: Props['route']['params']): BankAccount[] {
 
 export default function ReceiveMoneyScreen({ navigation, route }: Props) {
   const { isDark } = useTheme()
+  const requireOnline = useRequireOnline()
   const [confirmed, setConfirmed] = useState(false)
+  const [saving, setSaving] = useState(false)
   const bg       = isDark ? '#1A1C24' : colors.background
   const textCol  = isDark ? '#F2F2F7' : '#141414'
   const mutedCol = isDark ? '#A1A1AA' : colors.textMuted
@@ -54,7 +59,7 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
       numbers.unshift({
         id: 'registered',
         phone: route.params.registeredPhone,
-        provider: detectProvider(route.params.registeredPhone),
+        provider: detectProviderOrUnknown(route.params.registeredPhone),
       })
     }
     return numbers
@@ -64,9 +69,27 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
   const bankAccounts = useMemo(() => makeBankAccounts(route.params), [route.params])
   const hasBank = bankAccounts.length > 0
 
-  function handleContinue() {
-    if (!confirmed) return
-    navigation.navigate('RegistrationSuccess')
+  async function handleContinue() {
+    if (!confirmed || saving || !requireOnline()) return
+    const primaryBank = bankAccounts[0]
+    const provider = route.params.registeredPhone ? detectProvider(route.params.registeredPhone) : null
+    setSaving(true)
+    try {
+      await api.users.updateMe({
+        ...(route.params.name?.trim() ? { name: route.params.name.trim() } : {}),
+        ...(provider ? { mobile_money_provider: provider } : {}),
+        ...(primaryBank ? {
+          bank_name: primaryBank.bankName,
+          bank_branch_code: primaryBank.branchCode,
+          bank_account_number: primaryBank.accountNumber,
+        } : {}),
+      })
+      navigation.navigate('RegistrationSuccess')
+    } catch (error) {
+      Alert.alert('Could not save payment details', toApiUiError(error).message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -126,7 +149,7 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        <TouchableOpacity style={styles.confirmRow} onPress={() => setConfirmed(v => !v)} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.confirmRow} onPress={() => setConfirmed(v => !v)} activeOpacity={0.8} disabled={saving}>
           <View style={[styles.checkbox, confirmed && styles.checkboxChecked]}>
             {confirmed && <Ionicons name="checkmark" size={17} color="#FFFFFF" />}
           </View>
@@ -136,11 +159,14 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.primaryButton, !confirmed && styles.primaryButtonDisabled]}
-          onPress={handleContinue}
-          activeOpacity={confirmed ? 0.85 : 1}
+          style={[styles.primaryButton, (!confirmed || saving) && styles.primaryButtonDisabled]}
+          onPress={() => { void handleContinue() }}
+          activeOpacity={confirmed && !saving ? 0.85 : 1}
+          disabled={!confirmed || saving}
         >
-          <Text style={styles.primaryButtonText}>Confirm &amp; Continue</Text>
+          {saving
+            ? <ActivityIndicator color="#FFFFFF" />
+            : <Text style={styles.primaryButtonText}>Confirm &amp; Continue</Text>}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

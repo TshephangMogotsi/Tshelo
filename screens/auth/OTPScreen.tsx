@@ -107,12 +107,6 @@ export default function OTPScreen({ navigation, route }: Props) {
       try {
         await api.users.updateMe({
           name: registration.name,
-          mobile_money_provider: registration.provider,
-          bank_name: registration.bank.bankName,
-          bank_branch_code: registration.bank.branchCode,
-          bank_account_number: registration.bank.accountNumber,
-          profile_completed: true,
-          onboarding_completed: true,
           terms_accepted_at: now,
           terms_version: '1.0',
           privacy_accepted_at: now,
