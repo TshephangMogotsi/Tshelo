@@ -38,9 +38,6 @@ beforeEach(() => {
       title: 'Venue moved', body: 'Use the north gate.', isPinned: true,
       authorName: 'Ayanda', createdAt: '2026-09-10T12:00:00Z', attachmentCount: 1,
     },
-    plannedBudget: 'P 25,000', hasBudget: true,
-    linkedFund: { raised: 'P 10,000', available: 'P 7,000' },
-    canOpenBudget: true,
     attendance: { confirmedPeople: 8, pendingInvitations: 2, invitedPeople: 12 },
     guests: [
       { id: 'guest-1', name: 'Neo Kgosietsile', status: 'confirmed' },
@@ -49,7 +46,7 @@ beforeEach(() => {
     venue: 'Kgale View', venueAddress: 'Plot 1, Gaborone', hasVenue: true,
     files: Array.from({ length: 6 }, (_, index) => image(index)),
     previewBusy: false,
-    onOpenUpdates: jest.fn(), onOpenBudget: jest.fn(), onOpenGuests: jest.fn(),
+    onOpenUpdates: jest.fn(), onOpenGuests: jest.fn(),
     onOpenLocation: jest.fn(), onOpenFiles: jest.fn(), onPreview: jest.fn(),
   }
 })
@@ -67,20 +64,17 @@ const text = () => JSON.stringify(tree.toJSON())
 it('renders the phone-first hierarchy and its role-safe actions', async () => {
   await render()
   const output = text()
-  expect(output.indexOf('Pinned update')).toBeLessThan(output.indexOf('Budget snapshot'))
-  expect(output.indexOf('Budget snapshot')).toBeLessThan(output.indexOf('Attendance'))
+  expect(output.indexOf('Pinned update')).toBeLessThan(output.indexOf('Attendance'))
   expect(output.indexOf('Attendance')).toBeLessThan(output.indexOf('Location'))
   expect(output.indexOf('Location')).toBeLessThan(output.indexOf('Gallery'))
   expect(output).toContain('NK')
   expect(output).not.toContain('LM')
 
   button('View all: Pinned update').props.onPress()
-  button('Open budget: Budget snapshot').props.onPress()
   button('Guest list: Attendance').props.onPress()
   button('Open map: Location').props.onPress()
   button('View all: Gallery').props.onPress()
   expect(props.onOpenUpdates).toHaveBeenCalled()
-  expect(props.onOpenBudget).toHaveBeenCalled()
   expect(props.onOpenGuests).toHaveBeenCalled()
   expect(props.onOpenLocation).toHaveBeenCalled()
   expect(props.onOpenFiles).toHaveBeenCalled()
@@ -108,12 +102,8 @@ it('never falls back to the private original when a thumbnail is unavailable', a
   expect(api.events.createFileAccess).toHaveBeenCalledTimes(2)
 })
 
-it('shows clear empty and read-only budget states without an edit action', async () => {
+it('shows clear empty states without optional actions', async () => {
   props.latestAnnouncement = null
-  props.hasBudget = false
-  props.plannedBudget = 'Not set'
-  props.linkedFund = undefined
-  props.canOpenBudget = false
   props.hasVenue = false
   props.venue = 'Venue to be confirmed'
   props.venueAddress = null
@@ -122,10 +112,9 @@ it('shows clear empty and read-only budget states without an edit action', async
   props.files = []
   await render()
   expect(text()).toContain('No updates yet')
-  expect(text()).toContain('No event budget set')
+  expect(text()).not.toContain('Budget snapshot')
   expect(text()).toContain('Confirmed guests will appear here')
   expect(text()).toContain('The organiser has not added an address yet')
   expect(text()).toContain('No images yet')
-  expect(button('Open budget: Budget snapshot')).toBeUndefined()
   expect(button('Open map: Location')).toBeUndefined()
 })

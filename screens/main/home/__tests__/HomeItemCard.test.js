@@ -71,3 +71,19 @@ it('uses a neutral grey footer treatment for closed funds', () => {
     color: lightColors.disabledText,
   })
 })
+
+it('does not show an event-budget snapshot on event cards', () => {
+  renderCard({
+    ...baseItem,
+    id: 'event-1',
+    fundId: undefined,
+    eventId: 'event-1',
+    kind: 'event',
+    title: 'Wedding',
+    budget_amount: 25000,
+  })
+
+  const visibleText = tree.root.findAllByType(Text).map(node => node.props.children)
+  expect(visibleText).not.toContain('Event budget')
+  expect(visibleText).not.toContain('P 25,000')
+})

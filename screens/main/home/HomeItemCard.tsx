@@ -89,18 +89,6 @@ export default function HomeItemCard({ item, onPress }: Props) {
           </View>
         )}
 
-        {(isEvent || isEF) && (
-          <View style={styles.eventBudgetRow}>
-            <View style={styles.eventBudgetLabelRow}>
-              <Ionicons name="wallet-outline" size={15} color={colors.primary} />
-              <Text style={styles.eventBudgetLabel}>Event budget</Text>
-            </View>
-            <Text style={styles.eventBudgetValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-              {budgetText}
-            </Text>
-          </View>
-        )}
-
         {!isEvent && (
           <View style={styles.fundAmountsRow}>
             <View style={styles.fundAmount}>
@@ -253,41 +241,6 @@ function makeStyles(colors: AppColors) {
       lineHeight: 15,
       fontWeight: '700',
       color: colors.textSecondary,
-    },
-    eventBudgetRow: {
-      minHeight: 43,
-      marginTop: 9,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      paddingHorizontal: 11,
-      paddingVertical: 8,
-      backgroundColor: colors.primaryLight,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 11,
-    },
-    eventBudgetLabelRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    eventBudgetLabel: {
-      fontSize: 10,
-      lineHeight: 14,
-      fontWeight: '800',
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
-    },
-    eventBudgetValue: {
-      flexShrink: 1,
-      fontSize: 14,
-      lineHeight: 19,
-      fontWeight: '900',
-      color: colors.textPrimary,
-      textAlign: 'right',
     },
     overviewBottom: {
       flexDirection: 'row',

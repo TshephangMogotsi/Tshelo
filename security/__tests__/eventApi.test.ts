@@ -13,7 +13,6 @@ describe('event API slice', () => {
   const screens = [
     'screens/main/CreateFundScreen.tsx',
     'screens/main/EventDetailScreen.tsx',
-    'screens/main/EventBudgetScreen.tsx',
     'screens/main/GuestListScreen.tsx',
     'screens/main/JoinEventScreen.tsx',
   ]

@@ -84,12 +84,11 @@ export type MainStackParamList = {
   FundDetail:          { fundId: string; tab?: 'contributions' | 'sponsorships' | 'expenses' | 'members' }
   EventDetail:         {
     eventId: string
-    tab?: 'overview' | 'guests' | 'announcements' | 'files' | 'budget'
+    tab?: 'overview' | 'guests' | 'announcements' | 'files'
     workspace?: 'event' | 'fund'
     fundTab?: 'contributions' | 'sponsorships' | 'expenses' | 'members'
   }
   GuestList:           { eventId: string }
-  EventBudget:         { eventId: string }
   RecordContribution:  {
     fundId: string
     fundTitle: string

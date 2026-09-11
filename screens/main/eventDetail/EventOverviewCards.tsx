@@ -33,13 +33,6 @@ type Guest = {
 type Props = {
   eventId: string
   latestAnnouncement: OverviewAnnouncement | null
-  plannedBudget: string
-  hasBudget: boolean
-  linkedFund?: {
-    raised: string
-    available: string
-  }
-  canOpenBudget: boolean
   attendance: Attendance
   guests: Guest[]
   venue: string
@@ -48,7 +41,6 @@ type Props = {
   files: EventFile[]
   previewBusy: boolean
   onOpenUpdates: () => void
-  onOpenBudget: () => void
   onOpenGuests: () => void
   onOpenLocation: () => void
   onOpenFiles: () => void
@@ -156,10 +148,6 @@ function GalleryThumbnail({ eventId, file, disabled, onPreview, primaryColor, mu
 export default function EventOverviewCards({
   eventId,
   latestAnnouncement,
-  plannedBudget,
-  hasBudget,
-  linkedFund,
-  canOpenBudget,
   attendance,
   guests,
   venue,
@@ -168,7 +156,6 @@ export default function EventOverviewCards({
   files,
   previewBusy,
   onOpenUpdates,
-  onOpenBudget,
   onOpenGuests,
   onOpenLocation,
   onOpenFiles,
@@ -219,44 +206,6 @@ export default function EventOverviewCards({
             <Text style={styles.emptyText}>Announcements for everyone attending will appear here.</Text>
           </TouchableOpacity>
         )}
-      </View>
-
-      <View style={styles.card}>
-        <SectionHeader
-          icon="wallet-outline"
-          title="Budget snapshot"
-          action={canOpenBudget ? 'Open budget' : undefined}
-          onAction={canOpenBudget ? onOpenBudget : undefined}
-          primaryColor={colors.primary}
-          styles={styles}
-        />
-        <View style={styles.budgetGrid}>
-          <View style={styles.budgetStat}>
-            <Text style={styles.statLabel}>Planned budget</Text>
-            <Text style={styles.statValue} numberOfLines={1}>{plannedBudget}</Text>
-            <Text style={styles.statHelp}>{hasBudget ? 'Current event budget' : 'No event budget set'}</Text>
-          </View>
-          {linkedFund ? (
-            <>
-              <View style={styles.budgetStat}>
-                <Text style={styles.statLabel}>Raised</Text>
-                <Text style={styles.statValue} numberOfLines={1}>{linkedFund.raised}</Text>
-                <Text style={styles.statHelp}>Linked fund contributions</Text>
-              </View>
-              <View style={styles.budgetStat}>
-                <Text style={styles.statLabel}>Available</Text>
-                <Text style={styles.statValue} numberOfLines={1}>{linkedFund.available}</Text>
-                <Text style={styles.statHelp}>Linked fund balance</Text>
-              </View>
-            </>
-          ) : (
-            <View style={[styles.budgetStat, styles.budgetStatWide]}>
-              <Text style={styles.statLabel}>Event finances</Text>
-              <Text style={styles.statValue}>Event only</Text>
-              <Text style={styles.statHelp}>No contribution fund is linked to this event.</Text>
-            </View>
-          )}
-        </View>
       </View>
 
       <View style={styles.card}>
@@ -356,12 +305,6 @@ function makeStyles(colors: AppColors) {
     emptyBody: { minHeight: 92, justifyContent: 'center', padding: 14 },
     emptyTitle: { fontFamily: fonts.inter.bold, fontSize: 13, color: colors.textPrimary },
     emptyText: { marginTop: 4, fontFamily: fonts.inter.regular, fontSize: 11, lineHeight: 17, color: colors.textSecondary },
-    budgetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12 },
-    budgetStat: { flexGrow: 1, flexBasis: '30%', minWidth: 92, padding: 11, borderRadius: 12, backgroundColor: colors.background },
-    budgetStatWide: { flexBasis: '52%' },
-    statLabel: { fontFamily: fonts.inter.medium, fontSize: 9, color: colors.textSecondary },
-    statValue: { marginTop: 5, fontFamily: fonts.inter.extraBold, fontSize: 14, color: colors.textPrimary },
-    statHelp: { marginTop: 4, fontFamily: fonts.inter.regular, fontSize: 8, lineHeight: 12, color: colors.textSecondary },
     attendanceGrid: { minHeight: 78, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 },
     attendanceStat: { flex: 1, alignItems: 'center' },
     attendanceValue: { fontFamily: fonts.inter.extraBold, fontSize: 20, color: colors.textPrimary },

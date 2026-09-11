@@ -37,7 +37,6 @@ import { api } from '../../lib/api'
 import { runApiRead, toApiUiError } from '../../lib/apiScreen'
 import { mapsSearchUrl, normalizeMapsUrl } from '../../lib/maps'
 import LoadingOverlay from '../../components/LoadingOverlay'
-import type { Contribution, Expense } from './fundDetail/types'
 import { isFundReadOnly } from './fundDetail/finance'
 import { buildCalendarEventDetails } from './eventDetail/calendar'
 import { parseEstimatedSpend, summarizeEventGuests } from './eventDetail/eventOnly'
@@ -71,7 +70,7 @@ type Props = {
   route: RouteProp<MainStackParamList, 'EventDetail'>
 }
 
-type EventTab = 'overview' | 'guests' | 'announcements' | 'files' | 'budget'
+type EventTab = 'overview' | 'guests' | 'announcements' | 'files'
 type EventFundWorkspace = 'event' | 'fund'
 type GuestStatus = 'confirmed' | 'pending' | 'declined'
 
@@ -116,23 +115,14 @@ type EventView = {
   declined: number
   shareCode: string | null
   rsvpLink: string
-  budgetAmount: number | null
-  budgetCurrency: string
+  currency: string
   linkedFundId: string | null
 }
 
 type EmbeddedFund = {
   id: string
   ownerId: string
-  title: string
   status: string
-  currency: string
-  goal: number
-  contributions: number
-  expenses: number
-  code: string
-  deadline: string | null
-  isPrivate: boolean
 }
 
 const EVENT_HEADER_PURPLE = '#E8DDFF'
@@ -264,8 +254,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
   const [fund, setFund] = useState<EmbeddedFund | null>(null)
-  const [contributions, setContributions] = useState<Contribution[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
   const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const [isOpeningCalendar, setIsOpeningCalendar] = useState(false)
   const [showCloseEvent, setShowCloseEvent] = useState(false)
@@ -277,7 +265,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   const eventCapabilities = linkedEventCapabilities(isEventAdmin, linkedFundPermissions)
   const canManageGuests = eventCapabilities.manageGuests
   const canPostAnnouncements = eventCapabilities.postAnnouncements
-  const canManageEventBudget = eventCapabilities.manageBudget
   const canManageFiles = canPostAnnouncements && event?.status === 'active' && !isLoading
   const eventFiles = useEventFiles(eventId, canManageFiles)
   const { replaceFiles } = eventFiles
@@ -303,7 +290,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         const row = eventWorkspace.event
         const guests: EventGuest[] = eventWorkspace.guests.map(mapEventGuest)
         const count = (status: GuestStatus) => guests.filter(guest => guest.status === status).length
-        const budgetAmount = eventWorkspace.budget ? Number(eventWorkspace.budget.total_budget) : null
         const shareCode = row.share_code?.trim() || row.event_code?.trim() || null
         const venueName = row.venue_name?.trim() || ''
         const venueAddress = row.venue_address?.trim() || ''
@@ -343,11 +329,9 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           declined: count('declined'),
           shareCode,
           rsvpLink: shareCode ? eventInvitationUrl(shareCode) : 'RSVP link unavailable',
-          budgetAmount: budgetAmount !== null && Number.isFinite(budgetAmount) ? budgetAmount : null,
-          budgetCurrency: eventWorkspace.budget?.currency_code ?? row.currency_code ?? 'BWP',
+          currency: row.currency_code ?? 'BWP',
           linkedFundId: row.linked_fund_id ?? null,
         })
-        if (!row.linked_fund_id) setActiveTab(previous => previous === 'budget' ? 'guests' : previous)
 
         const linkedFund = eventWorkspace.linked_fund
         if (linkedFund) {
@@ -355,28 +339,10 @@ export default function EventDetailScreen({ navigation, route }: Props) {
           setFund({
             id: fundRow.id,
             ownerId: fundRow.owner_id,
-            title: fundRow.title,
             status: fundRow.status,
-            currency: fundRow.currency_code,
-            goal: Number(fundRow.goal_amount ?? 0),
-            contributions: Number(fundRow.totals.raised),
-            expenses: Number(fundRow.totals.spent),
-            code: fundRow.fund_code,
-            deadline: fundRow.contribution_deadline ?? null,
-            isPrivate: fundRow.is_private ?? false,
           })
-          setContributions(linkedFund.contributions.map(item => ({
-            ...item,
-            amount: Number(item.amount),
-            pledged_amount: item.pledged_amount == null ? null : Number(item.pledged_amount),
-            allocated_amount: Number(item.allocated_amount),
-            outstanding_amount: item.outstanding_amount == null ? null : Number(item.outstanding_amount),
-          })))
-          setExpenses(linkedFund.expenses.map(item => ({ ...item, amount: Number(item.amount) })))
         } else {
           setFund(null)
-          setContributions([])
-          setExpenses([])
         }
       } catch (error) {
         if (!active || controller.signal.aborted) return
@@ -873,7 +839,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
     if (!event) return
 
     // Event + Fund already exposes calendar, location, invitations,
-    // announcements, budget, and fund navigation in the main interface. Keep
+    // announcements and fund navigation in the main interface. Keep
     // its overflow focused on actions that do not have another visible home.
     if (event.linkedFundId) {
       const eventFundOptions: any[] = []
@@ -979,13 +945,9 @@ export default function EventDetailScreen({ navigation, route }: Props) {
   if (!event) return <View style={styles.loadingScreen}><LoadingOverlay /></View>
 
   // A code-joined guest may attend an Event + Fund without joining its fund.
-  // In that case, keep financial data and the Budget tab out of their view.
+  // In that case, keep the linked fund workspace out of their view.
   const isEventOnly = !fund
   const guestSummary = summarizeEventGuests(eventGuests)
-  const totalBudget = event.budgetAmount ?? fund?.goal ?? 0
-  const totalIn = fund?.contributions ?? 0
-  const totalSpent = fund?.expenses ?? 0
-  const remaining = Math.max(totalBudget - totalSpent, 0)
   const pinnedAnnouncement = announcements.find(item => item.isPinned) ?? null
   const sortedAnnouncements = sortEventAnnouncements(announcements)
   const latestOverviewAnnouncement = pinnedAnnouncement ?? sortedAnnouncements[0] ?? null
@@ -1077,17 +1039,12 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                     <Text style={styles.estimatedSpendHint}>Captured when the event was closed</Text>
                   </View>
                   <Text style={styles.estimatedSpendValue}>
-                    {formatEventMoney(event.estimatedSpendAmount, event.budgetCurrency)}
+                    {formatEventMoney(event.estimatedSpendAmount, event.currency)}
                   </Text>
                 </View>
               )}
             </>
-          ) : (
-            <View style={styles.metricRow}>
-              <MetricCard label="Event Budget" value={formatEventMoney(totalBudget, event.budgetCurrency)} styles={styles} />
-              <MetricCard label="Fund Goal" value={formatEventMoney(fund?.goal ?? 0, event.budgetCurrency)} styles={styles} />
-            </View>
-          )}
+          ) : null}
 
           <View style={styles.metricRow}>
             <MetricCard
@@ -1219,10 +1176,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         ) : (
           <>
             <View style={styles.tabBar}>
-              {(isEventOnly
-                ? ([['overview', 'Overview'], ['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files']] as const)
-                : ([['overview', 'Overview'], ['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files'], ['budget', 'Budget']] as const)
-              ).map(([id, label]) => (
+              {([['overview', 'Overview'], ['guests', 'Guests'], ['announcements', 'Updates'], ['files', 'Files']] as const).map(([id, label]) => (
                 <TouchableOpacity key={id} style={[styles.tab, activeTab === id && styles.tabActive]} onPress={() => setActiveTab(id)} accessibilityRole="tab" accessibilityState={{ selected: activeTab === id }}>
                   <Text style={[styles.tabText, activeTab === id && styles.tabTextActive]}>{label}</Text>
                 </TouchableOpacity>
@@ -1272,13 +1226,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                   createdAt: latestOverviewAnnouncement.createdAt,
                   attachmentCount: latestOverviewAnnouncement.attachments.length,
                 } : null}
-                plannedBudget={event.budgetAmount === null ? 'Not set' : formatEventMoney(event.budgetAmount, event.budgetCurrency)}
-                hasBudget={event.budgetAmount !== null}
-                linkedFund={fund ? {
-                  raised: formatEventMoney(totalIn, event.budgetCurrency),
-                  available: formatEventMoney(totalIn - totalSpent, event.budgetCurrency),
-                } : undefined}
-                canOpenBudget={Boolean(fund) || (canManageEventBudget && event.status === 'active')}
                 attendance={guestSummary}
                 guests={eventGuests}
                 venue={event.venue}
@@ -1287,7 +1234,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
                 files={visibleEventFiles}
                 previewBusy={attachmentActionPath !== null}
                 onOpenUpdates={() => setActiveTab('announcements')}
-                onOpenBudget={() => fund ? setActiveTab('budget') : navigation.navigate('EventBudget', { eventId })}
                 onOpenGuests={() => setActiveTab('guests')}
                 onOpenLocation={confirmOpenEventLocation}
                 onOpenFiles={() => setActiveTab('files')}
@@ -1481,37 +1427,6 @@ export default function EventDetailScreen({ navigation, route }: Props) {
               onPreview={(items, file) => { void previewEventFile(items, file) }}
               onDownload={file => { void downloadAttachment(file) }}
             />
-          ) : !isEventOnly ? (
-            <View style={styles.budgetContent}>
-              <View style={styles.budgetSummaryCard}>
-                <Text style={styles.budgetSummaryEyebrow}>EVENT BUDGET</Text>
-                <Text style={styles.budgetSummaryValue}>{formatEventMoney(totalBudget, event.budgetCurrency)}</Text>
-                <View style={styles.budgetStatsRow}>
-                  <View style={styles.budgetStat}>
-                    <Text style={styles.budgetStatLabel}>Total in</Text>
-                    <Text style={styles.budgetStatValue}>{formatEventMoney(totalIn, event.budgetCurrency)}</Text>
-                  </View>
-                  <View style={styles.budgetStatDivider} />
-                  <View style={styles.budgetStat}>
-                    <Text style={styles.budgetStatLabel}>Spent</Text>
-                    <Text style={styles.budgetStatValue}>{formatEventMoney(totalSpent, event.budgetCurrency)}</Text>
-                  </View>
-                  <View style={styles.budgetStatDivider} />
-                  <View style={styles.budgetStat}>
-                    <Text style={styles.budgetStatLabel}>Remaining</Text>
-                    <Text style={styles.budgetStatValue}>{formatEventMoney(remaining, event.budgetCurrency)}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {canManageEventBudget && event.status === 'active' && (!fund || !isFundReadOnly(fund.status)) ? (
-                <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('EventBudget', { eventId })}>
-                  <Ionicons name="create-outline" size={17} color="#FFFFFF" />
-                  <Text style={styles.primaryButtonText}>{event.budgetAmount ? 'Edit event budget' : 'Set event budget'}</Text>
-                </TouchableOpacity>
-              ) : null}
-
-            </View>
           ) : null}
             </ScrollView>
           </>
@@ -1804,7 +1719,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
             <Text style={styles.composerLabel}>ESTIMATED TOTAL SPEND (OPTIONAL)</Text>
             <View style={styles.estimateInputRow}>
-              <Text style={styles.estimateCurrency}>{event.budgetCurrency === 'BWP' ? 'P' : event.budgetCurrency}</Text>
+              <Text style={styles.estimateCurrency}>{event.currency === 'BWP' ? 'P' : event.currency}</Text>
               <TextInput
                 value={estimatedSpend}
                 onChangeText={value => setEstimatedSpend(value.replace(/[^0-9,.]/g, ''))}
@@ -2183,17 +2098,6 @@ function makeStyles(colors: AppColors) {
     announcementAuthor: { fontSize: 9, fontFamily: fonts.inter.bold, color: '#71717A' },
     announcementDot: { width: 3, height: 3, marginHorizontal: 6, borderRadius: 2, backgroundColor: '#C4C4CA' },
     announcementDate: { fontSize: 9, fontFamily: fonts.inter.regular, color: MUTED },
-    budgetContent: { gap: 12 },
-    budgetSummaryCard: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 16, backgroundColor: '#F7F7F8', borderWidth: 1, borderColor: BORDER },
-    budgetSummaryEyebrow: { fontSize: 9, fontFamily: fonts.inter.bold, letterSpacing: 0.5, color: MUTED },
-    budgetSummaryValue: { marginTop: 2, fontSize: 18, lineHeight: 22, fontFamily: fonts.inter.extraBold, color: INK },
-    budgetStatsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 9 },
-    budgetStat: { flex: 1 },
-    budgetStatDivider: { width: 1, height: 26, marginHorizontal: 8, backgroundColor: BORDER },
-    budgetStatLabel: { marginBottom: 3, fontSize: 8, fontFamily: fonts.inter.regular, color: MUTED },
-    budgetStatValue: { fontSize: 11, fontFamily: fonts.inter.bold, color: INK },
-    primaryButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 14, backgroundColor: colors.primary },
-    primaryButtonText: { fontSize: 12, fontFamily: fonts.inter.bold, color: '#FFFFFF' },
     composerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.42)' },
     composerDismissArea: { flex: 1 },
     composerCard: {

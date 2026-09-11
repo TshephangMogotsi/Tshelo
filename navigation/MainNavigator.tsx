@@ -20,7 +20,6 @@ import JoinEventScreen          from '../screens/main/JoinEventScreen'
 import FundDetailScreen         from '../screens/main/FundDetailScreen'
 import EventDetailScreen        from '../screens/main/EventDetailScreen'
 import GuestListScreen          from '../screens/main/GuestListScreen'
-import EventBudgetScreen        from '../screens/main/EventBudgetScreen'
 import RecordContributionScreen from '../screens/main/RecordContributionScreen'
 import AssignContributionScreen from '../screens/main/AssignContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
@@ -161,7 +160,6 @@ export default function MainNavigator() {
       <Stack.Screen name="FundDetail"         component={FundDetailScreen}        />
       <Stack.Screen name="EventDetail"        component={EventDetailScreen}       />
       <Stack.Screen name="GuestList"          component={GuestListScreen}         />
-      <Stack.Screen name="EventBudget"        component={EventBudgetScreen}       />
       <Stack.Screen name="RecordContribution" component={RecordContributionScreen}/>
       <Stack.Screen name="AssignContribution" component={AssignContributionScreen}/>
       <Stack.Screen name="RecordExpense"      component={RecordExpenseScreen}     />
