@@ -240,7 +240,7 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
             {mobileMoneyNumbers.map(item => (
               <View key={item.id} style={[styles.savedItem, { borderColor: borderCol }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <ProviderLogo provider={item.provider} width={58} />
+                  <ProviderLogo provider={item.provider} width={44} />
                   <View>
                     <Text style={[styles.savedItemTitle, { color: textCol }]}>{formatPhone(item.phone)}</Text>
                     <Text style={[styles.savedItemMeta, { color: mutedCol }]}>{PROVIDER_LABELS[item.provider]}</Text>
