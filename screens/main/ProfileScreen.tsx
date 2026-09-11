@@ -176,7 +176,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           <SettingsRow icon="person-outline"            label="Edit Profile"   onPress={openEdit} />
           <SettingsRow icon="shield-checkmark-outline"  label="Trust & Achievements" value={`${trustScore}/100`} onPress={() => navigation.navigate('Rewards')} />
           <SettingsRow icon="ribbon-outline"            label="Rich Auntie Status" onPress={() => navigation.navigate('RichAuntieStatus')} />
-          <SettingsRow icon="cash-outline"              label="Buy Tokens" value={`${tokenBalance} tokens`} onPress={() => navigation.navigate('TokenPurchase')} />
           <SettingsRow icon="shield-checkmark-outline"  label="Security"       onPress={() => {}} />
         </View>
 
