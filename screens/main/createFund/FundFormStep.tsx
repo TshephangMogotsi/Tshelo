@@ -13,7 +13,9 @@ import {
   EMOJI_OPTIONS,
   EmojiOption,
   GOAL_PRESETS,
+  isOtherFundIcon,
 } from './constants'
+import FundIconPickerSheet from './FundIconPickerSheet'
 
 type Props = {
   name: string
@@ -55,6 +57,8 @@ export default function FundFormStep({
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [showFundIconPicker, setShowFundIconPicker] = useState(false)
+  const hasOtherFundIcon = isOtherFundIcon(selectedEmoji.id)
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -86,30 +90,52 @@ export default function FundFormStep({
             <Text style={styles.fundFormLabel}>Fund icon <Text style={styles.optional}>(optional)</Text></Text>
             <View style={styles.iconRow}>
               {EMOJI_OPTIONS.map(item => {
-                const active = selectedEmoji.id === item.id
+                const isOther = item.id === 'other'
+                const displayItem = isOther && hasOtherFundIcon ? selectedEmoji : item
+                const active = isOther
+                  ? selectedEmoji.id === 'other' || hasOtherFundIcon
+                  : selectedEmoji.id === item.id
                 return (
                   <TouchableOpacity
                     key={item.id}
                     style={[styles.iconChoice, active && styles.iconChoiceActive]}
                     activeOpacity={0.84}
-                    onPress={() => onSelectEmoji(item)}
+                    onPress={() => {
+                      if (isOther) {
+                        setShowFundIconPicker(true)
+                        return
+                      }
+                      onSelectEmoji(item)
+                    }}
                     accessibilityRole="radio"
-                    accessibilityLabel={`${item.label} fund icon`}
+                    accessibilityLabel={isOther
+                      ? `${hasOtherFundIcon ? displayItem.label : 'More'} fund icons`
+                      : `${item.label} fund icon`}
                     accessibilityState={{ checked: active }}
                   >
                     <Ionicons
-                      name={item.icon ?? 'wallet-outline'}
+                      name={displayItem.icon ?? 'shapes-outline'}
                       size={22}
                       color={active ? colors.primary : colors.textSecondary}
                     />
                     <Text style={[styles.iconChoiceLabel, active && styles.iconChoiceLabelActive]} numberOfLines={1}>
-                      {item.label}
+                      {displayItem.label}
                     </Text>
                   </TouchableOpacity>
                 )
               })}
             </View>
           </View>
+
+          <FundIconPickerSheet
+            visible={showFundIconPicker}
+            selectedId={hasOtherFundIcon ? selectedEmoji.id : null}
+            onSelect={item => {
+              onSelectEmoji(item)
+              setShowFundIconPicker(false)
+            }}
+            onClose={() => setShowFundIconPicker(false)}
+          />
 
           <View style={styles.fundFormField}>
             <Text style={styles.fundFormLabel}>Fundraising goal <Text style={styles.optional}>(optional)</Text></Text>

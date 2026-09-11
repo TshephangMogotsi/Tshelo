@@ -5,11 +5,12 @@ jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 jest.mock('../FlowHeader', () => 'FlowHeader')
 jest.mock('../DateTimeSheet', () => 'DateTimeSheet')
+jest.mock('../FundIconPickerSheet', () => 'FundIconPickerSheet')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
 const { Text, TouchableOpacity } = require('react-native')
-const { EMOJI_OPTIONS } = require('../constants')
+const { EMOJI_OPTIONS, OTHER_FUND_ICON_OPTIONS } = require('../constants')
 const FundFormStep = require('../FundFormStep').default
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -64,14 +65,27 @@ it('uses an optional, accessible icon picker instead of rendering emoji choices'
     .toEqual({ checked: true })
 })
 
-it('selects the Other icon while retaining its compatible stored value', () => {
+it('opens more choices instead of treating Other as a generic selection', () => {
   act(() => {
-    tree.root.findByProps({ accessibilityLabel: 'Other fund icon' }).props.onPress()
+    tree.root.findByProps({ accessibilityLabel: 'More fund icons' }).props.onPress()
+  })
+
+  expect(onSelectEmoji).not.toHaveBeenCalled()
+  expect(tree.root.findByType('FundIconPickerSheet').props.visible).toBe(true)
+})
+
+it('applies a chosen additional icon and closes the picker', () => {
+  act(() => {
+    tree.root.findByProps({ accessibilityLabel: 'More fund icons' }).props.onPress()
+  })
+  act(() => {
+    tree.root.findByType('FundIconPickerSheet').props.onSelect(OTHER_FUND_ICON_OPTIONS[0])
   })
 
   expect(onSelectEmoji).toHaveBeenCalledWith(expect.objectContaining({
-    id: 'other',
-    icon: 'shapes-outline',
-    emoji: '✨',
+    id: 'health',
+    icon: 'medical-outline',
+    emoji: '🩺',
   }))
+  expect(tree.root.findByType('FundIconPickerSheet').props.visible).toBe(false)
 })

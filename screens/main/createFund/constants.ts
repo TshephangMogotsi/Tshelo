@@ -48,6 +48,27 @@ export const EMOJI_OPTIONS: EmojiOption[] = [
   { id: 'other',     label: 'Other',     emoji: '✨', icon: 'shapes-outline' },
 ]
 
+export const OTHER_FUND_ICON_OPTIONS: EmojiOption[] = [
+  { id: 'health',      label: 'Health',      emoji: '🩺', icon: 'medical-outline' },
+  { id: 'community',   label: 'Community',   emoji: '🤝', icon: 'people-outline' },
+  { id: 'business',    label: 'Business',    emoji: '💼', icon: 'briefcase-outline' },
+  { id: 'travel',      label: 'Travel',      emoji: '✈️', icon: 'airplane-outline' },
+  { id: 'celebration', label: 'Celebration', emoji: '🎁', icon: 'gift-outline' },
+  { id: 'sport',       label: 'Sport',       emoji: '⚽', icon: 'football-outline' },
+  { id: 'pets',        label: 'Pets',        emoji: '🐾', icon: 'paw-outline' },
+  { id: 'food',        label: 'Food',        emoji: '🍲', icon: 'restaurant-outline' },
+  { id: 'faith',       label: 'Faith',       emoji: '🙏', icon: 'heart-circle-outline' },
+  { id: 'emergency',   label: 'Emergency',   emoji: '🚨', icon: 'alert-circle-outline' },
+  { id: 'environment', label: 'Environment', emoji: '🌱', icon: 'leaf-outline' },
+  { id: 'arts',        label: 'Arts',        emoji: '🎵', icon: 'musical-notes-outline' },
+]
+
+const OTHER_FUND_ICON_IDS = new Set(OTHER_FUND_ICON_OPTIONS.map(option => option.id))
+
+export function isOtherFundIcon(id: string) {
+  return OTHER_FUND_ICON_IDS.has(id)
+}
+
 export const CUSTOM_EVENT_EMOJIS = ['🎉', '✨', '💜', '🙏']
 
 export const GOAL_PRESETS = [
