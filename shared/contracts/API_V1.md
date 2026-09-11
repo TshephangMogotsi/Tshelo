@@ -16,6 +16,7 @@ Authenticated calls require `Authorization: Bearer <supabase-access-token>`. The
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/v1/users` | `ListUsersRequest` query | `Paginated<UserSummary>` | Caller-scoped `users` query; active platform admin required. |
 | `GET` | `/api/v1/users/:userId` | UUID path parameter | `User` | Caller-scoped `users` query; RLS decides visibility. |
+| `GET/POST` | `/api/v1/users/me/closure-request` | None | `AccountClosureRequest \| null` / `AccountClosureRequest` | Reads or idempotently creates the caller's active account-closure support ticket; the account remains active pending review. |
 | `GET` | `/api/v1/events` | `ListEventsRequest` query | `Paginated<EventSummary>` | Caller-scoped `events` query; RLS decides visibility. |
 | `GET` | `/api/v1/events/:eventId` | UUID path parameter | `{ event: Event; guests: EventGuest[] }` | Caller-scoped `events` and `event_guests` queries; RLS decides visibility. |
 | `POST` | `/api/v1/events` | `CreateEventRequest` | `Event` | `create_standalone_event(...)` |

@@ -6,7 +6,7 @@ app, Expo web, and interactive admin components. It consumes the types in
 
 It provides typed methods for the implemented users, funds, reports and exports,
 events, notifications, rewards, contributions, expenses, receipts, Rich Auntie,
-support-ticket, admin-audit, moderation, and platform-admin routes. List filters
+account-closure, support-ticket, admin-audit, moderation, and platform-admin routes. List filters
 use the same contract fields as the API, including opaque pagination cursors.
 
 ## Authentication

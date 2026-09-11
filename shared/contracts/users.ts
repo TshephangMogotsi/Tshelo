@@ -94,7 +94,16 @@ export type SearchConnectionsRequest = {
   q: string
 }
 
+export type AccountClosureRequest = {
+  id: Uuid
+  ticket_number: string
+  status: 'open' | 'pending' | 'in_progress'
+  created_at: IsoDateTime
+}
+
 export type ListUsersResponse = PaginatedResponse<UserSummary>
 export type GetUserResponse = ApiResponse<User>
 export type UpdateCurrentUserResponse = ApiResponse<User>
 export type SearchConnectionsResponse = ApiResponse<ConnectionSummary[]>
+export type GetAccountClosureRequestResponse = ApiResponse<AccountClosureRequest | null>
+export type CreateAccountClosureRequestResponse = ApiResponse<AccountClosureRequest>

@@ -16,6 +16,7 @@ describe('shared API client integration', () => {
   it('exposes every implemented route through typed resource methods', () => {
     for (const path of [
       '/api/v1/users',
+      '/api/v1/users/me/closure-request',
       '/api/v1/funds',
       '/api/v1/events',
       '/api/v1/contributions',

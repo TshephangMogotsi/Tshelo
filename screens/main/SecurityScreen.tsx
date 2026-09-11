@@ -17,7 +17,9 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth, type SecuritySessionDetails } from '../../context/AuthContext'
 import { useRequireOnline } from '../../context/ConnectivityContext'
+import { api } from '../../lib/api'
 import type { MainStackParamList } from '../../navigation/types'
+import type { AccountClosureRequest } from '../../shared/contracts/users'
 import { fonts } from '../../theme/typography'
 import type { AppColors } from '../../theme/themes'
 
@@ -63,11 +65,15 @@ export default function SecurityScreen({ navigation }: Props) {
   const [loadError, setLoadError] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [isSigningOutOthers, setIsSigningOutOthers] = useState(false)
+  const [closureRequest, setClosureRequest] = useState<AccountClosureRequest | null>(null)
+  const [isClosureLoading, setIsClosureLoading] = useState(true)
+  const [isRequestingClosure, setIsRequestingClosure] = useState(false)
 
   useFocusEffect(useCallback(() => {
     let active = true
     setIsLoading(true)
     setLoadError(false)
+    setIsClosureLoading(true)
 
     void loadSecuritySession().then(session => {
       if (!active) return
@@ -78,6 +84,16 @@ export default function SecurityScreen({ navigation }: Props) {
       setDetails(null)
       setLoadError(true)
       setIsLoading(false)
+    })
+
+    void api.users.getAccountClosureRequest().then(request => {
+      if (!active) return
+      setClosureRequest(request)
+      setIsClosureLoading(false)
+    }).catch(() => {
+      if (!active) return
+      setClosureRequest(null)
+      setIsClosureLoading(false)
     })
 
     return () => { active = false }
@@ -111,6 +127,38 @@ export default function SecurityScreen({ navigation }: Props) {
           text: 'Sign Out',
           style: 'destructive',
           onPress: () => { void signOutOtherDevices() },
+        },
+      ],
+    )
+  }
+
+  async function submitAccountClosureRequest() {
+    if (!requireOnline()) return
+    setIsRequestingClosure(true)
+    try {
+      const request = await api.users.requestAccountClosure()
+      setClosureRequest(request)
+      Alert.alert(
+        'Request received',
+        `Your account remains active while Tshelo reviews request ${request.ticket_number}.`,
+      )
+    } catch {
+      Alert.alert('Could not send request', 'Please try again. Your account has not been changed.')
+    } finally {
+      setIsRequestingClosure(false)
+    }
+  }
+
+  function confirmAccountClosureRequest() {
+    Alert.alert(
+      'Request account closure?',
+      'This asks Tshelo to close your account and delete personal data we are not legally required to keep. Your account will remain active while support confirms ownership and reviews any shared fund or event responsibilities.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Request',
+          style: 'destructive',
+          onPress: () => { void submitAccountClosureRequest() },
         },
       ],
     )
@@ -234,6 +282,55 @@ export default function SecurityScreen({ navigation }: Props) {
               Individual device names are not available yet. Use this action if you signed in on a device you no longer control.
             </Text>
           </View>
+
+          <Text style={styles.sectionLabel}>ACCOUNT CLOSURE</Text>
+          <View style={styles.card}>
+            <View style={styles.closureHeader}>
+              <View style={styles.closureIcon}>
+                <Ionicons name="person-remove-outline" size={23} color={colors.error} />
+              </View>
+              <View style={styles.protectionCopy}>
+                <Text style={styles.cardTitle}>Request account closure</Text>
+                <Text style={styles.cardText}>
+                  Ask Tshelo to close your account and delete personal data that we are not legally required to retain.
+                </Text>
+              </View>
+            </View>
+
+            {isClosureLoading ? (
+              <View style={styles.closureLoading} accessibilityLabel="Checking account closure request">
+                <ActivityIndicator size="small" color={colors.textMuted} />
+                <Text style={styles.cardText}>Checking request status…</Text>
+              </View>
+            ) : closureRequest ? (
+              <View style={styles.closureStatus}>
+                <View style={styles.closureStatusTitle}>
+                  <Ionicons name="checkmark-circle" size={19} color={colors.success} />
+                  <Text style={styles.closureStatusText}>Request received</Text>
+                </View>
+                <Text style={styles.closureTicket} selectable>{closureRequest.ticket_number}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.closureButton, isRequestingClosure && styles.buttonDisabled]}
+                onPress={confirmAccountClosureRequest}
+                disabled={isRequestingClosure}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Request account closure"
+              >
+                {isRequestingClosure ? (
+                  <ActivityIndicator color={colors.error} />
+                ) : (
+                  <Text style={styles.closureButtonText}>Request account closure</Text>
+                )}
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.closureNote}>
+              Shared transaction, audit, or compliance records may be retained where required by law.
+            </Text>
+          </View>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -341,8 +438,51 @@ function makeStyles(colors: AppColors) {
     },
     signOutOthersText: { fontSize: 14, fontWeight: '800', color: colors.error },
     buttonDisabled: { opacity: 0.55 },
-    note: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingHorizontal: 5 },
+    note: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingHorizontal: 5, marginBottom: 14 },
     noteText: { flex: 1, fontSize: 12, lineHeight: 18, color: colors.textMuted },
+    closureHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+    closureIcon: {
+      width: 46,
+      height: 46,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.errorLight,
+    },
+    closureLoading: {
+      minHeight: 48,
+      marginTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 9,
+    },
+    closureStatus: {
+      minHeight: 54,
+      marginTop: 16,
+      paddingHorizontal: 14,
+      borderRadius: 15,
+      backgroundColor: colors.successLight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    closureStatusTitle: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    closureStatusText: { fontSize: 13, fontWeight: '800', color: colors.success },
+    closureTicket: { flexShrink: 1, fontSize: 12, fontWeight: '800', color: colors.textSecondary },
+    closureButton: {
+      minHeight: 50,
+      marginTop: 16,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: colors.error,
+      backgroundColor: colors.errorLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closureButtonText: { fontSize: 14, fontWeight: '800', color: colors.error },
+    closureNote: { marginTop: 12, fontSize: 11, lineHeight: 17, color: colors.textMuted },
     center: {
       flex: 1,
       paddingHorizontal: 28,

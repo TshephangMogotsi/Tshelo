@@ -3,6 +3,8 @@ jest.mock('../../../context/ThemeContext', () => ({
 }))
 const mockLoadSecuritySession = jest.fn()
 const mockSignOutOtherSessions = jest.fn()
+const mockGetAccountClosureRequest = jest.fn()
+const mockRequestAccountClosure = jest.fn()
 
 jest.mock('../../../context/ConnectivityContext', () => ({ useRequireOnline: () => () => true }))
 jest.mock('../../../context/AuthContext', () => ({
@@ -10,6 +12,14 @@ jest.mock('../../../context/AuthContext', () => ({
     loadSecuritySession: mockLoadSecuritySession,
     signOutOtherSessions: mockSignOutOtherSessions,
   }),
+}))
+jest.mock('../../../lib/api', () => ({
+  api: {
+    users: {
+      getAccountClosureRequest: mockGetAccountClosureRequest,
+      requestAccountClosure: mockRequestAccountClosure,
+    },
+  },
 }))
 jest.mock('@react-navigation/native', () => {
   const React = require('react')
@@ -35,6 +45,13 @@ beforeEach(() => {
     lastSignInAt: '2026-09-11T08:30:00.000Z',
   })
   mockSignOutOtherSessions.mockResolvedValue(undefined)
+  mockGetAccountClosureRequest.mockResolvedValue(null)
+  mockRequestAccountClosure.mockResolvedValue({
+    id: '11111111-1111-4111-8111-111111111111',
+    ticket_number: 'TSH-1001',
+    status: 'open',
+    created_at: '2026-09-11T09:00:00.000Z',
+  })
 })
 
 afterEach(async () => {
@@ -100,4 +117,39 @@ it('recovers when signing out other devices fails', async () => {
 
   expect(alert).toHaveBeenLastCalledWith('Could not sign out other devices', 'Please try again.')
   expect(tree.root.findByProps({ accessibilityLabel: 'Sign out other devices' }).props.disabled).toBe(false)
+})
+
+it('submits account closure only after explicit confirmation', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await renderScreen()
+
+  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Request account closure' }).props.onPress())
+  expect(mockRequestAccountClosure).not.toHaveBeenCalled()
+
+  const confirmationActions = alert.mock.calls[0][2]
+  await act(async () => {
+    confirmationActions.find(action => action.text === 'Send Request').onPress()
+    await Promise.resolve()
+  })
+
+  expect(mockRequestAccountClosure).toHaveBeenCalledTimes(1)
+  expect(alert).toHaveBeenLastCalledWith(
+    'Request received',
+    'Your account remains active while Tshelo reviews request TSH-1001.',
+  )
+  expect(hasText('Request received')).toBe(true)
+  expect(hasText('TSH-1001')).toBe(true)
+})
+
+it('shows an existing closure request instead of offering a duplicate action', async () => {
+  mockGetAccountClosureRequest.mockResolvedValueOnce({
+    id: '11111111-1111-4111-8111-111111111111',
+    ticket_number: 'TSH-0999',
+    status: 'pending',
+    created_at: '2026-09-10T09:00:00.000Z',
+  })
+  await renderScreen()
+
+  expect(hasText('TSH-0999')).toBe(true)
+  expect(tree.root.findAllByProps({ accessibilityLabel: 'Request account closure' })).toHaveLength(0)
 })

@@ -35,6 +35,20 @@ function failure(status: number, code: string, requestId = 'request-123') {
 }
 
 describe('shared Tshelo API client', () => {
+  it('loads and submits the authenticated account closure request', async () => {
+    const fetchMock = jest.fn(async () => success({}))
+    const client = createTsheloApiClient({ baseUrl: 'https://api.example', getAccessToken: async () => 'token', fetch: fetchMock as typeof fetch })
+
+    await client.users.getAccountClosureRequest()
+    await client.users.requestAccountClosure()
+
+    const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>
+    expect(calls.map(([url, options]) => [url, options.method, options.body])).toEqual([
+      ['https://api.example/api/v1/users/me/closure-request', 'GET', undefined],
+      ['https://api.example/api/v1/users/me/closure-request', 'POST', undefined],
+    ])
+  })
+
   it('serializes the event file upload, finalise, access, and removal operations', async () => {
     const fetchMock = jest.fn(async () => success({}))
     const client = createTsheloApiClient({ baseUrl: 'https://api.example', getAccessToken: async () => 'token', fetch: fetchMock as typeof fetch })

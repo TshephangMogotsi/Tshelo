@@ -162,6 +162,28 @@ export const tsheloOpenApiDocument = {
         responses: { '200': response('Profile updated.', success({ $ref: '#/components/schemas/User' })), ...standardErrors },
       },
     },
+    '/users/me/closure-request': {
+      get: {
+        tags: ['Users'],
+        operationId: 'getAccountClosureRequest',
+        summary: 'Get the current account closure request',
+        description: 'Returns the caller\'s latest active account closure request, or null when none is under review.',
+        responses: {
+          '200': response('Account closure request returned.', success({ oneOf: [{ $ref: '#/components/schemas/AccountClosureRequest' }, { type: 'null' }] })),
+          ...standardErrors,
+        },
+      },
+      post: {
+        tags: ['Users'],
+        operationId: 'requestAccountClosure',
+        summary: 'Request account closure',
+        description: 'Creates an account-closure support ticket, or returns the existing active request. The account remains active until the request is reviewed and processed.',
+        responses: {
+          '200': response('Account closure request accepted.', success({ $ref: '#/components/schemas/AccountClosureRequest' })),
+          ...standardErrors,
+        },
+      },
+    },
     '/users/connections': {
       get: {
         tags: ['Users'], operationId: 'searchConnections', summary: 'Search relationship-scoped connections',
@@ -1028,6 +1050,16 @@ export const tsheloOpenApiDocument = {
           data_processing_consent: { type: 'boolean' }, data_processing_consent_at: { type: 'string', format: 'date-time' },
           marketing_consent: { type: 'boolean' }, marketing_consent_at: { type: 'string', format: 'date-time' },
           marketing_email_enabled: { type: 'boolean' }, marketing_sms_enabled: { type: 'boolean' },
+        },
+      },
+      AccountClosureRequest: {
+        type: 'object',
+        required: ['id', 'ticket_number', 'status', 'created_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          ticket_number: { type: 'string' },
+          status: { type: 'string', enum: ['open', 'pending', 'in_progress'] },
+          created_at: { type: 'string', format: 'date-time' },
         },
       },
       ConnectionSummary: {

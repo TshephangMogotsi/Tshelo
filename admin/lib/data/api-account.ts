@@ -18,6 +18,7 @@ import type {
   RewardSnackbarItem,
 } from '@shared/contracts/rewards'
 import type {
+  AccountClosureRequest,
   ConnectionSummary,
   UpdateCurrentUserRequest,
   User,
@@ -35,6 +36,17 @@ import {
 
 const USER_SELECT = 'id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, privacy_accepted_at, privacy_version, marketing_consent, marketing_consent_at, marketing_email_enabled, marketing_sms_enabled, data_processing_consent, data_processing_consent_at, is_flagged, is_banned, last_active_at, created_at, updated_at'
 const NOTIFICATION_SELECT = 'id, user_id, fund_id, type, title, body, data, is_read, read_at, delivered_at, opened_at, clicked_at, response_action, created_at'
+const ACCOUNT_CLOSURE_SELECT = 'id, ticket_number, status, created_at'
+const ACTIVE_ACCOUNT_CLOSURE_STATUSES = ['open', 'pending', 'in_progress'] as const
+
+function accountClosureRequestFromRow(row: Record<string, unknown>): AccountClosureRequest {
+  return {
+    id: row.id as string,
+    ticket_number: row.ticket_number as string,
+    status: row.status as AccountClosureRequest['status'],
+    created_at: row.created_at as string,
+  }
+}
 
 function values<T>(value: T | T[] | undefined): T[] {
   if (value === undefined) return []
@@ -95,6 +107,49 @@ export async function updateApiCurrentUser(
 
   if (error) return dataFailure({ kind: 'database', error })
   return dataSuccess(data ? toUser(data as UserRow) : null)
+}
+
+export async function getApiAccountClosureRequest(
+  client: SupabaseClient,
+  actorUserId: string,
+): Promise<ApiDataResult<AccountClosureRequest | null>> {
+  const { data, error } = await client
+    .from('support_tickets')
+    .select(ACCOUNT_CLOSURE_SELECT)
+    .eq('user_id', actorUserId)
+    .eq('category', 'account_closure')
+    .in('status', [...ACTIVE_ACCOUNT_CLOSURE_STATUSES])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) return dataFailure({ kind: 'database', error })
+  return dataSuccess(data ? accountClosureRequestFromRow(data) : null)
+}
+
+export async function requestApiAccountClosure(
+  client: SupabaseClient,
+  actorUserId: string,
+): Promise<ApiDataResult<AccountClosureRequest>> {
+  const existing = await getApiAccountClosureRequest(client, actorUserId)
+  if (existing.error) return existing
+  if (existing.data) return dataSuccess(existing.data)
+
+  const { data, error } = await client
+    .from('support_tickets')
+    .insert({
+      user_id: actorUserId,
+      category: 'account_closure',
+      subject: 'Account closure request',
+      description: 'Authenticated user requested account closure from the Tshelo Security screen. Confirm ownership and review shared fund, event, financial, audit, and legal-retention obligations before processing.',
+      priority: 'normal',
+      status: 'open',
+    })
+    .select(ACCOUNT_CLOSURE_SELECT)
+    .single()
+
+  if (error) return dataFailure({ kind: 'database', error })
+  return dataSuccess(accountClosureRequestFromRow(data))
 }
 
 export async function searchApiConnections(

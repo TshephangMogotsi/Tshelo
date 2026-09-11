@@ -18,6 +18,7 @@ describe('profile, notification, and reward API slice', () => {
 
   const mutationRoutes = [
     'admin/app/api/v1/users/me/route.ts',
+    'admin/app/api/v1/users/me/closure-request/route.ts',
     'admin/app/api/v1/notifications/route.ts',
     'admin/app/api/v1/events/organiser-invites/respond/route.ts',
     'admin/app/api/v1/events/organiser-invites/sync/route.ts',
@@ -39,7 +40,8 @@ describe('profile, notification, and reward API slice', () => {
 
   it('uses caller-scoped data functions and the existing business-rule RPCs', () => {
     for (const service of [
-      'getApiCurrentUser', 'updateApiCurrentUser', 'searchApiConnections',
+      'getApiCurrentUser', 'updateApiCurrentUser', 'getApiAccountClosureRequest',
+      'requestApiAccountClosure', 'searchApiConnections',
       'listApiNotifications', 'getApiNotification', 'markApiNotificationsRead',
       'syncApiOrganiserInvites', 'respondApiOrganiserInvite',
       'evaluateApiRewards', 'getApiRewardProgress', 'listApiUnseenRewards',
@@ -77,7 +79,8 @@ describe('profile, notification, and reward API slice', () => {
 
   it('exposes every operation through the shared typed client', () => {
     for (const method of [
-      'updateMe(', 'searchConnections(', 'syncOrganiserInvites(',
+      'updateMe(', 'getAccountClosureRequest(', 'requestAccountClosure(',
+      'searchConnections(', 'syncOrganiserInvites(',
       'respondOrganiserInvite(', 'markRead(', 'evaluate(', 'progress(',
       'listUnseen(', 'markSeen(',
     ]) expect(client).toContain(method)

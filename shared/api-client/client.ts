@@ -1,5 +1,6 @@
 import type {
   AdminAuditEntry,
+  AccountClosureRequest,
   ConnectionSummary,
   Contribution,
   ContributionSummary,
@@ -344,6 +345,15 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
           `/api/v1/users/connections${toQueryString(input)}`,
           call,
         )
+      },
+      getAccountClosureRequest(call?: ApiCallOptions) {
+        return request<AccountClosureRequest | null>('/api/v1/users/me/closure-request', call)
+      },
+      requestAccountClosure(call?: ApiCallOptions) {
+        return request<AccountClosureRequest>('/api/v1/users/me/closure-request', {
+          ...call,
+          method: 'POST',
+        })
       },
     },
     funds: {
