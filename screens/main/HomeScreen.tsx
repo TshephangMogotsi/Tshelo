@@ -233,22 +233,24 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   <Ionicons name="add" size={16} color="#FFFFFF" />
                   <Text style={styles.emptyPrimaryBtnText}>Create</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.emptySecondaryBtn}
-                  activeOpacity={0.8}
-                  onPress={() => navigation.navigate('JoinFund')}
-                >
-                  <Ionicons name="link-outline" size={16} color={colors.primary} />
-                  <Text style={styles.emptySecondaryBtnText}>Join Fund</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.emptySecondaryBtn}
-                  activeOpacity={0.8}
-                  onPress={() => navigation.navigate('JoinEvent')}
-                >
-                  <Ionicons name="ticket-outline" size={16} color={colors.primary} />
-                  <Text style={styles.emptySecondaryBtnText}>Join Event</Text>
-                </TouchableOpacity>
+                <View style={styles.emptyJoinActions}>
+                  <TouchableOpacity
+                    style={styles.emptySecondaryBtn}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('JoinFund')}
+                  >
+                    <Ionicons name="link-outline" size={16} color={colors.primary} />
+                    <Text style={styles.emptySecondaryBtnText}>Join Fund</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.emptySecondaryBtn}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('JoinEvent')}
+                  >
+                    <Ionicons name="ticket-outline" size={16} color={colors.primary} />
+                    <Text style={styles.emptySecondaryBtnText}>Join Event</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           )}
@@ -459,11 +461,14 @@ function makeStyles(colors: AppColors) {
       marginBottom: 16,
     },
     emptyActions: {
+      gap: 10,
+    },
+    emptyJoinActions: {
       flexDirection: 'row',
       gap: 10,
     },
     emptyPrimaryBtn: {
-      flex: 1,
+      width: '100%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
