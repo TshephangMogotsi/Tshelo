@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Linking, Platform, ScrollView } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
@@ -14,7 +14,8 @@ import {
   suggestedEventFundName,
 } from './format'
 import { BRAND_LAVENDER, BRAND_PURPLE, BRAND_PURPLE_DARK } from './constants'
-import { isMapsUrl, mapsSearchUrl } from '../../../lib/maps'
+import { isMapsUrl } from '../../../lib/maps'
+import VenueLocationField from './VenueLocationField'
 
 type Props = {
   selectedEventLabel: string
@@ -63,10 +64,6 @@ export default function EventFundDetailsStep({
     && eventVenue.trim().length >= 3
     && !hasInvalidMapLink
   const derivedFundName = fundName.trim() || suggestedEventFundName(eventName, selectedEventLabel)
-
-  function openVenueSearch() {
-    void Linking.openURL(mapsSearchUrl(eventVenue, Platform.OS === 'ios' ? 'ios' : 'android'))
-  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -128,52 +125,12 @@ export default function EventFundDetailsStep({
             </View>
           </View>
 
-          <View style={styles.eventFundDetailsField}>
-            <Text style={styles.eventFundDetailsLabel}>Venue</Text>
-            <View style={styles.eventFundVenueBox}>
-              <TextInput
-                style={styles.eventFundVenueInput}
-                placeholder="Cresta Lodge, Gaborone"
-                placeholderTextColor={colors.textMuted}
-                value={eventVenue}
-                onChangeText={onEventVenueChange}
-                multiline
-                maxLength={120}
-                textAlignVertical="center"
-              />
-              <Ionicons name="location-outline" size={22} color={colors.textMuted} />
-            </View>
-            <TouchableOpacity style={styles.openMapsButton} onPress={openVenueSearch} activeOpacity={0.75}>
-              <Ionicons name="map-outline" size={16} color={BRAND_PURPLE} />
-              <Text style={styles.openMapsText}>Find this venue in Maps</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.eventFundDetailsField}>
-            <View style={styles.mapLinkLabelRow}>
-              <Text style={styles.eventFundDetailsLabel}>Maps link</Text>
-              <Text style={styles.optionalLabel}>Optional</Text>
-            </View>
-            <View style={[styles.mapLinkRow, hasInvalidMapLink && styles.inputError]}>
-              <TextInput
-                style={styles.mapLinkInput}
-                placeholder="Paste a Google, Apple Maps or Waze link"
-                placeholderTextColor={colors.textMuted}
-                value={eventVenueMapLink}
-                onChangeText={onEventVenueMapLinkChange}
-                maxLength={500}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-              />
-              <Ionicons name="link-outline" size={21} color={colors.textMuted} />
-            </View>
-            {hasInvalidMapLink ? (
-              <Text style={styles.mapLinkError}>Use a Google Maps, Apple Maps or Waze link.</Text>
-            ) : (
-              <Text style={styles.mapLinkHelp}>Open Maps above, share or copy the place link, then paste it here.</Text>
-            )}
-          </View>
+          <VenueLocationField
+            venue={eventVenue}
+            onVenueChange={onEventVenueChange}
+            mapLink={eventVenueMapLink}
+            onMapLinkChange={onEventVenueMapLinkChange}
+          />
 
           <View style={styles.eventFundDetailsField}>
             <Text style={styles.eventFundDetailsLabel}>Fund name</Text>
@@ -245,16 +202,6 @@ function makeStyles(colors: AppColors) {
       color: colors.textMuted,
       marginBottom: 8,
     },
-    mapLinkLabelRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    optionalLabel: {
-      marginBottom: 8,
-      fontSize: 11,
-      color: colors.textMuted,
-    },
     eventFundDetailsNameInput: {
       minHeight: 56,
       backgroundColor: colors.surface,
@@ -291,57 +238,6 @@ function makeStyles(colors: AppColors) {
       color: colors.textPrimary,
       textAlign: 'center',
     },
-    eventFundVenueBox: {
-      minHeight: 82,
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      gap: 10,
-    },
-    eventFundVenueInput: {
-      flex: 1,
-      fontSize: 16,
-      lineHeight: 22,
-      color: colors.textPrimary,
-      paddingVertical: 18,
-    },
-    openMapsButton: {
-      alignSelf: 'flex-start',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: 9,
-      paddingVertical: 4,
-    },
-    openMapsText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: BRAND_PURPLE,
-    },
-    mapLinkRow: {
-      minHeight: 56,
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      gap: 10,
-    },
-    mapLinkInput: {
-      flex: 1,
-      paddingVertical: 15,
-      fontSize: 14,
-      color: colors.textPrimary,
-    },
-    inputError: { borderColor: colors.error },
-    mapLinkHelp: { marginTop: 6, fontSize: 11, lineHeight: 16, color: colors.textMuted },
-    mapLinkError: { marginTop: 6, fontSize: 11, lineHeight: 16, color: colors.error },
     eventFundNameCard: {
       backgroundColor: BRAND_LAVENDER,
       borderRadius: 18,
