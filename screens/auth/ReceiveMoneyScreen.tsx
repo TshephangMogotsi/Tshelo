@@ -105,8 +105,8 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
               <View style={[styles.optionIcon, styles.mobileIcon]}>
                 <Ionicons name="phone-portrait-outline" size={22} color="#FFFFFF" />
               </View>
-              <View>
-                <Text style={styles.mobileTitle}>Mobile{'\n'}Money</Text>
+              <View style={styles.mobileHeadingRow}>
+                <Text style={styles.mobileTitle}>Mobile Money</Text>
                 <Text style={styles.mobileStatus}>Verified ✓</Text>
               </View>
             </View>
@@ -228,11 +228,16 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '800',
   },
+  mobileHeadingRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
   mobileStatus: {
     color: '#21A650',
     fontSize: 14,
     fontWeight: '700',
-    marginTop: 2,
   },
   bankTitle: {
     color: '#2453C7',

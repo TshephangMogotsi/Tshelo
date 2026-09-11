@@ -111,6 +111,8 @@ it('persists confirmed payment details before showing registration success', asy
     },
   }
   await act(async () => { tree = create(React.createElement(ReceiveMoneyScreen, { navigation, route })) })
+  expect(tree.root.findAllByType(Text).some(text => text.props.children === 'Mobile Money')).toBe(true)
+  expect(tree.root.findAllByType(Text).some(text => text.props.children === 'Verified ✓')).toBe(true)
   const confirmation = tree.root.findAllByType(TouchableOpacity).find(item => (
     item.findAllByType(Text).some(text => String(text.props.children).startsWith('I confirm'))
   ))
