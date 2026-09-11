@@ -4,11 +4,12 @@ jest.mock('../../../../context/ThemeContext', () => ({
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 jest.mock('../FlowHeader', () => 'FlowHeader')
+jest.mock('../FundIconPickerSheet', () => 'FundIconPickerSheet')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
 const { Text, TouchableOpacity } = require('react-native')
-const { EVENT_TYPES } = require('../constants')
+const { EMOJI_OPTIONS, EVENT_TYPES, OTHER_FUND_ICON_OPTIONS } = require('../constants')
 const EventFundTypeStep = require('../EventFundTypeStep').default
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -23,6 +24,8 @@ function renderStep(overrides = {}) {
       isOtherEvent: false,
       customEventType: '',
       onCustomEventTypeChange: jest.fn(),
+      selectedFundIcon: EMOJI_OPTIONS[0],
+      onSelectFundIcon: jest.fn(),
       isStepValid: true,
       onContinue: jest.fn(),
       onBack: jest.fn(),
@@ -64,11 +67,33 @@ it('uses accessible icons instead of emoji choices', () => {
   expect(tree.root.findByType('FlowHeader').props.step).toBe('Step 2 of 5')
 })
 
-it('asks only for a custom event name when Other is selected', () => {
+it('asks for a custom event name and offers a fund icon when Other is selected', () => {
   const other = EVENT_TYPES.find(item => item.id === 'other')
   renderStep({ eventType: other, isOtherEvent: true })
 
   expect(renderedText()).toContain('Custom event type')
+  expect(renderedText()).toContain('Fund icon')
   expect(renderedText()).not.toContain('Choose an emoji')
   expect(tree.root.findByProps({ placeholder: 'Name your event type' })).toBeDefined()
+  expect(tree.root.findByProps({ accessibilityLabel: 'Choose fund icon. Current selection General' })).toBeDefined()
+})
+
+it('saves a chosen fund icon and closes the picker', () => {
+  const other = EVENT_TYPES.find(item => item.id === 'other')
+  const onSelectFundIcon = jest.fn()
+  renderStep({ eventType: other, isOtherEvent: true, onSelectFundIcon })
+
+  act(() => {
+    tree.root.findByProps({ accessibilityLabel: 'Choose fund icon. Current selection General' }).props.onPress()
+  })
+  expect(tree.root.findByType('FundIconPickerSheet').props.visible).toBe(true)
+
+  act(() => {
+    tree.root.findByType('FundIconPickerSheet').props.onSelect(OTHER_FUND_ICON_OPTIONS[0])
+  })
+  expect(onSelectFundIcon).toHaveBeenCalledWith(expect.objectContaining({
+    id: 'health',
+    icon: 'medical-outline',
+  }))
+  expect(tree.root.findByType('FundIconPickerSheet').props.visible).toBe(false)
 })

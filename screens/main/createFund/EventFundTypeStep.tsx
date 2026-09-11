@@ -1,14 +1,18 @@
+import { useState } from 'react'
 import { KeyboardAvoidingView, Platform, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import FlowHeader from './FlowHeader'
+import FundIconPickerSheet from './FundIconPickerSheet'
 import {
   BRAND_LAVENDER,
   BRAND_PURPLE,
   EVENT_TYPES,
+  EmojiOption,
   EventTypeOption,
+  isOtherFundIcon,
 } from './constants'
 
 type Props = {
@@ -17,6 +21,8 @@ type Props = {
   isOtherEvent: boolean
   customEventType: string
   onCustomEventTypeChange: (text: string) => void
+  selectedFundIcon: EmojiOption
+  onSelectFundIcon: (icon: EmojiOption) => void
   isStepValid: boolean
   onContinue: () => void
   onBack: () => void
@@ -28,12 +34,15 @@ export default function EventFundTypeStep({
   isOtherEvent,
   customEventType,
   onCustomEventTypeChange,
+  selectedFundIcon,
+  onSelectFundIcon,
   isStepValid,
   onContinue,
   onBack,
 }: Props) {
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
+  const [showFundIconPicker, setShowFundIconPicker] = useState(false)
   const eventFundTypes = [
     ...EVENT_TYPES.slice(0, 4),
     EVENT_TYPES.find(item => item.id === 'other')!,
@@ -84,8 +93,42 @@ export default function EventFundTypeStep({
                 autoCapitalize="words"
                 returnKeyType="done"
               />
+
+              <Text style={styles.customFundIconLabel}>
+                Fund icon <Text style={styles.optional}>(optional)</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.customIconButton}
+                activeOpacity={0.8}
+                onPress={() => setShowFundIconPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Choose fund icon. Current selection ${selectedFundIcon.label}`}
+              >
+                <View style={styles.customIconPreview}>
+                  <Ionicons
+                    name={selectedFundIcon.icon ?? 'wallet-outline'}
+                    size={22}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.customIconCopy}>
+                  <Text style={styles.customIconTitle}>{selectedFundIcon.label}</Text>
+                  <Text style={styles.customIconHint}>Tap to choose a different icon</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
             </View>
           ) : null}
+
+          <FundIconPickerSheet
+            visible={showFundIconPicker}
+            selectedId={isOtherFundIcon(selectedFundIcon.id) ? selectedFundIcon.id : null}
+            onSelect={item => {
+              onSelectFundIcon(item)
+              setShowFundIconPicker(false)
+            }}
+            onClose={() => setShowFundIconPicker(false)}
+          />
 
           <TouchableOpacity
             style={[styles.continueButton, !isStepValid && styles.continueButtonDisabled]}
@@ -194,6 +237,52 @@ function makeStyles(colors: AppColors) {
       paddingVertical: 14,
       fontSize: 16,
       color: colors.textPrimary,
+      marginBottom: 16,
+    },
+    customFundIconLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    optional: {
+      fontWeight: '400',
+      color: colors.textMuted,
+    },
+    customIconButton: {
+      minHeight: 64,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: colors.background,
+    },
+    customIconPreview: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: colors.primaryLight,
+    },
+    customIconCopy: {
+      flex: 1,
+    },
+    customIconTitle: {
+      fontSize: 14,
+      lineHeight: 19,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    customIconHint: {
+      marginTop: 1,
+      fontSize: 12,
+      lineHeight: 16,
+      color: colors.textMuted,
     },
     continueButton: {
       flexDirection: 'row',

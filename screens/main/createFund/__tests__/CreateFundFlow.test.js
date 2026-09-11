@@ -33,6 +33,7 @@ jest.mock('../FundQuickActionSheet', () => 'FundQuickActionSheet')
 
 const React = require('react')
 const { act, create } = require('react-test-renderer')
+const { OTHER_FUND_ICON_OPTIONS } = require('../constants')
 const CreateFundScreen = require('../../CreateFundScreen').default
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -70,7 +71,11 @@ it('starts Event and Fund with the shared home-currency step before event type',
 
   act(() => currencyStep.props.onContinue())
   const typeStep = tree.root.findByType('EventFundTypeStep')
+  expect(typeStep.props.selectedFundIcon.id).toBe('general')
 
-  act(() => typeStep.props.onBack())
+  act(() => typeStep.props.onSelectFundIcon(OTHER_FUND_ICON_OPTIONS[0]))
+  expect(tree.root.findByType('EventFundTypeStep').props.selectedFundIcon.id).toBe('health')
+
+  act(() => tree.root.findByType('EventFundTypeStep').props.onBack())
   expect(tree.root.findByType('CurrencyStep')).toBeDefined()
 })

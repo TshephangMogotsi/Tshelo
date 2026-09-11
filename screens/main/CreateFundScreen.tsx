@@ -447,7 +447,7 @@ export default function CreateFundScreen({ navigation }: Props) {
         created = await api.events.createFund({
           event_name: eventName.trim(),
           event_type: isOtherEvent ? customEventType.trim() : eventType.id,
-          event_emoji: selectedEventEmoji,
+          event_emoji: isOtherEvent ? selectedEmoji.emoji : eventType.emoji,
           event_date: formatDateISO(eventDate),
           event_time: formatTimeISO(eventTime),
           event_venue: eventVenue.trim(),
@@ -648,6 +648,8 @@ export default function CreateFundScreen({ navigation }: Props) {
         isOtherEvent={isOtherEvent}
         customEventType={customEventType}
         onCustomEventTypeChange={setCustomEventType}
+        selectedFundIcon={selectedEmoji}
+        onSelectFundIcon={setSelectedEmoji}
         isStepValid={eventTypeStepValid}
         onContinue={() => setEventFundTypeDone(true)}
         onBack={handleBack}
