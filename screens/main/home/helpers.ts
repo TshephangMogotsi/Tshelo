@@ -32,7 +32,6 @@ export type HomeItem = {
   guest_count:         number
   role:                MemberRole
   event_date:          string
-  event_time:          string
   venue_name:          string
   category:            string
   emoji:               string
@@ -63,16 +62,6 @@ export function formatEventDate(value: string) {
   return new Date(year, month - 1, day).toLocaleDateString('en-BW', {
     day: 'numeric', month: 'short', year: 'numeric',
   })
-}
-
-export function formatEventTime(value: string) {
-  if (!value) return 'Time TBC'
-  const [hourValue, minuteValue] = value.split(':').map(Number)
-  if (!Number.isInteger(hourValue) || !Number.isInteger(minuteValue) || hourValue < 0 || hourValue > 23 || minuteValue < 0 || minuteValue > 59) {
-    return value
-  }
-  const suffix = hourValue >= 12 ? 'PM' : 'AM'
-  return `${hourValue % 12 || 12}:${String(minuteValue).padStart(2, '0')} ${suffix}`
 }
 
 export function labelFromValue(value: string | null | undefined) {

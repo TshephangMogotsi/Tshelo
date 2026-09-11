@@ -1,4 +1,4 @@
-import { activeFundItems, countHomeFilters, DEFAULT_HOME_STATUS_FILTER, HOME_STATUS_FILTER_ORDER, HomeItem, formatMoney, formatEventDate, formatEventTime, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
+import { activeFundItems, countHomeFilters, DEFAULT_HOME_STATUS_FILTER, HOME_STATUS_FILTER_ORDER, HomeItem, formatMoney, formatEventDate, labelFromValue, initials, matchesHomeStatus, sortHomeItems } from '../helpers'
 
 it('defaults the Home list to active items', () => {
   expect(DEFAULT_HOME_STATUS_FILTER).toBe('active')
@@ -30,18 +30,6 @@ describe('formatEventDate', () => {
 
   it('passes through malformed values unchanged', () => {
     expect(formatEventDate('soon')).toBe('soon')
-  })
-})
-
-describe('formatEventTime', () => {
-  it('formats stored event times consistently with the schedule screen', () => {
-    expect(formatEventTime('00:05:00')).toBe('12:05 AM')
-    expect(formatEventTime('14:30:00')).toBe('2:30 PM')
-  })
-
-  it('shows a clear fallback and preserves malformed legacy values', () => {
-    expect(formatEventTime('')).toBe('Time TBC')
-    expect(formatEventTime('later')).toBe('later')
   })
 })
 
@@ -80,7 +68,6 @@ describe('sortHomeItems', () => {
       guest_count: 0,
       role: 'organiser',
       event_date: '',
-      event_time: '',
       venue_name: '',
       category: 'Event',
       emoji: '🎉',
@@ -150,7 +137,6 @@ describe('activeFundItems', () => {
     guest_count: 0,
     role: 'owner' as const,
     event_date: '',
-    event_time: '',
     venue_name: '',
     category: 'Fund',
     emoji: '💜',
