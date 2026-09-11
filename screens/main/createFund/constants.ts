@@ -81,8 +81,6 @@ export function fundIconForEmoji(emoji: string): keyof typeof Ionicons.glyphMap 
   return FUND_ICON_BY_EMOJI.get(emoji) ?? 'wallet-outline'
 }
 
-export const CUSTOM_EVENT_EMOJIS = ['🎉', '✨', '💜', '🙏']
-
 export const GOAL_PRESETS = [
   { label: 'P5k',  value: '5,000' },
   { label: 'P10k', value: '10,000' },

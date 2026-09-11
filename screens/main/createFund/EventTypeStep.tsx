@@ -4,12 +4,10 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import FlowHeader from './FlowHeader'
-import EmojiPickerModal from './EmojiPickerModal'
 import {
   BRAND_LAVENDER,
   BRAND_PURPLE,
   BRAND_PURPLE_DARK,
-  CUSTOM_EVENT_EMOJIS,
   EVENT_TYPES,
   EventTypeOption,
 } from './constants'
@@ -20,14 +18,6 @@ type Props = {
   isOtherEvent: boolean
   customEventType: string
   onCustomEventTypeChange: (text: string) => void
-  customEventEmoji: string
-  onCustomEventEmojiChange: (emoji: string) => void
-  showEmojiDialog: boolean
-  onShowEmojiDialog: (visible: boolean) => void
-  emojiSearch: string
-  onEmojiSearchChange: (text: string) => void
-  emojiCategory: string
-  onEmojiCategoryChange: (category: string) => void
   isStepValid: boolean
   onContinue: () => void
   onBack: () => void
@@ -39,14 +29,6 @@ export default function EventTypeStep({
   isOtherEvent,
   customEventType,
   onCustomEventTypeChange,
-  customEventEmoji,
-  onCustomEventEmojiChange,
-  showEmojiDialog,
-  onShowEmojiDialog,
-  emojiSearch,
-  onEmojiSearchChange,
-  emojiCategory,
-  onEmojiCategoryChange,
   isStepValid,
   onContinue,
   onBack,
@@ -68,7 +50,7 @@ export default function EventTypeStep({
       >
         <Text style={styles.eventQuestion}>What are you planning?</Text>
 
-        <View style={styles.eventGrid}>
+        <View style={styles.eventGrid} accessibilityRole="radiogroup" accessibilityLabel="Event type">
           {EVENT_TYPES.map(item => {
             const active = eventType.id === item.id
             return (
@@ -77,8 +59,13 @@ export default function EventTypeStep({
                 style={[styles.eventTypeCard, active && styles.eventTypeCardActive]}
                 activeOpacity={0.84}
                 onPress={() => onSelectType(item)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={`${item.label} event type`}
               >
-                <Text style={styles.eventTypeEmoji}>{item.emoji}</Text>
+                <View style={[styles.eventTypeIcon, active && styles.eventTypeIconActive]}>
+                  <Ionicons name={item.icon} size={25} color={active ? colors.primary : colors.textSecondary} />
+                </View>
                 <Text style={[styles.eventTypeLabel, active && styles.eventTypeLabelActive]}>
                   {item.label}
                 </Text>
@@ -87,7 +74,7 @@ export default function EventTypeStep({
           })}
         </View>
 
-        {isOtherEvent && (
+        {isOtherEvent ? (
           <View style={styles.customEventPanel}>
             <Text style={styles.customEventLabel}>Custom event type</Text>
             <TextInput
@@ -100,56 +87,17 @@ export default function EventTypeStep({
               autoCapitalize="words"
               returnKeyType="done"
             />
-
-            <Text style={styles.customEmojiLabel}>Choose an emoji</Text>
-            <View style={styles.customEmojiRow}>
-              {CUSTOM_EVENT_EMOJIS.map(emoji => {
-                const active = customEventEmoji === emoji
-                return (
-                  <TouchableOpacity
-                    key={emoji}
-                    style={[styles.customEmojiButton, active && styles.customEmojiButtonActive]}
-                    activeOpacity={0.84}
-                    onPress={() => onCustomEventEmojiChange(emoji)}
-                  >
-                    <Text style={styles.customEmojiText}>{emoji}</Text>
-                  </TouchableOpacity>
-                )
-              })}
-              <TouchableOpacity
-                style={styles.customEmojiMoreButton}
-                activeOpacity={0.84}
-                onPress={() => onShowEmojiDialog(true)}
-              >
-                <Ionicons name="add" size={22} color={BRAND_PURPLE} />
-              </TouchableOpacity>
-            </View>
           </View>
-        )}
-
-        <EmojiPickerModal
-          visible={showEmojiDialog}
-          selected={customEventEmoji}
-          search={emojiSearch}
-          onSearchChange={onEmojiSearchChange}
-          category={emojiCategory}
-          onCategoryChange={onEmojiCategoryChange}
-          onSelect={native => {
-            onCustomEventEmojiChange(native)
-            onShowEmojiDialog(false)
-          }}
-          onClose={() => onShowEmojiDialog(false)}
-        />
+        ) : null}
 
         <TouchableOpacity
           style={[styles.eventContinueButton, !isStepValid && styles.eventContinueDisabled]}
           activeOpacity={isStepValid ? 0.86 : 1}
-          onPress={() => {
-            if (!isStepValid) return
-            onContinue()
-          }}
+          disabled={!isStepValid}
+          onPress={onContinue}
         >
           <Text style={styles.eventContinueText}>Continue</Text>
+          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </ScrollView>
       </KeyboardAvoidingView>
@@ -165,7 +113,7 @@ function makeStyles(colors: AppColors) {
       flexGrow: 1,
       backgroundColor: colors.background,
       paddingHorizontal: 24,
-      paddingTop: 28,
+      paddingTop: 22,
       paddingBottom: 44,
     },
     eventQuestion: {
@@ -173,115 +121,83 @@ function makeStyles(colors: AppColors) {
       lineHeight: 30,
       fontWeight: '900',
       color: colors.textPrimary,
-      marginBottom: 28,
+      marginBottom: 22,
     },
     eventGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 14,
-      marginBottom: 34,
+      gap: 12,
+      marginBottom: 20,
     },
     eventTypeCard: {
       width: '48%',
-      minHeight: 124,
+      minHeight: 104,
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 10,
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 16,
       paddingHorizontal: 14,
-      paddingVertical: 24,
+      paddingVertical: 16,
     },
     eventTypeCardActive: {
       backgroundColor: BRAND_LAVENDER,
-      borderWidth: 2,
       borderColor: BRAND_PURPLE,
     },
-    eventTypeEmoji: {
-      fontSize: 38,
-      marginBottom: 12,
+    eventTypeIcon: {
+      width: 46,
+      height: 46,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 14,
+      backgroundColor: colors.background,
+    },
+    eventTypeIconActive: {
+      backgroundColor: colors.surface,
     },
     eventTypeLabel: {
-      fontSize: 16,
-      lineHeight: 24,
+      fontSize: 14,
+      lineHeight: 19,
       fontWeight: '700',
-      color: colors.textMuted,
+      color: colors.textSecondary,
       textAlign: 'center',
     },
     eventTypeLabelActive: {
-      color: colors.textPrimary,
+      color: colors.primary,
+      fontWeight: '900',
     },
     customEventPanel: {
       backgroundColor: colors.surface,
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 18,
-      paddingHorizontal: 16,
-      paddingVertical: 16,
-      marginTop: -8,
-      marginBottom: 24,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
     },
     customEventLabel: {
       fontSize: 13,
-      fontWeight: '500',
-      color: colors.textMuted,
+      fontWeight: '600',
+      color: colors.textSecondary,
       marginBottom: 8,
     },
     customEventInput: {
-      minHeight: 56,
+      minHeight: 54,
       backgroundColor: colors.background,
-      borderWidth: 1.5,
-      borderColor: BRAND_PURPLE,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: 14,
       paddingHorizontal: 16,
       paddingVertical: 14,
       fontSize: 16,
       color: colors.textPrimary,
-      marginBottom: 16,
-    },
-    customEmojiLabel: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 10,
-    },
-    customEmojiRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-    },
-    customEmojiButton: {
-      width: 46,
-      height: 46,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderRadius: 14,
-    },
-    customEmojiButtonActive: {
-      backgroundColor: BRAND_LAVENDER,
-      borderWidth: 2,
-      borderColor: BRAND_PURPLE,
-    },
-    customEmojiMoreButton: {
-      width: 46,
-      height: 46,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-      borderWidth: 1.5,
-      borderColor: BRAND_PURPLE,
-      borderRadius: 14,
-    },
-    customEmojiText: {
-      fontSize: 24,
     },
     eventContinueButton: {
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 8,
       backgroundColor: BRAND_PURPLE_DARK,
       borderRadius: 28,
       paddingVertical: 17,

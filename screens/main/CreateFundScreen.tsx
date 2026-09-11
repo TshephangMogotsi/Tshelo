@@ -17,7 +17,6 @@ import { eventInvitationUrl } from '../../lib/fundLinks'
 import { activeFundItems, HomeItem } from './home/helpers'
 import { loadHomeItems } from './home/loadHomeItems'
 import {
-  CUSTOM_EVENT_EMOJIS,
   CreateOption,
   CreatedEvent,
   EMOJI_OPTIONS,
@@ -62,10 +61,6 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [selectedEmoji,  setSelectedEmoji]  = useState(EMOJI_OPTIONS[0])
   const [eventType,      setEventType]      = useState(EVENT_TYPES[0])
   const [customEventType, setCustomEventType] = useState('')
-  const [customEventEmoji, setCustomEventEmoji] = useState(CUSTOM_EVENT_EMOJIS[0])
-  const [showCustomEmojiDialog, setShowCustomEmojiDialog] = useState(false)
-  const [emojiSearch, setEmojiSearch] = useState('')
-  const [emojiCategory, setEmojiCategory] = useState('all')
   const [eventStep,      setEventStep]      = useState<1 | 2 | 3>(1)
   const [eventCreated,   setEventCreated]   = useState(false)
   const [isCreatingEvent, setIsCreatingEvent] = useState(false)
@@ -232,7 +227,7 @@ export default function CreateFundScreen({ navigation }: Props) {
     && eventVenueMapLinkValid
   const isOtherEvent = eventType.id === 'other'
   const selectedEventLabel = isOtherEvent ? customEventType.trim() || 'Other' : eventType.label
-  const selectedEventEmoji = isOtherEvent ? customEventEmoji : eventType.emoji
+  const selectedEventEmoji = eventType.emoji
   const eventTypeStepValid = !isOtherEvent || customEventType.trim().length >= 2
   const selectedCurrency = FUND_CURRENCIES.find(item => item.id === currency) ?? {
     id: currency,
@@ -725,14 +720,6 @@ export default function CreateFundScreen({ navigation }: Props) {
         isOtherEvent={isOtherEvent}
         customEventType={customEventType}
         onCustomEventTypeChange={setCustomEventType}
-        customEventEmoji={customEventEmoji}
-        onCustomEventEmojiChange={setCustomEventEmoji}
-        showEmojiDialog={showCustomEmojiDialog}
-        onShowEmojiDialog={setShowCustomEmojiDialog}
-        emojiSearch={emojiSearch}
-        onEmojiSearchChange={setEmojiSearch}
-        emojiCategory={emojiCategory}
-        onEmojiCategoryChange={setEmojiCategory}
         isStepValid={eventTypeStepValid}
         onContinue={() => setEventStep(2)}
         onBack={handleBack}
