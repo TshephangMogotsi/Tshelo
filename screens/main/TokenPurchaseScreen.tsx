@@ -45,12 +45,24 @@ function OfferCard({
   styles: Styles
 }) {
   const isTopUp = isTokenPack(offer)
+  const offerValue = isTopUp ? `${offer.tokens} tokens` : '12-month pass'
+  const accessibilityLabel = [
+    offer.label,
+    offerValue,
+    `${offer.priceBWP} Botswana pula`,
+    offer.description,
+    !isTopUp ? offer.termLabel : null,
+  ].filter(Boolean).join('. ')
 
   return (
     <TouchableOpacity
       style={[styles.packCard, selected && styles.packCardSelected]}
       onPress={onSelect}
       activeOpacity={0.85}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={selected ? undefined : 'Selects this checkout option'}
     >
       <View style={styles.packTop}>
         <View>
@@ -96,20 +108,14 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
 
   const selectedOffer = CHECKOUT_OFFERS.find((offer) => offer.id === selectedOfferId) ?? CHECKOUT_OFFERS[0]
   const selectedIsTopUp = isTokenPack(selectedOffer)
+  const checkoutUrl = buildTokenPortalUrl(TOKEN_PORTAL_URL, selectedOffer.id)
 
   useFocusEffect(useCallback(() => {
     void refreshProfile()
   }, [refreshProfile]))
 
   async function handlePurchase() {
-    const checkoutUrl = buildTokenPortalUrl(TOKEN_PORTAL_URL, selectedOffer.id)
-    if (!checkoutUrl) {
-      Alert.alert(
-        'Web checkout coming soon',
-        'Token payments will be completed securely on the Tshelo website. No payment has been taken.',
-      )
-      return
-    }
+    if (!checkoutUrl) return
 
     if (!await Linking.canOpenURL(checkoutUrl)) {
       Alert.alert('Could not open checkout', 'Please try again or visit the Tshelo website in your browser.')
@@ -162,7 +168,11 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
 
         {/* ── Pack selector ────────────────────────── */}
         <Text style={styles.sectionLabel}>Choose an option</Text>
-        <View style={styles.packGrid}>
+        <View
+          style={styles.packGrid}
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Token and annual pass options"
+        >
           {CHECKOUT_OFFERS.map((offer) => (
             <OfferCard
               key={offer.id}
@@ -204,23 +214,40 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
           )}
         </View>
 
+        {/* ── Checkout action or availability ───────── */}
+        {checkoutUrl ? (
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handlePurchase}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Continue to secure checkout, P${selectedOffer.priceBWP.toFixed(2)}`}
+            accessibilityHint="Opens the secure Tshelo website"
+          >
+            <Text style={styles.primaryButtonText}>
+              Continue to secure checkout · P{selectedOffer.priceBWP.toFixed(2)}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={styles.checkoutUnavailable}
+            accessible
+            accessibilityRole="text"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Secure checkout is being activated. No payment has been taken."
+          >
+            <Text style={styles.checkoutUnavailableText}>
+              Secure checkout is being activated. No payment has been taken.
+            </Text>
+          </View>
+        )}
+
         {/* ── Payment notice ───────────────────────── */}
         <View style={styles.paymentNotice}>
           <Text style={styles.paymentNoticeText}>
-            💳 Checkout opens on the secure Tshelo website. Your in-app balance updates only after the payment is confirmed.
+            🛡️ Your balance updates only after the payment provider confirms the order.
           </Text>
         </View>
-
-        {/* ── CTA ──────────────────────────────────── */}
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={handlePurchase}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.primaryButtonText}>
-            Continue on web — P{selectedOffer.priceBWP}
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   )
@@ -474,7 +501,7 @@ function makeStyles(colors: AppColors) {
       backgroundColor: colors.accentLight,
       borderRadius: 12,
       padding: 14,
-      marginBottom: 24,
+      marginTop: 16,
     },
     paymentNoticeText: {
       fontSize: 12,
@@ -499,6 +526,20 @@ function makeStyles(colors: AppColors) {
       fontSize: 16,
       fontWeight: '700',
       letterSpacing: 0.2,
+    },
+    checkoutUnavailable: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+    },
+    checkoutUnavailableText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+      lineHeight: 20,
+      textAlign: 'center',
     },
   })
 }
