@@ -9,7 +9,6 @@ import FlowHeader from './FlowHeader'
 import DateTimeSheet from './DateTimeSheet'
 import { formatDateDisplay } from './format'
 import {
-  BRAND_LAVENDER,
   BRAND_PURPLE,
   EMOJI_OPTIONS,
   EmojiOption,
@@ -84,18 +83,28 @@ export default function FundFormStep({
           </View>
 
           <View style={styles.fundFormField}>
-            <Text style={styles.fundFormLabel}>Choose an emoji</Text>
-            <View style={styles.emojiRow}>
+            <Text style={styles.fundFormLabel}>Fund icon <Text style={styles.optional}>(optional)</Text></Text>
+            <View style={styles.iconRow}>
               {EMOJI_OPTIONS.map(item => {
                 const active = selectedEmoji.id === item.id
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.emojiChoice, active && styles.emojiChoiceActive]}
+                    style={[styles.iconChoice, active && styles.iconChoiceActive]}
                     activeOpacity={0.84}
                     onPress={() => onSelectEmoji(item)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${item.label} fund icon`}
+                    accessibilityState={{ checked: active }}
                   >
-                    <Text style={styles.emojiChoiceText}>{item.emoji}</Text>
+                    <Ionicons
+                      name={item.icon ?? 'wallet-outline'}
+                      size={22}
+                      color={active ? colors.primary : colors.textSecondary}
+                    />
+                    <Text style={[styles.iconChoiceLabel, active && styles.iconChoiceLabelActive]} numberOfLines={1}>
+                      {item.label}
+                    </Text>
                   </TouchableOpacity>
                 )
               })}
@@ -227,27 +236,38 @@ function makeStyles(colors: AppColors) {
       fontSize: 16,
       color: colors.textPrimary,
     },
-    emojiRow: {
+    iconRow: {
       flexDirection: 'row',
-      gap: 16,
+      gap: 8,
     },
-    emojiChoice: {
-      width: 62,
-      height: 64,
+    iconChoice: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 72,
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 7,
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.border,
       borderRadius: 14,
     },
-    emojiChoiceActive: {
+    iconChoiceActive: {
       borderWidth: 2,
-      borderColor: BRAND_PURPLE,
-      backgroundColor: BRAND_LAVENDER,
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
     },
-    emojiChoiceText: {
-      fontSize: 34,
+    iconChoiceLabel: {
+      maxWidth: '92%',
+      fontSize: 9,
+      lineHeight: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    iconChoiceLabelActive: {
+      color: colors.primary,
+      fontWeight: '800',
     },
     optional: {
       fontSize: 13,

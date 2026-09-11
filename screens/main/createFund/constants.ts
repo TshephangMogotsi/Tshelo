@@ -20,7 +20,12 @@ export type PickedOrganiser = {
   initials: string
 }
 export type EventTypeOption = { id: string; label: string; emoji: string }
-export type EmojiOption = { id: string; label: string; emoji: string }
+export type EmojiOption = {
+  id: string
+  label: string
+  emoji: string
+  icon?: keyof typeof Ionicons.glyphMap
+}
 export type CreatedEvent = {
   id: string
   share_code: string | null
@@ -36,10 +41,11 @@ export const EVENT_TYPES: EventTypeOption[] = [
 ]
 
 export const EMOJI_OPTIONS: EmojiOption[] = [
-  { id: 'heart',      label: 'Support',    emoji: '💜' },
-  { id: 'funeral',    label: 'Funeral',    emoji: '🕯️' },
-  { id: 'celebration', label: 'Event',      emoji: '🏠' },
-  { id: 'graduation', label: 'Graduation', emoji: '🎓' },
+  { id: 'general',   label: 'General',   emoji: '💜', icon: 'wallet-outline' },
+  { id: 'memorial',  label: 'Memorial',  emoji: '🕯️', icon: 'flame-outline' },
+  { id: 'family',    label: 'Family',    emoji: '🏠', icon: 'home-outline' },
+  { id: 'education', label: 'Education', emoji: '🎓', icon: 'school-outline' },
+  { id: 'other',     label: 'Other',     emoji: '✨', icon: 'shapes-outline' },
 ]
 
 export const CUSTOM_EVENT_EMOJIS = ['🎉', '✨', '💜', '🙏']

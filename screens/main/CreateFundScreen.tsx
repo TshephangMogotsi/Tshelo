@@ -57,7 +57,7 @@ export default function CreateFundScreen({ navigation }: Props) {
   const [createOption,   setCreateOption]   = useState<CreateOption | null>(null)
   const [currency,       setCurrency]       = useState<FundCurrency>('BWP')
   const [currencyDone,   setCurrencyDone]   = useState(false)
-  const [selectedEmoji,  setSelectedEmoji]  = useState(EMOJI_OPTIONS[1])
+  const [selectedEmoji,  setSelectedEmoji]  = useState(EMOJI_OPTIONS[0])
   const [eventType,      setEventType]      = useState(EVENT_TYPES[0])
   const [customEventType, setCustomEventType] = useState('')
   const [customEventEmoji, setCustomEventEmoji] = useState(CUSTOM_EVENT_EMOJIS[0])
