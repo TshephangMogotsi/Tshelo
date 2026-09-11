@@ -91,7 +91,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const userInitials   = userName ? initials(userName) : '?'
 
-  const presentKinds   = Array.from(new Set(homeItems.map(i => i.kind)))
   const normalizedSearch = searchQuery.trim().toLowerCase()
   const filteredItems  = sortHomeItems(homeItems.filter(item => {
     const matchesKind = kindFilter === 'all' || item.kind === kindFilter
@@ -200,7 +199,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             sortOrder={sortOrder}
             statusFilter={statusFilter}
             kindFilter={kindFilter}
-            availableKinds={presentKinds}
             onSortChange={setSortOrder}
             onStatusChange={setStatusFilter}
             onKindChange={setKindFilter}

@@ -27,7 +27,6 @@ type Props = {
   sortOrder: HomeSortOrder
   statusFilter: HomeStatusFilter
   kindFilter: 'all' | HomeItemKind
-  availableKinds: HomeItemKind[]
   onSortChange: (value: HomeSortOrder) => void
   onStatusChange: (value: HomeStatusFilter) => void
   onKindChange: (value: 'all' | HomeItemKind) => void
@@ -49,6 +48,15 @@ const STATUS_OPTION_META: Record<HomeStatusFilter, {
 
 const STATUS_OPTIONS = HOME_STATUS_FILTER_ORDER.map(value => ({ value, ...STATUS_OPTION_META[value] }))
 
+const KIND_OPTIONS: {
+  value: HomeItemKind
+  icon: keyof typeof Ionicons.glyphMap
+}[] = [
+  { value: 'fund', icon: 'wallet-outline' },
+  { value: 'eventFund', icon: 'albums-outline' },
+  { value: 'event', icon: 'calendar-outline' },
+]
+
 const SORT_OPTIONS: {
   value: HomeSortOrder
   icon: keyof typeof Ionicons.glyphMap
@@ -61,7 +69,6 @@ export default function HomeSortMenu({
   sortOrder,
   statusFilter,
   kindFilter,
-  availableKinds,
   onSortChange,
   onStatusChange,
   onKindChange,
@@ -170,27 +177,23 @@ export default function HomeSortMenu({
                 />
               ))}
 
-              {availableKinds.length > 1 && (
-                <>
-                  <View style={styles.divider} />
-                  <Text style={styles.sectionTitle}>TYPE</Text>
-                  <Option
-                    selected={kindFilter === 'all'}
-                    icon="layers-outline"
-                    label="All types"
-                    onPress={() => onKindChange('all')}
-                  />
-                  {availableKinds.map(kind => (
-                    <Option
-                      key={kind}
-                      selected={kindFilter === kind}
-                      icon={kind === 'fund' ? 'wallet-outline' : kind === 'event' ? 'calendar-outline' : 'sparkles-outline'}
-                      label={KIND_LABELS[kind]}
-                      onPress={() => onKindChange(kind)}
-                    />
-                  ))}
-                </>
-              )}
+              <View style={styles.divider} />
+              <Text style={styles.sectionTitle}>TYPE</Text>
+              <Option
+                selected={kindFilter === 'all'}
+                icon="layers-outline"
+                label="All types"
+                onPress={() => onKindChange('all')}
+              />
+              {KIND_OPTIONS.map(option => (
+                <Option
+                  key={option.value}
+                  selected={kindFilter === option.value}
+                  icon={option.icon}
+                  label={KIND_LABELS[option.value]}
+                  onPress={() => onKindChange(option.value)}
+                />
+              ))}
 
               <View style={styles.divider} />
               <Text style={styles.sectionTitle}>SORT</Text>
