@@ -1,19 +1,23 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { invitationUrl } from '@shared/invitations'
+import { fundShareUrl } from '@shared/invitations'
+import { shareFundCard } from '@/lib/fund-share-card'
 
 type InviteMembersDialogProps = {
   code: string
   fundTitle: string
   memberCount: number
+  updatedAt?: string | null
   onClose: () => void
 }
 
-export function InviteMembersDialog({ code, fundTitle, memberCount, onClose }: InviteMembersDialogProps) {
+export function InviteMembersDialog({ code, fundTitle, memberCount, updatedAt, onClose }: InviteMembersDialogProps) {
   const closeButton = useRef<HTMLButtonElement>(null)
   const [copied, setCopied] = useState(false)
-  const inviteUrl = useMemo(() => invitationUrl('fund', code), [code])
+  const [cardStatus, setCardStatus] = useState('')
+  const [preparingCard, setPreparingCard] = useState(false)
+  const inviteUrl = useMemo(() => fundShareUrl(code, updatedAt), [code, updatedAt])
   const shareText = `Join ${fundTitle} on Tshelo with invite code ${code}.`
 
   useEffect(() => {
@@ -42,6 +46,21 @@ export function InviteMembersDialog({ code, fundTitle, memberCount, onClose }: I
     else window.location.href = `sms:?&body=${message}`
   }
 
+  async function shareBrandedCard() {
+    setPreparingCard(true)
+    setCardStatus('')
+    try {
+      const result = await shareFundCard({ code, fundTitle, updatedAt, text: shareText })
+      setCardStatus(result === 'shared'
+        ? 'Your branded card and fund link are ready to send.'
+        : 'Your branded card was downloaded. Attach it in WhatsApp, then paste the link above.')
+    } catch {
+      setCardStatus('Could not prepare the branded card. Please try again.')
+    } finally {
+      setPreparingCard(false)
+    }
+  }
+
   return (
     <div className="tshelo-dashboard modal-root">
       <div className="overlay on" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
@@ -58,10 +77,12 @@ export function InviteMembersDialog({ code, fundTitle, memberCount, onClose }: I
               <button className="copybtn" type="button" onClick={copyInvite}>{copied ? 'Copied' : 'Copy'}</button>
             </div>
             <div className="sharegrid">
-              <button type="button" onClick={() => share('whatsapp')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5l1.4-4.6A8.2 8.2 0 1112 20.2a8.2 8.2 0 01-4.2-1.15z" /></svg>WhatsApp</button>
+              <button type="button" onClick={shareBrandedCard} disabled={preparingCard}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM7 15l3-3 2 2 3-4 2 5" /></svg>{preparingCard ? 'Preparing…' : 'Share branded card'}</button>
+              <button type="button" onClick={() => share('whatsapp')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5l1.4-4.6A8.2 8.2 0 1112 20.2a8.2 8.2 0 01-4.2-1.15z" /></svg>WhatsApp link</button>
               <button type="button" onClick={() => share('sms')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>SMS</button>
             </div>
-            <div className="mnote"><b>{memberCount} member{memberCount === 1 ? '' : 's'} currently in this fund.</b> Share this invite only with people who should be able to see the fund&apos;s financial activity.</div>
+            {cardStatus && <p className="member-form-note share-card-status" role="status">{cardStatus}</p>}
+            <div className="mnote"><b>{memberCount} member{memberCount === 1 ? '' : 's'} currently in this fund.</b> Use Share branded card for a consistent image; WhatsApp link previews can take a moment to load.</div>
           </div>
           <footer><button className="btn purple" type="button" onClick={onClose}>Done</button></footer>
         </section>

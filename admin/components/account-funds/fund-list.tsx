@@ -144,7 +144,7 @@ export function FundList() {
   const [reload, setReload] = useState(0)
   const [inviting, setInviting] = useState('')
   const [inviteError, setInviteError] = useState('')
-  const [invite, setInvite] = useState<{ code: string; fundTitle: string; memberCount: number } | null>(null)
+  const [invite, setInvite] = useState<{ code: string; fundTitle: string; memberCount: number; updatedAt: string } | null>(null)
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
 
   const retry = useCallback(() => {
@@ -225,6 +225,7 @@ export function FundList() {
         code: workspace.fund.fund_code,
         fundTitle: workspace.fund.title,
         memberCount: workspace.fund.totals.member_count,
+        updatedAt: workspace.fund.updated_at,
       })
     } catch (cause) {
       setInviteError(apiErrorMessage(cause))

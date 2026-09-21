@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Award, BadgeDollarSign, Check, CircleCheck, Copy, RefreshCw, Settings, Share2, UsersRound } from 'lucide-react'
 import { isExpenseCategory, type FundMemberStatus, type FundSponsorshipItem, type FundWorkspace, type RichAuntieAward, type UpdateFundRequest, type User } from '@shared/contracts'
-import { invitationUrl } from '@shared/invitations'
+import { fundShareUrl } from '@shared/invitations'
 import { StatusPill } from '@/components/status-pill'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage, runApiRead } from '@/lib/api-ui'
@@ -42,7 +42,7 @@ function Summary({ data, onViewActivity }: { data: WorkspaceData; onViewActivity
   const { workspace, user } = data
   const { fund } = workspace
   const canInvite = fund.status === 'active' && (fund.owner_id === user.id || workspace.permissions.includes('manage_members'))
-  const inviteUrl = invitationUrl('fund', fund.fund_code)
+  const inviteUrl = fundShareUrl(fund.fund_code, fund.updated_at)
   const [copied, setCopied] = useState<'code' | 'invite' | null>(null)
   const goal = Number(fund.goal_amount ?? 0)
   const raised = Number(fund.totals.raised)
@@ -429,7 +429,7 @@ function FundSettings({ data, reload }: { data: WorkspaceData; reload: () => voi
         {error && <p className="member-form-error" role="alert">{error}</p>}
       </div>
     </section>
-    {inviteOpen && <InviteMembersDialog code={inviteCode} fundTitle={fund.title} memberCount={fund.totals.member_count} onClose={() => setInviteOpen(false)} />}
+    {inviteOpen && <InviteMembersDialog code={inviteCode} fundTitle={fund.title} memberCount={fund.totals.member_count} updatedAt={fund.updated_at} onClose={() => setInviteOpen(false)} />}
     </>
   )
 }

@@ -580,7 +580,9 @@ tbody tr:hover { background: #fcfbfd; }
 .tshelo-dashboard .sharegrid { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px; margin-top: 14px; }
 .tshelo-dashboard .sharegrid button { display: grid; justify-items: center; gap: 7px; padding: 14px 10px; background: var(--cream); border: 1px solid var(--rule-2); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
 .tshelo-dashboard .sharegrid button:hover { color: var(--purple-dk); border-color: var(--purple); }
+.tshelo-dashboard .sharegrid button:disabled { opacity: .55; cursor: wait; }
 .tshelo-dashboard .sharegrid svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tshelo-dashboard .share-card-status { margin: 12px 0 0; }
 .tshelo-dashboard .linkbox { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 12px 14px; background: var(--cream); border-radius: var(--r-sm); }
 .tshelo-dashboard .linkbox code { flex: 1; overflow: hidden; font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
 .tshelo-dashboard .copybtn { padding: 6px 13px; color: var(--purple-dk); background: var(--purple-soft); border: 0; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }

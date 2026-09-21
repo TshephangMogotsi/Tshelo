@@ -14,6 +14,7 @@ import type {
   User,
 } from '@shared/contracts'
 import { FUND_PERMISSION_KEYS } from '@shared/contracts'
+import { shareFundCard } from '@/lib/fund-share-card'
 import { createApiClient } from '@/lib/api-client'
 import { apiErrorMessage, runApiRead } from '@/lib/api-ui'
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog'
@@ -307,8 +308,8 @@ function ActivityAndReports({ data }: { data: WorkspaceData }) {
     setBusy('share'); setError('')
     try {
       const text = `${workspace.fund.title} · Invite code ${workspace.fund.fund_code}`
-      if (navigator.share) await navigator.share({ title: workspace.fund.title, text, url: window.location.href })
-      else { await navigator.clipboard.writeText(`${text}\n${window.location.href}`); window.alert('Fund link copied.') }
+      const result = await shareFundCard({ code: workspace.fund.fund_code, fundTitle: workspace.fund.title, updatedAt: workspace.fund.updated_at, text })
+      if (result === 'downloaded') window.alert('Your branded fund card was downloaded. Attach it in WhatsApp, then paste the fund link.')
       await createApiClient().funds.createExport(workspace.fund.id, { export_type: 'share' })
       setBusy('')
     } catch (cause) { if ((cause as DOMException)?.name !== 'AbortError') setError(apiErrorMessage(cause)); setBusy('') }
@@ -316,7 +317,7 @@ function ActivityAndReports({ data }: { data: WorkspaceData }) {
 
   return <>
     <section className="member-card" id="history">
-      <header><div className="member-section-title"><span><Activity size={18} /></span><h2>History & reports</h2></div>{canExport && <div className="member-inline-actions"><button type="button" disabled={Boolean(busy)} onClick={exportCsv}><Download size={13} /> {busy === 'csv' ? 'Preparing…' : 'CSV'}</button><button type="button" disabled={Boolean(busy)} onClick={printReport}><FileText size={13} /> {busy === 'pdf' ? 'Generating…' : 'Generate PDF'}</button><button type="button" disabled={Boolean(busy)} onClick={share}><Share2 size={13} /> Share</button></div>}</header>
+      <header><div className="member-section-title"><span><Activity size={18} /></span><h2>History & reports</h2></div>{canExport && <div className="member-inline-actions"><button type="button" disabled={Boolean(busy)} onClick={exportCsv}><Download size={13} /> {busy === 'csv' ? 'Preparing…' : 'CSV'}</button><button type="button" disabled={Boolean(busy)} onClick={printReport}><FileText size={13} /> {busy === 'pdf' ? 'Generating…' : 'Generate PDF'}</button><button type="button" disabled={Boolean(busy)} onClick={share}><Share2 size={13} /> {busy === 'share' ? 'Preparing…' : 'Share branded card'}</button></div>}</header>
       <div className="member-card-body">
         {summary && <div className="member-report-summary"><div><span>Confirmed</span><strong>{formatMoney(String(summary.confirmed), workspace.fund.currency_code)}</strong></div><div><span>Spent</span><strong>{formatMoney(String(summary.spent), workspace.fund.currency_code)}</strong></div><div><span>Snapshot</span><strong>{formatDate(report?.history_snapshot_at ?? '')}</strong></div></div>}
         <div className="member-history-filter"><label><span>Activity type</span><select value={filter} onChange={event => setFilter(event.target.value)}><option value="">Everything</option><option value="contribution">Contributions</option><option value="expense">Expenses</option><option value="member">Members</option><option value="fund">Fund changes</option></select></label></div>

@@ -45,6 +45,20 @@ export function invitationUrl(kind: InvitationKind, code: string): string {
   return `${INVITATION_WEB_ORIGIN}${invitationPath(kind, code)}`
 }
 
+/**
+ * A public, read-only fund page intended for social sharing. It deliberately
+ * uses the same high-entropy invite code as the join flow, but never exposes
+ * fund ledger data.
+ */
+export function fundShareUrl(code: string, updatedAt?: string | null): string {
+  const normalizedCode = normalizeInvitationCode(code)
+  if (!normalizedCode) throw new Error('Invalid fund share code.')
+  const url = new URL(`/share/f/${encodeURIComponent(normalizedCode)}`, INVITATION_WEB_ORIGIN)
+  const timestamp = updatedAt ? Date.parse(updatedAt) : Number.NaN
+  if (Number.isFinite(timestamp)) url.searchParams.set('v', String(Math.floor(timestamp / 1000)))
+  return url.toString()
+}
+
 export function invitationAccountPath({ kind, code }: Invitation): string {
   const normalizedCode = normalizeInvitationCode(code)
   if (!normalizedCode) throw new Error('Invalid invitation code.')

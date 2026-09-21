@@ -8,13 +8,14 @@ const supabase = createClient(
 Deno.serve(async (req) => {
   const url  = new URL(req.url)
   const code = url.searchParams.get('code')?.trim().toUpperCase()
+  const format = url.searchParams.get('format')
 
-  if (!code) return errorPage('Missing fund code.', 400)
+  if (!code) return previewError('Missing fund code.', 400, format)
 
   const { data: rows } = await supabase.rpc('find_fund_by_code', { p_code: code })
   const fund = rows?.[0] ?? null
 
-  if (!fund) return errorPage('This invite link is invalid or the fund no longer exists.', 404)
+  if (!fund) return previewError('This invite link is invalid or the fund no longer exists.', 404, format)
 
   const { count } = await supabase
     .from('fund_members')
@@ -40,6 +41,23 @@ Deno.serve(async (req) => {
 
   const pageUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/fund-preview?code=${encodeURIComponent(code)}`
   const invitationUrl = `https://app.tshelo.com/invite/fund/${encodeURIComponent(code)}`
+
+  // The Vercel share page consumes only this safe, public subset. Keep the
+  // response equivalent to the existing social-preview content: no balances,
+  // contributions, expenses, phone numbers, or member identities.
+  if (format === 'json') {
+    return Response.json({
+      code,
+      title: fund.title,
+      organiserName: fund.organiser_name ?? 'Tshelo',
+      goalAmount: fund.goal_amount ?? null,
+      currencyCode: fund.currency_code,
+      memberCount,
+      status: fund.status,
+      invitationUrl,
+      description: ogDescription,
+    }, { headers: { 'Cache-Control': 'public, max-age=60' } })
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -213,6 +231,13 @@ Deno.serve(async (req) => {
     },
   })
 })
+
+function previewError(message: string, status: number, format: string | null): Response {
+  if (format === 'json') {
+    return Response.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } })
+  }
+  return errorPage(message, status)
+}
 
 function h(str: string): string {
   return str
