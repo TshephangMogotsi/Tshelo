@@ -10,6 +10,7 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Icon')
 const React = require('react')
 const { act, create } = require('react-test-renderer')
 const { Text } = require('react-native')
+const appConfig = require('../../../app.json')
 const AboutLegalScreen = require('../AboutLegalScreen').default
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -40,7 +41,7 @@ function hasText(label) {
 it('shows Tshelo information and the configured app version', () => {
   expect(hasText('Tshelo')).toBe(true)
   expect(hasText('Plan together. Contribute transparently.')).toBe(true)
-  expect(hasText('Version 1.0.0')).toBe(true)
+  expect(hasText(`Version ${appConfig.expo.version}`)).toBe(true)
 })
 
 it.each([

@@ -7,6 +7,10 @@ import { supabase } from './supabase'
 import type { MobileMoneyProvider } from './providers'
 import type { EventSubscription } from 'expo-modules-core'
 
+// Leave the implementation in place for a later policy-compliant release.
+// This launch build must not request or receive SMS messages.
+const SMS_WATCHER_ENABLED = false
+
 // A money-in SMS the watcher recognised. Serialisable — it travels
 // through the notification data payload into AssignContribution.
 export type DetectedSms = {
@@ -80,11 +84,11 @@ async function notifyDetected(detected: DetectedSms, userId: string) {
   })
 }
 
-// Requests the SMS permission and starts watching incoming messages.
+// Requests the SMS permission and starts watching incoming messages when enabled.
 // Returns the subscription (remove() to stop), or null when unavailable
-// (iOS, permission denied, or module missing from the native build).
+// (feature disabled, iOS, permission denied, or module missing from the native build).
 export async function startSmsWatcher(userId: string): Promise<EventSubscription | null> {
-  if (Platform.OS !== 'android') return null
+  if (!SMS_WATCHER_ENABLED || Platform.OS !== 'android') return null
 
   const granted = await PermissionsAndroid.request(
     PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,

@@ -31,9 +31,14 @@ import { parseInvitationUrl, type Invitation } from '@shared/invitations'
 import { clearPendingInvitation, readPendingInvitation, rememberPendingInvitation } from './navigation/pendingInvitation'
 
 const ONBOARDING_KEY = 'tshelo_onboarded_v1'
+const STARTUP_TIMEOUT_MS = 5_000
 
-// Keep the native splash visible until fonts + onboarding state are ready
-SplashScreen.preventAutoHideAsync()
+// Keep the native splash visible while startup state is restored. Every
+// asynchronous startup path below has a fallback so this can never trap a
+// user on the splash screen indefinitely.
+void SplashScreen.preventAutoHideAsync().catch(error => {
+  console.warn('Could not keep the splash screen visible during startup.', error)
+})
 SplashScreen.setOptions({ fade: true, duration: 300 })
 
 export const navigationRef = createNavigationContainerRef<MainStackParamList>()
@@ -152,7 +157,7 @@ function RootNavigator({ initialAuthRoute, navigationReady }: { initialAuthRoute
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     'Fraunces-Regular':  require('./assets/fonts/Fraunces_72pt-Regular.ttf'),
     'Fraunces-SemiBold': require('./assets/fonts/Fraunces_72pt-SemiBold.ttf'),
     'Fraunces-Bold':     require('./assets/fonts/Fraunces_72pt-Bold.ttf'),
@@ -168,26 +173,71 @@ export default function App() {
   const [hasOnboarded,    setHasOnboarded]    = useState<boolean | null>(null)
   const [initialAuthRoute, setInitialAuthRoute] = useState<'Welcome' | 'CountrySelect' | 'Login'>('Welcome')
   const [navigationReady, setNavigationReady] = useState(false)
+  const [fontLoadTimedOut, setFontLoadTimedOut] = useState(false)
 
   useEffect(() => {
-    AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
-      setHasOnboarded(val === 'true')
-    })
+    if (fontError) {
+      console.error('Could not load app fonts; continuing with system fonts.', fontError)
+      return
+    }
+    if (fontsLoaded) return
+
+    const timeout = setTimeout(() => {
+      console.warn('App fonts did not finish loading; continuing with system fonts.')
+      setFontLoadTimedOut(true)
+    }, STARTUP_TIMEOUT_MS)
+
+    return () => clearTimeout(timeout)
+  }, [fontError, fontsLoaded])
+
+  useEffect(() => {
+    let active = true
+    let settled = false
+
+    function finish(onboarded: boolean) {
+      if (!active || settled) return
+      settled = true
+      setHasOnboarded(onboarded)
+    }
+
+    const timeout = setTimeout(() => {
+      if (settled) return
+      console.warn('Timed out restoring onboarding state; showing onboarding instead.')
+      finish(false)
+    }, STARTUP_TIMEOUT_MS)
+
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then(val => finish(val === 'true'))
+      .catch(error => {
+        console.error('Could not restore onboarding state; showing onboarding instead.', error)
+        finish(false)
+      })
+
+    return () => {
+      active = false
+      clearTimeout(timeout)
+    }
   }, [])
 
-  const appReady = fontsLoaded && hasOnboarded !== null
+  const fontsReady = fontsLoaded || fontError !== null || fontLoadTimedOut
+  const appReady = fontsReady && hasOnboarded !== null
 
   useEffect(() => {
-    if (appReady) SplashScreen.hideAsync()
+    if (!appReady) return
+    void SplashScreen.hideAsync().catch(error => {
+      console.error('Could not hide the splash screen after startup.', error)
+    })
   }, [appReady])
 
-  // Splash stays up until fonts and AsyncStorage are ready
+  // Splash stays up until startup completes, with a five-second fallback.
   if (!appReady) return null
 
-  async function completeOnboarding(dest?: 'CountrySelect' | 'Login') {
+  function completeOnboarding(dest?: 'CountrySelect' | 'Login') {
     if (dest) setInitialAuthRoute(dest)
-    await AsyncStorage.setItem(ONBOARDING_KEY, 'true')
     setHasOnboarded(true)
+    void AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(error => {
+      console.error('Could not persist onboarding state.', error)
+    })
   }
 
   if (!hasOnboarded) {

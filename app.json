@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tshelo",
     "slug": "tshelo",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -37,7 +37,6 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.tshelo.app",
-      "permissions": ["android.permission.RECEIVE_SMS"],
       "intentFilters": [
         {
           "action": "VIEW",
