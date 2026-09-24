@@ -84,6 +84,9 @@ does not contain reviewer credentials, API keys, or other secrets.
   deleted/retained data categories, and a 30-day completion target for
   straightforward verified requests. The form creates a reviewable support
   ticket only for a matching account; it does not delete any account itself.
+- [x] Public deletion-request form deployed and verified at
+  `https://app.tshelo.com/legal/account-deletion/request`; its backing
+  Supabase ticket function is applied to the linked project.
 - [ ] Enter `https://app.tshelo.com/legal/account-deletion` in the Google Play
   Data safety declaration after the latest web deployment is live.
 - [ ] Data safety data-type and purpose selections still need to be completed
