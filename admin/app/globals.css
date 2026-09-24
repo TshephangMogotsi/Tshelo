@@ -1809,6 +1809,28 @@ tbody tr:hover { background: #fcfbfd; }
 .member-policy-hero > p { max-width: 68ch; margin: 13px 0 0; color: #c9d1e1; font-family: var(--font-fraunces), Georgia, serif; font-size: 14px; line-height: 1.6; }
 .deletion-request-link { width: fit-content; display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; padding: 11px 15px; color: #1a1230; background: #fff; border-radius: 999px; box-shadow: 0 5px 16px rgba(0,0,0,.15); font-size: 11px; font-weight: 800; }
 .deletion-request-link:hover { color: #fff; background: var(--purple); }
+.deletion-request-page { max-width: 760px; }
+.deletion-request-form { display: grid; gap: 18px; margin: 28px 0 0; padding: 30px; background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+.deletion-request-form-heading { display: flex; align-items: flex-start; gap: 11px; padding-bottom: 17px; border-bottom: 1px solid var(--line); color: var(--purple-dark); }
+.deletion-request-form-heading h2 { margin: 0; color: var(--ink); font-family: var(--font-fraunces), Georgia, serif; font-size: 22px; }
+.deletion-request-form-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.deletion-request-form > label:not(.deletion-request-check):not(.deletion-request-honeypot) { display: grid; gap: 6px; }
+.deletion-request-form > label > span { color: var(--ink); font-size: 11px; font-weight: 750; }
+.deletion-request-form b { color: var(--red); }
+.deletion-request-form i { color: var(--muted); font-style: normal; font-weight: 500; }
+.deletion-request-form small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.deletion-request-check { display: flex; align-items: flex-start; gap: 9px; color: var(--ink); font-size: 11px; line-height: 1.55; }
+.deletion-request-check input { flex: 0 0 auto; margin: 2px 0 0; }
+.deletion-request-honeypot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.deletion-request-form button { width: fit-content; display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; color: white; background: var(--purple); border: 0; border-radius: 9px; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+.deletion-request-form button:hover:not(:disabled) { background: var(--purple-dark); }
+.deletion-request-form button:disabled { opacity: .65; cursor: wait; }
+.deletion-request-error { margin: 0; padding: 10px 12px; color: #a42417; background: #fff1ef; border: 1px solid #f2c9c3; border-radius: 8px; font-size: 11px; line-height: 1.45; }
+.deletion-request-fallback { margin: -4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.deletion-request-fallback a, .deletion-request-success a { color: var(--purple-dark); font-weight: 750; text-decoration: underline; }
+.deletion-request-success { display: flex; align-items: flex-start; gap: 12px; margin: 28px 0 0; padding: 26px 28px; color: #175b3d; background: #f0faf3; border: 1px solid #b9dec4; border-radius: 18px; }
+.deletion-request-success h2 { margin: 0; color: #175b3d; font-family: var(--font-fraunces), Georgia, serif; font-size: 22px; }
+.deletion-request-success p { margin: 7px 0 0; color: #315d48; font-size: 11px; line-height: 1.6; }
 .member-policy-meta { display: flex; gap: 26px; flex-wrap: wrap; margin: 27px 0 0; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.18); }
 .member-policy-meta div { display: grid; gap: 3px; }
 .member-policy-meta dt { color: #9ca9c1; font-size: 7px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }

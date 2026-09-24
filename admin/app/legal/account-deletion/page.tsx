@@ -1,6 +1,6 @@
 import type { Metadata, Route } from 'next'
 import Link from 'next/link'
-import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ClipboardPenLine, ShieldCheck } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: { absolute: 'Delete your Tshelo account' },
@@ -13,7 +13,7 @@ const sections = [
     title: 'Request account deletion',
     paragraphs: [
       'The quickest way is in the Tshelo app: open Account, choose Security, then choose Request account closure. You must be signed in to submit that request.',
-      'If you no longer have the app, use the request link above or email support@tshelo.co.bw with the subject “Tshelo account deletion request”. Include the mobile number or email address registered to your Tshelo account. Do not send passwords, one-time codes, or bank details by email.',
+      'If you no longer have the app, use the request form above or email support@tshelo.co.bw with the subject “Tshelo account deletion request”. Include the mobile number or email address registered to your Tshelo account. Do not send passwords, one-time codes, or bank details by email.',
     ],
   },
   {
@@ -61,9 +61,9 @@ export default function AccountDeletionPage() {
         <span className="member-policy-eyebrow"><ShieldCheck size={14} /> Account and data controls</span>
         <h1>Delete your <em>Tshelo account</em></h1>
         <p>Request the deletion of your Tshelo account and associated personal data. We explain the small set of shared records that may need to be retained below.</p>
-        <a className="deletion-request-link" href="mailto:support@tshelo.co.bw?subject=Tshelo%20account%20deletion%20request">
-          <Mail size={16} /> Request account deletion
-        </a>
+        <Link className="deletion-request-link" href={'/legal/account-deletion/request' as Route}>
+          <ClipboardPenLine size={16} /> Request account deletion
+        </Link>
       </header>
 
       <div className="member-policy-layout">

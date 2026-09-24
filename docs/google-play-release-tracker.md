@@ -80,9 +80,12 @@ does not contain reviewer credentials, API keys, or other secrets.
 - [x] Account-deletion URL: a dedicated public page is live and verified at
   `https://app.tshelo.com/legal/account-deletion` (HTTP 200). Do **not** use
   the existing privacy-policy page for this requirement.
-  before entering `https://app.tshelo.com/legal/account-deletion` in Play
-  Console. It includes an email and in-app request path, deleted/retained data
-  categories, and a proposed 30-day completion target for verified requests.
+  It includes a public request form, email and in-app request paths,
+  deleted/retained data categories, and a 30-day completion target for
+  straightforward verified requests. The form creates a reviewable support
+  ticket only for a matching account; it does not delete any account itself.
+- [ ] Enter `https://app.tshelo.com/legal/account-deletion` in the Google Play
+  Data safety declaration after the latest web deployment is live.
 - [ ] Data safety data-type and purpose selections still need to be completed
   from the actual app/service data inventory.
 
@@ -97,7 +100,7 @@ does not contain reviewer credentials, API keys, or other secrets.
 - [x] Associated Supabase migration applied to the linked database.
 - [x] Automated verification passed before the latest small provisioning-script
   adjustment.
-- [ ] Commit the reviewer-access code and documentation, excluding unrelated
+- [x] Reviewer-access code and documentation committed, excluding unrelated
   local files.
 - [ ] Build and upload a new Android App Bundle that contains this sign-in
   route. Its version code must be greater than 11.
@@ -108,8 +111,8 @@ does not contain reviewer credentials, API keys, or other secrets.
 
 ### Store and policy
 
-- [ ] Deploy the dedicated public account-deletion page and enter its URL in
-  the Data safety declaration.
+- [x] Deploy the dedicated public account-deletion page.
+- [ ] Enter its URL in the Data safety declaration.
 - [ ] Complete and submit Data safety, content rating, app-content questions,
   store listing, category/contact details, and all dashboard-required tasks.
 - [ ] Ensure the Privacy Policy and Terms explicitly state the adult-only
