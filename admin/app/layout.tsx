@@ -24,6 +24,10 @@ export const metadata: Metadata = {
     template: '%s · Tshelo Admin',
   },
   description: 'Secure operations dashboard for the Tshelo platform.',
+  icons: {
+    icon: [{ url: '/tshelo-icon.png', type: 'image/png', sizes: '512x512' }],
+    apple: [{ url: '/tshelo-icon.png', type: 'image/png', sizes: '512x512' }],
+  },
   robots: { index: false, follow: false },
 }
 
