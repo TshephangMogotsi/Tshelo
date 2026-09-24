@@ -77,9 +77,9 @@ does not contain reviewer credentials, API keys, or other secrets.
 - [ ] Finish and submit the content-rating questionnaire; verify its generated
   rating on the summary screen before saving.
 - [ ] Finish the Data safety declaration.
-- [ ] Account-deletion URL: do **not** use the existing privacy-policy page.
-  A dedicated public page has been implemented locally at
-  `/legal/account-deletion`; it still needs review, commit, and deployment
+- [x] Account-deletion URL: a dedicated public page is live and verified at
+  `https://app.tshelo.com/legal/account-deletion` (HTTP 200). Do **not** use
+  the existing privacy-policy page for this requirement.
   before entering `https://app.tshelo.com/legal/account-deletion` in Play
   Console. It includes an email and in-app request path, deleted/retained data
   categories, and a proposed 30-day completion target for verified requests.
