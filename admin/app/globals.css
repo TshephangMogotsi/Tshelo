@@ -1807,6 +1807,8 @@ tbody tr:hover { background: #fcfbfd; }
 .member-policy-hero h1 { max-width: 740px; margin: 11px 0 0; font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(32px, 4vw, 48px); line-height: 1.02; font-weight: 600; letter-spacing: -.025em; }
 .member-policy-hero h1 em { color: #af86ff; font-style: italic; }
 .member-policy-hero > p { max-width: 68ch; margin: 13px 0 0; color: #c9d1e1; font-family: var(--font-fraunces), Georgia, serif; font-size: 14px; line-height: 1.6; }
+.deletion-request-link { width: fit-content; display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; padding: 11px 15px; color: #1a1230; background: #fff; border-radius: 999px; box-shadow: 0 5px 16px rgba(0,0,0,.15); font-size: 11px; font-weight: 800; }
+.deletion-request-link:hover { color: #fff; background: var(--purple); }
 .member-policy-meta { display: flex; gap: 26px; flex-wrap: wrap; margin: 27px 0 0; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.18); }
 .member-policy-meta div { display: grid; gap: 3px; }
 .member-policy-meta dt { color: #9ca9c1; font-size: 7px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }

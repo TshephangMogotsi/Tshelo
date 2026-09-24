@@ -3,6 +3,7 @@ import { AuthStackParamList } from './types'
 import WelcomeScreen from '../screens/auth/WelcomeScreen'
 import CountrySelectScreen from '../screens/auth/CountrySelectScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
+import ReviewLoginScreen from '../screens/auth/ReviewLoginScreen'
 import RegisterScreen from '../screens/auth/RegisterScreen'
 import OTPScreen from '../screens/auth/OTPScreen'
 import BankDetailsScreen from '../screens/auth/BankDetailsScreen'
@@ -19,6 +20,7 @@ export default function AuthNavigator({ initialRouteName = 'Welcome' }: { initia
       <Stack.Screen name="Welcome"       component={WelcomeScreen}       />
       <Stack.Screen name="CountrySelect" component={CountrySelectScreen}  />
       <Stack.Screen name="Login"         component={LoginScreen}          />
+      <Stack.Screen name="ReviewLogin"   component={ReviewLoginScreen}    />
       <Stack.Screen name="Register"     component={RegisterScreen} />
       <Stack.Screen name="OTP"         component={OTPScreen}         />
       <Stack.Screen name="BankDetails" component={BankDetailsScreen} />

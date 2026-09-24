@@ -19,6 +19,7 @@ type AuthContextType = {
   preferredCurrency: string | null
   tokenBalance: number
   trustScore: number
+  isGooglePlayReviewer: boolean
   refreshProfile: () => Promise<void>
   loadSecuritySession: () => Promise<SecuritySessionDetails>
   signOutOtherSessions: () => Promise<void>
@@ -36,9 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [preferredCurrency, setPreferredCurrency] = useState<string | null>(null)
   const [tokenBalance, setTokenBalance] = useState(0)
   const [trustScore, setTrustScore] = useState(0)
+  const [isGooglePlayReviewer, setIsGooglePlayReviewer] = useState(false)
 
-  const checkProfile = useCallback(async (uid: string) => {
+  const checkProfile = useCallback(async (uid: string, googlePlayReviewer = false) => {
     setUserId(uid)
+    setIsGooglePlayReviewer(googlePlayReviewer)
     // Attach any Event + Fund organiser invitations that were sent to this
     // account's verified profile phone before the user next opened the app.
     try {
@@ -64,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setIsAuthenticated(!!session)
-      if (session) await checkProfile(session.user.id)
+      if (session) await checkProfile(session.user.id, session.user.app_metadata?.google_play_reviewer === true)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -72,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Auth callbacks run while Supabase holds its auth lock. Do not await a
       // Supabase query here or the callback (and navigator update) can stall
       // until the app is restarted.
-      if (session) void checkProfile(session.user.id)
+      if (session) void checkProfile(session.user.id, session.user.app_metadata?.google_play_reviewer === true)
       else {
         setProfileCompleted(false)
         setUserId(null)
@@ -81,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPreferredCurrency(null)
         setTokenBalance(0)
         setTrustScore(0)
+        setIsGooglePlayReviewer(false)
       }
     })
 
@@ -89,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    if (session) await checkProfile(session.user.id)
+    if (session) await checkProfile(session.user.id, session.user.app_metadata?.google_play_reviewer === true)
   }, [checkProfile])
 
   const loadSecuritySession = useCallback(async (): Promise<SecuritySessionDetails> => {
@@ -120,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPreferredCurrency(null)
     setTokenBalance(0)
     setTrustScore(0)
+    setIsGooglePlayReviewer(false)
   }, [])
 
   return (
@@ -132,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       preferredCurrency,
       tokenBalance,
       trustScore,
+      isGooglePlayReviewer,
       refreshProfile,
       loadSecuritySession,
       signOutOtherSessions,

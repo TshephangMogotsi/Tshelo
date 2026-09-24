@@ -23,6 +23,7 @@
     "verify": "npm run typecheck && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security && npm run test:db-bootstrap && npm run test:dependency-security && npm run test:ios-simulator",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
+    "provision:google-play-reviewer": "node scripts/provision-google-play-reviewer.mjs",
     "postinstall": "patch-package"
   },
   "engines": {

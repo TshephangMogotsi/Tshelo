@@ -134,6 +134,15 @@ export default function LoginScreen({ navigation }: Props) {
               <Text style={styles.footerLink}>Create One</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ReviewLogin')}
+            accessibilityRole="button"
+            accessibilityLabel="Google Play reviewer access"
+            style={styles.reviewAccessLink}
+          >
+            <Text style={styles.reviewAccessText}>Google Play reviewer access</Text>
+          </TouchableOpacity>
         </ScrollView>
 
       </KeyboardAvoidingView>
@@ -258,4 +267,14 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 14, color: colors.textSecondary },
   footerLink: { fontSize: 14, fontWeight: '700', color: colors.primaryMid },
+  reviewAccessLink: {
+    alignSelf: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  reviewAccessText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
 })

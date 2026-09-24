@@ -14,6 +14,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           <nav aria-label="Legal documents">
             <Link href={'/legal/terms' as Route}>Terms</Link>
             <Link href={'/legal/privacy' as Route}>Privacy</Link>
+            <Link href={'/legal/account-deletion' as Route}>Delete account</Link>
             <Link className="legal-sign-in" href={'/login' as Route}>Sign in</Link>
           </nav>
         </div>

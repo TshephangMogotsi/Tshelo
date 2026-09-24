@@ -62,6 +62,7 @@ describe('mobile API migration boundaries', () => {
       'lib/api.ts',
       'context/AuthContext.tsx',
       'screens/auth/LoginScreen.tsx',
+      'screens/auth/ReviewLoginScreen.tsx',
       'screens/auth/OTPScreen.tsx',
       'screens/auth/ProfileSetupScreen.tsx',
       'screens/auth/RegisterScreen.tsx',

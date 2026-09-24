@@ -30,6 +30,7 @@ export type AuthStackParamList = {
   Welcome:       undefined
   CountrySelect: undefined
   Login:         undefined
+  ReviewLogin:   undefined
   Register:      { countryCode?: string; countryName?: string; currency?: string; flag?: string; dialCode?: string } | undefined
   OTP: {
     phone: string

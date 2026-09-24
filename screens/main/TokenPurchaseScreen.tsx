@@ -99,7 +99,7 @@ function OfferCard({
 
 export default function TokenPurchaseScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme()
-  const { tokenBalance, refreshProfile } = useAuth()
+  const { tokenBalance, refreshProfile, isGooglePlayReviewer } = useAuth()
   const styles = makeStyles(colors)
 
   const [selectedOfferId, setSelectedOfferId] = useState<CheckoutOfferId>('top_up_60')
@@ -115,6 +115,10 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
   }, [refreshProfile]))
 
   async function handlePurchase() {
+    if (isGooglePlayReviewer) {
+      Alert.alert('Unavailable in review mode', 'Purchases are disabled for the Google Play review account.')
+      return
+    }
     if (!checkoutUrl) return
 
     if (!await Linking.canOpenURL(checkoutUrl)) {
@@ -151,6 +155,13 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
             Choose a token top-up or a dated annual pass. Tokens are separate from trust points.
           </Text>
         </View>
+
+        {isGooglePlayReviewer && (
+          <View style={styles.reviewNotice}>
+            <Text style={styles.reviewNoticeTitle}>Google Play review mode</Text>
+            <Text style={styles.reviewNoticeText}>Purchases and paid upgrades are disabled for this sample account.</Text>
+          </View>
+        )}
 
         {/* ── What tokens do ───────────────────────── */}
         <View style={styles.usesCard}>
@@ -215,7 +226,7 @@ export default function TokenPurchaseScreen({ navigation, route }: Props) {
         </View>
 
         {/* ── Checkout action or availability ───────── */}
-        {checkoutUrl ? (
+        {checkoutUrl && !isGooglePlayReviewer ? (
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handlePurchase}
@@ -492,6 +503,23 @@ function makeStyles(colors: AppColors) {
     },
     passSummaryNote: {
       color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    reviewNotice: {
+      backgroundColor: colors.accentLight,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 18,
+    },
+    reviewNoticeTitle: {
+      color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    reviewNoticeText: {
+      color: colors.textSecondary,
       fontSize: 12,
       lineHeight: 18,
     },
