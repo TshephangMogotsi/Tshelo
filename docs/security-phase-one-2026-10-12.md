@@ -53,3 +53,12 @@ is required for these restrictions.
 Recovery: restore only a specifically justified grant or read policy after
 investigating a demonstrated dependency. Do not restore the blanket client grants
 or client-authored verification/SMS insert policies.
+
+## SMS privacy follow-up
+
+`20261012130000_protect_sms_log_content.sql` was subsequently applied on
+12 October. The SMS table was empty. It now has no client read access, and its
+active trigger discards raw message and arbitrary error text on future writes.
+Trusted server access remains available. The database regression test covers
+both migrations. See [the complete live classification inventory](security-data-classification-2026-10-12.md)
+for all 32 config/template rows, SMS review evidence and retention boundaries.

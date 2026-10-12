@@ -74,6 +74,34 @@ test('Phase 1 closes client writes/catalog reads while retaining owner reads and
     await db.query("INSERT INTO sms_logs(user_id,raw_message) VALUES ($1,'server-authored')", [owner])
     await db.query(`INSERT INTO mobile_money_verifications (user_id,country_code,provider,phone_number,expected_reference,expected_currency)
       VALUES ($1,'BW','orange_money','26771234567','SERVER-NEW','BWP')`, [owner])
+    await db.exec('RESET ROLE')
+    // Follow-up privacy boundary: even owners cannot read raw or parsed logs.
+    await db.exec('GRANT SELECT (raw_message) ON sms_logs TO authenticated')
+    await db.exec(await readFile(new URL('../../supabase/migrations/20261012130000_protect_sms_log_content.sql', import.meta.url), 'utf8'))
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`SET ROLE ${role}`)
+      await assert.rejects(db.query('SELECT * FROM sms_logs'), /permission denied/)
+      await assert.rejects(db.query('SELECT raw_message FROM sms_logs'), /permission denied/)
+      await assert.rejects(db.query('SELECT minimize_sms_log_content()'), /permission denied/)
+      await assert.rejects(db.query('INSERT INTO sms_logs DEFAULT VALUES'), /permission denied/)
+      await assert.rejects(db.query("UPDATE sms_logs SET raw_message='override'"), /permission denied/)
+      await assert.rejects(db.query('DELETE FROM sms_logs'), /permission denied/)
+      await db.exec('RESET ROLE')
+    }
+    await db.exec('SET ROLE service_role')
+    const inserted = await db.query(`INSERT INTO sms_logs(user_id,raw_message,parse_error,parsed_amount,parsed_reference,status)
+      VALUES ($1,'OTP 123456; bank account 0123456789','Failed to parse OTP 987654',25,'PAYMENT-REF','pending')
+      RETURNING id,raw_message,parse_error,parsed_amount,parsed_reference,status`, [owner])
+    assert.deepEqual(inserted.rows[0], {
+      id: inserted.rows[0].id,
+      raw_message: '[message content not retained]',
+      parse_error: '[processing error details not retained]',
+      parsed_amount: '25.00', parsed_reference: 'PAYMENT-REF', status: 'pending',
+    })
+    await db.query("UPDATE sms_logs SET raw_message='new OTP 222222',parse_error='secret',status='processed' WHERE id=$1", [inserted.rows[0].id])
+    assert.deepEqual((await db.query('SELECT raw_message,parse_error,status FROM sms_logs WHERE id=$1', [inserted.rows[0].id])).rows[0], {
+      raw_message: '[message content not retained]', parse_error: '[processing error details not retained]', status: 'processed',
+    })
   } finally {
     await db.close()
   }
