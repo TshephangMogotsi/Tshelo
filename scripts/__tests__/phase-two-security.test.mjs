@@ -103,5 +103,18 @@ test('Phase 2 membership, future-table defaults and waitlist controls', async ()
     assert.equal((await db.query('SELECT * FROM country_waitlist')).rows.length,0)
     await db.exec("UPDATE country_waitlist_rate_limits SET expires_at=now()-interval '1 day'")
     assert.equal((await db.query('SELECT consume_country_waitlist_limits($1,$2) AS allowed',['a'.repeat(64),['b'.repeat(64)]])).rows[0].allowed,true)
+    await db.exec('RESET ROLE')
+    // PGlite does not provide pg_cron. Test the real retention SQL here;
+    // scheduling is verified against the hosted extension after deployment.
+    const retention = await readFile(new URL('../../supabase/migrations/20261012170000_waitlist_retention_and_cleanup.sql',import.meta.url),'utf8')
+    await db.exec(retention.split('-- Read-only inspection')[0])
+    await asServer()
+    for(const email of ['fresh@example.test','notified@example.test','signedup@example.test','expired@example.test']) {
+      await db.query("SELECT submit_country_waitlist('KEN',$1,NULL)",[email])
+    }
+    assert.equal((await db.query("SELECT bool_and(expires_at=created_at+interval '12 months') AS correct FROM country_waitlist")).rows[0].correct,true)
+    await db.exec("UPDATE country_waitlist SET notified=true WHERE email='notified@example.test'; UPDATE country_waitlist SET signed_up=true WHERE email='signedup@example.test'; UPDATE country_waitlist SET expires_at=now()-interval '1 second' WHERE email='expired@example.test'")
+    await db.query('SELECT purge_expired_country_waitlist()')
+    assert.deepEqual((await db.query('SELECT email FROM country_waitlist')).rows,[{email:'fresh@example.test'}])
   } finally { await db.close() }
 })

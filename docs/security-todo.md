@@ -12,7 +12,8 @@ security remediation discussion; unchecked items are not yet verified complete.
 - [x] Validate supported country codes, contact formats and field lengths.
 - [x] Normalize contacts and handle duplicates without exposing existing entries.
 - [x] Add durable rate limits for IP/contact identity and server-validated CAPTCHA code.
-- [ ] Confirm the proposed 365-day retention period and configure scheduled deletion.
+- [x] Confirm the 12-month retention period and implement dedicated daily database cleanup.
+- [ ] Verify the cleanup job's first scheduled execution and monitor subsequent failures.
 - [x] Test invalid input, repeated submissions, abuse limits and denied direct access.
 - [x] Deploy and verify database permissions and server-only RPCs.
 - [ ] Configure Turnstile/secrets, deploy web routes and test real public submissions.

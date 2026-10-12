@@ -78,24 +78,25 @@ CAPTCHA uses server-validated Turnstile with the configured hostname and action
 
 Before public collection starts:
 
-1. Confirm the proposed **365-day** contact retention period. No contacts have
-   been collected under it; adjust the default and submission RPC if changed.
+1. Use the approved **12-calendar-month** contact retention period. Contacts are
+   removed sooner after launch notification, sign-up, or verified deletion request.
 2. Configure a production Turnstile widget for the actual hostname. Store its
    secret as `WAITLIST_TURNSTILE_SECRET_KEY`; set `WAITLIST_TURNSTILE_HOSTNAME`.
-3. Configure strong, distinct server secrets `WAITLIST_RATE_LIMIT_KEY` and
-   `WAITLIST_CLEANUP_SECRET`; do not expose them to browsers or commit them.
-4. Deploy the web/API code. Add a daily scheduled POST to
-   `/api/internal/country-waitlist-cleanup`, using
-   `Authorization: Bearer <WAITLIST_CLEANUP_SECRET>`. This deletes expired contacts
-   and expired rate-limit records. Monitor failures and verify cleanup runs.
+3. Configure a strong server secret `WAITLIST_RATE_LIMIT_KEY`. Optionally set
+   `WAITLIST_CLEANUP_SECRET` for the manual cleanup endpoint. Do not expose secrets
+   to browsers or commit them.
+4. Deploy the web/API code. Verify the dedicated database cleanup schedule
+   and monitor its job results. The protected cleanup endpoint is an optional
+   manual fallback; it does not need a second external schedule.
 5. Add the CAPTCHA-enabled submission UI if product requirements call for one,
    show the collection purpose/retention notice, and test a real token end to end.
 6. Set `WAITLIST_ENABLED=true` only after those checks pass.
 
 The database provides `purge_expired_country_waitlist()` for trusted schedulers.
-pg_cron is not enabled in this project. It was not enabled here because doing so
-could activate unrelated, previously configured reminder jobs. Cleanup is ready
-but **not scheduled**. A contacts' deletion request can be fulfilled by support
+The follow-up migration enables pg_cron and schedules only the dedicated cleanup
+job at 02:15 UTC (04:15 Botswana time) daily. Before enabling it, inspection
+confirmed no existing cron job table; the historical reminder migration skipped
+scheduling while the extension was absent. A contact's deletion request can be fulfilled by support
 after verifying contact ownership, using server-only deletion; neither record
 IDs nor contact-search endpoints are public.
 
@@ -122,4 +123,18 @@ Live checks confirm all three migration records, closed waitlist client writes,
 restricted helper execution, and the table-security guard. A temporary test table
 created as `postgres` received no automatic anon/authenticated grants; its entire
 transaction was rolled back. No production contact/member fixtures were created.
-Live CAPTCHA, scheduled cleanup and managed-admin-default changes remain pending.
+Live CAPTCHA and managed-admin-default changes remain pending. The cleanup job
+is configured by `20261012170000`; its actual first daily execution must be checked
+in `cron.job_run_details` after 04:15 Botswana time.
+
+Production configuration check: the confirmed Vercel project is
+`diginav/tshelo-admin`. It has Supabase configuration but no `WAITLIST_*` variables
+or CAPTCHA key. Keep public collection disabled until a production Turnstile
+widget and secret are configured. Never use a CAPTCHA test key in production.
+
+The approved retention migration `20261012170000` is deployed. Live verification
+confirmed the 12-month default and exactly one active cron job, the dedicated
+waitlist cleanup at 04:15 Botswana time daily. A direct cleanup invocation passed;
+the table remains empty. Production Vercel configuration explicitly contains
+`WAITLIST_ENABLED=false`. This is a configuration change for subsequent builds;
+the waitlist API has not been deployed or enabled.
