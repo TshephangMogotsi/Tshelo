@@ -72,6 +72,12 @@ jobs:
           --dbname postgres
           --set ON_ERROR_STOP=1
           --file supabase/tests/api_v1_boundaries.sql
+      - name: Verify future table access and RLS
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql --host 127.0.0.1 --port 54322 --username postgres --dbname postgres
+          --set ON_ERROR_STOP=1 --file supabase/tests/future_table_security.sql
       - name: Stop disposable database
         if: always()
         run: supabase stop --no-backup
