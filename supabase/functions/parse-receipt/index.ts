@@ -10,9 +10,26 @@ const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY') ?? Deno.env.get('Tshelo_k
 const anthropic = new Anthropic({ apiKey: anthropicKey })
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const auditClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+})
 const MAX_REQUEST_BYTES = 7_000_000
 const MAX_IMAGE_BYTES = 5_000_000
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const MODEL = 'claude-haiku-4-5'
+
+async function logScan(
+  userId: string, fundId: string, receiptPath: string | undefined,
+  result: unknown, failureCode: string | null = null, modelVersion = MODEL,
+) {
+  const { data, error } = await auditClient.rpc('log_receipt_scan', {
+    p_user_id: userId, p_fund_id: fundId, p_receipt_path: receiptPath ?? '', p_model: MODEL,
+    p_model_version: modelVersion, p_result: result, p_failure_code: failureCode,
+  })
+  if (error || typeof data !== 'string') throw new Error('Receipt scan audit logging failed')
+  return data
+}
 
 function base64(bytes: Uint8Array) {
   let binary = ''
@@ -39,7 +56,7 @@ const CATEGORY_VALUES = [
 const RECEIPT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['is_receipt', 'vendor', 'date', 'total', 'items'],
+  required: ['is_receipt', 'vendor', 'date', 'total', 'items', 'review_required', 'review_reasons'],
   properties: {
     is_receipt: {
       type: 'boolean',
@@ -75,6 +92,15 @@ const RECEIPT_SCHEMA = {
         },
       },
     },
+    review_required: {
+      type: 'boolean',
+      description: 'True if any key detail is unclear, inferred, missing, or the total does not clearly match the line items',
+    },
+    review_reasons: {
+      type: 'array',
+      description: 'Short, user-facing reasons to check the scan. Empty only when the key details are clear.',
+      items: { type: 'string' },
+    },
   },
 }
 
@@ -84,7 +110,8 @@ const PROMPT = `Extract the data from this receipt photo for an expense tracker 
 - Receipts may be thermal-printed, faded, crumpled, handwritten, or mix English and Setswana — do your best.
 - Combine quantity lines into a single item with the line total (e.g. "2 x Chibuku 15.00" -> name "Chibuku x2", amount 30).
 - Skip non-purchase lines (change, cash tendered, VAT breakdowns, loyalty points).
-- If the image is not a receipt or is too unreadable to extract anything, set is_receipt to false and return an empty items array.`
+- If the image is not a receipt or is too unreadable to extract anything, set is_receipt to false and return an empty items array.
+- Set review_required to true and explain why in review_reasons if the vendor, date, total, or line items are unclear, inferred, or incomplete. Do not guess. Set it to false only when these details are clearly legible and consistent.`
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +129,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  if (!anthropicKey || !supabaseUrl || !supabaseAnonKey) {
+  if (!anthropicKey || !supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
     return json({ error: 'Receipt parsing is not configured' }, 503)
   }
 
@@ -171,7 +198,7 @@ Deno.serve(async (req) => {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+      model: MODEL,
       max_tokens: 2048,
       output_config: { format: { type: 'json_schema', schema: RECEIPT_SCHEMA } },
       messages: [
@@ -186,15 +213,21 @@ Deno.serve(async (req) => {
     })
 
     if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') {
-      return json({ is_receipt: false, vendor: null, date: null, total: null, items: [] })
+      const result = { is_receipt: false, vendor: null, date: null, total: null, items: [], review_required: true, review_reasons: ['The receipt could not be read.'] }
+      return json({ ...result, audit_id: await logScan(user.id, fundId, receiptPath, result, response.stop_reason, response.model) })
     }
 
     const text = response.content.find((block) => block.type === 'text')?.text
-    if (!text) return json({ error: 'Empty model response' }, 502)
+    if (!text) {
+      await logScan(user.id, fundId, receiptPath, null, 'empty_model_response', response.model)
+      return json({ error: 'Empty model response' }, 502)
+    }
 
-    return json(JSON.parse(text))
+    const result = JSON.parse(text)
+    return json({ ...result, audit_id: await logScan(user.id, fundId, receiptPath, result, null, response.model) })
   } catch (error) {
     console.error('parse-receipt failed', error)
+    try { await logScan(user.id, fundId, receiptPath, null, 'parse_failed') } catch { /* preserve the original error response */ }
     return json({ error: 'Could not read the receipt' }, 502)
   }
 })

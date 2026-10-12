@@ -69,13 +69,18 @@ import {
 import type { MarkNotificationsReadRequest } from '@shared/contracts/notifications'
 import type { CreateExpensesRequest, UpdateExpenseRequest } from '@shared/contracts/expenses'
 import { isExpenseCategory } from '@shared/contracts/expenses'
-import type { CreateReceiptUploadSessionRequest, ParseReceiptRequest } from '@shared/contracts/receipts'
+import type { CompleteReceiptScanRequest, CreateReceiptUploadSessionRequest, ParseReceiptRequest } from '@shared/contracts/receipts'
 import { RECEIPT_MEDIA_TYPES } from '@shared/contracts/receipts'
 import type { CreateRichAuntieAwardRequest } from '@shared/contracts/rich-auntie'
 import { RICH_AUNTIE_REASON_CODES } from '@shared/contracts/rich-auntie'
 import type { CreateFundExportRequest } from '@shared/contracts/reports'
 import { FUND_EXPORT_TYPES } from '@shared/contracts/reports'
-import type { UpdateCurrentUserRequest } from '@shared/contracts/users'
+import {
+  NOTIFICATION_PREFERENCE_KEYS,
+  type CreateSupportReportRequest,
+  type UpdateCurrentUserRequest,
+} from '@shared/contracts/users'
+import { SUPPORT_REPORT_CATEGORIES } from '@shared/contracts/users'
 
 type JsonObject = Record<string, JsonValue | undefined>
 
@@ -727,11 +732,10 @@ export function validateUpdateCurrentUserRequest(
 
   const allowed = [
     'name', 'email', 'avatar_url', 'country_code', 'preferred_currency',
-    'notifications_enabled', 'mobile_money_provider', 'bank_name', 'bank_branch_code',
+    'notifications_enabled', 'notification_preferences', 'mobile_money_provider', 'bank_name', 'bank_branch_code',
     'bank_account_number', 'profile_completed', 'onboarding_completed',
-    'terms_accepted_at', 'terms_version', 'privacy_accepted_at', 'privacy_version',
-    'data_processing_consent', 'data_processing_consent_at',
-    'marketing_consent', 'marketing_consent_at', 'marketing_email_enabled', 'marketing_sms_enabled',
+    'terms_version', 'privacy_version', 'data_processing_consent',
+    'marketing_consent', 'marketing_email_enabled', 'marketing_sms_enabled',
   ] as const
   const errors: ApiFieldError[] = []
   rejectUnknownFields(value, allowed, errors)
@@ -775,14 +779,41 @@ export function validateUpdateCurrentUserRequest(
     'notifications_enabled', 'profile_completed', 'onboarding_completed',
     'data_processing_consent', 'marketing_consent', 'marketing_email_enabled', 'marketing_sms_enabled',
   ]) optionalBoolean(value, field, errors)
-  for (const field of [
-    'terms_accepted_at', 'privacy_accepted_at', 'data_processing_consent_at', 'marketing_consent_at',
-  ]) optionalIsoDateTime(value, field, errors)
-
+  if (value.notification_preferences !== undefined) {
+    const preferences = objectValue(value.notification_preferences)
+    if (!preferences) {
+      errors.push(issue('notification_preferences', 'invalid_type', 'Must be a notification preference object.'))
+    } else {
+      rejectUnknownFields(preferences, [...NOTIFICATION_PREFERENCE_KEYS], errors)
+      for (const key of NOTIFICATION_PREFERENCE_KEYS) {
+        if (typeof preferences[key] !== 'boolean') {
+          errors.push(issue(`notification_preferences.${key}`, 'invalid_boolean', 'Must be true or false.'))
+        }
+      }
+    }
+  }
   if (allowed.every(field => value[field] === undefined)) {
     errors.push(issue('body', 'empty_patch', 'At least one profile field must be supplied.'))
   }
   return finish<UpdateCurrentUserRequest>(value, errors)
+}
+
+export function validateCreateSupportReportRequest(
+  input: unknown,
+): ValidationResult<CreateSupportReportRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['category', 'description', 'platform'], errors)
+  if (!SUPPORT_REPORT_CATEGORIES.includes(value.category as never)) {
+    errors.push(issue('category', 'invalid_category', 'Choose a supported report category.'))
+  }
+  requireString(value, 'description', errors, 10, 2_000)
+  if (value.platform !== undefined && !['android', 'ios', 'web'].includes(String(value.platform))) {
+    errors.push(issue('platform', 'invalid_platform', 'Platform must be android, ios, or web.'))
+  }
+  return finish<CreateSupportReportRequest>(value, errors)
 }
 
 export function validateMarkNotificationsReadRequest(
@@ -1201,6 +1232,16 @@ export function validateParseReceiptRequest(input: unknown): ValidationResult<Pa
   requireUuid(value, 'fund_id', errors)
   requireString(value, 'object_path', errors, 1, 500)
   return finish<ParseReceiptRequest>(value, errors)
+}
+
+export function validateCompleteReceiptScanRequest(input: unknown): ValidationResult<CompleteReceiptScanRequest> {
+  const value = objectValue(input)
+  if (!value) return { ok: false, fieldErrors: [issue('body', 'invalid_type', 'Must be a JSON object.')] }
+  const errors: ApiFieldError[] = []
+  rejectUnknownFields(value, ['audit_id', 'user_edits'], errors)
+  requireUuid(value, 'audit_id', errors)
+  if (!objectValue(value.user_edits)) errors.push(issue('user_edits', 'invalid_type', 'Must be an object.'))
+  return finish<CompleteReceiptScanRequest>(value, errors)
 }
 
 export function validateCreateRichAuntieAwardRequest(

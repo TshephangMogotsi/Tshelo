@@ -20,6 +20,9 @@ import type {
 import type {
   AccountClosureRequest,
   ConnectionSummary,
+  CreateSupportReportRequest,
+  SupportReportReceipt,
+  NotificationPreferences,
   UpdateCurrentUserRequest,
   User,
 } from '@shared/contracts/users'
@@ -34,16 +37,37 @@ import {
   resolvePageWindow,
 } from './api-pagination'
 
-const USER_SELECT = 'id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, privacy_accepted_at, privacy_version, marketing_consent, marketing_consent_at, marketing_email_enabled, marketing_sms_enabled, data_processing_consent, data_processing_consent_at, is_flagged, is_banned, last_active_at, created_at, updated_at'
+const USER_SELECT = 'id, name, phone, email, avatar_url, country_code, preferred_currency, token_balance, trust_level, trust_score, profile_completed, onboarding_completed, notifications_enabled, notification_preferences, privacy_accepted_at, privacy_version, marketing_consent, marketing_consent_at, marketing_email_enabled, marketing_sms_enabled, data_processing_consent, data_processing_consent_at, is_flagged, is_banned, last_active_at, created_at, updated_at'
 const NOTIFICATION_SELECT = 'id, user_id, fund_id, type, title, body, data, is_read, read_at, delivered_at, opened_at, clicked_at, response_action, created_at'
 const ACCOUNT_CLOSURE_SELECT = 'id, ticket_number, status, created_at'
 const ACTIVE_ACCOUNT_CLOSURE_STATUSES = ['open', 'pending', 'in_progress'] as const
+const SUPPORT_REPORT_SELECT = 'id, ticket_number, status, created_at'
+
+const SUPPORT_REPORT_SUBJECTS: Record<CreateSupportReportRequest['category'], string> = {
+  sign_in: 'Sign-in issue',
+  fund_or_event: 'Fund or event issue',
+  contribution_or_expense: 'Contribution or expense issue',
+  report_or_export: 'Report or export issue',
+  notifications: 'Notification issue',
+  technical: 'Technical issue',
+  suggestion: 'Product suggestion',
+  other: 'Other app issue',
+}
 
 function accountClosureRequestFromRow(row: Record<string, unknown>): AccountClosureRequest {
   return {
     id: row.id as string,
     ticket_number: row.ticket_number as string,
     status: row.status as AccountClosureRequest['status'],
+    created_at: row.created_at as string,
+  }
+}
+
+function supportReportReceiptFromRow(row: Record<string, unknown>): SupportReportReceipt {
+  return {
+    id: row.id as string,
+    ticket_number: row.ticket_number as string,
+    status: 'open',
     created_at: row.created_at as string,
   }
 }
@@ -92,18 +116,36 @@ export async function updateApiCurrentUser(
   actorUserId: string,
   request: UpdateCurrentUserRequest,
 ): Promise<ApiDataResult<User | null>> {
-  const patch: Record<string, string | boolean | null> = {}
+  const patch: Record<string, string | boolean | NotificationPreferences | null> = {}
+  const paymentFields = new Set(['mobile_money_provider', 'mobile_money_number', 'mobile_money_name', 'bank_name', 'bank_account_number', 'bank_account_name', 'bank_branch_code'])
+  const consentFields = new Set(['terms_version', 'privacy_version', 'marketing_consent', 'marketing_email_enabled', 'marketing_sms_enabled', 'marketing_push_enabled', 'data_processing_consent'])
+  const paymentDetails: Record<string, unknown> = {}
+  const consents: Record<string, unknown> = {}
   for (const [field, rawValue] of Object.entries(request)) {
-    patch[field] = typeof rawValue === 'string' ? rawValue.trim() : rawValue
+    const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
+    // Acceptance timestamps are never accepted from the client. The database
+    // stamps and audits consent in record_own_consents.
+    if (field.endsWith('_accepted_at') || field.endsWith('_consent_at')) continue
+    if (paymentFields.has(field)) paymentDetails[field] = value
+    else if (consentFields.has(field)) consents[field] = value
+    else patch[field] = value as string | boolean | NotificationPreferences | null
   }
 
-  const { data, error } = await client
-    .from('users')
-    .update(patch)
-    .eq('id', actorUserId)
-    .is('deleted_at', null)
-    .select(USER_SELECT)
-    .maybeSingle()
+  if (Object.keys(paymentDetails).length) {
+    const { error } = await client.rpc('update_own_payment_details', { p_details: paymentDetails })
+    if (error) return dataFailure({ kind: 'database', error })
+  }
+  if (Object.keys(consents).length) {
+    const { error } = await client.rpc('record_own_consents', { p_consents: consents })
+    if (error) return dataFailure({ kind: 'database', error })
+  }
+
+  if (Object.keys(patch).length) {
+    const { error } = await client.from('users').update(patch).eq('id', actorUserId).is('deleted_at', null)
+    if (error) return dataFailure({ kind: 'database', error })
+  }
+
+  const { data, error } = await client.from('users').select(USER_SELECT).eq('id', actorUserId).is('deleted_at', null).maybeSingle()
 
   if (error) return dataFailure({ kind: 'database', error })
   return dataSuccess(data ? toUser(data as UserRow) : null)
@@ -150,6 +192,34 @@ export async function requestApiAccountClosure(
 
   if (error) return dataFailure({ kind: 'database', error })
   return dataSuccess(accountClosureRequestFromRow(data))
+}
+
+/**
+ * Stores a member's app feedback as an authenticated support ticket. The
+ * subject, reporter identity, priority, and technical context are owned by
+ * the server so the mobile client cannot impersonate another reporter.
+ */
+export async function createApiSupportReport(
+  client: SupabaseClient,
+  actorUserId: string,
+  request: CreateSupportReportRequest,
+): Promise<ApiDataResult<SupportReportReceipt>> {
+  const context = request.platform ? `\n\n---\nSubmitted from Tshelo app · Platform: ${request.platform}` : ''
+  const { data, error } = await client
+    .from('support_tickets')
+    .insert({
+      user_id: actorUserId,
+      category: request.category,
+      subject: SUPPORT_REPORT_SUBJECTS[request.category],
+      description: `${request.description.trim()}${context}`,
+      priority: request.category === 'suggestion' ? 'low' : 'normal',
+      status: 'open',
+    })
+    .select(SUPPORT_REPORT_SELECT)
+    .single()
+
+  if (error) return dataFailure({ kind: 'database', error })
+  return dataSuccess(supportReportReceiptFromRow(data))
 }
 
 export async function searchApiConnections(

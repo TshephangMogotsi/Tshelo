@@ -17,6 +17,7 @@ describe('shared API client integration', () => {
     for (const path of [
       '/api/v1/users',
       '/api/v1/users/me/closure-request',
+      '/api/v1/users/me/support-reports',
       '/api/v1/funds',
       '/api/v1/events',
       '/api/v1/contributions',

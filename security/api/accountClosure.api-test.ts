@@ -1,6 +1,7 @@
 jest.mock('server-only', () => ({}), { virtual: true })
 
 import {
+  createApiSupportReport,
   getApiAccountClosureRequest,
   requestApiAccountClosure,
 } from '../../admin/lib/data/api-account'
@@ -77,6 +78,26 @@ describe('account closure API data service', () => {
       category: 'account_closure',
       subject: 'Account closure request',
       status: 'open',
+    }))
+  })
+
+  it('creates an authenticated app report with server-owned identity and context', async () => {
+    const insert = insertBuilder()
+    const client = { from: jest.fn(() => insert) } as unknown as SupabaseClient
+
+    await expect(createApiSupportReport(client, actorUserId, {
+      category: 'technical',
+      description: 'Reports fail after I choose a fund.',
+      platform: 'android',
+    })).resolves.toEqual({ data: request, error: null })
+
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: actorUserId,
+      category: 'technical',
+      subject: 'Technical issue',
+      priority: 'normal',
+      status: 'open',
+      description: expect.stringContaining('Platform: android'),
     }))
   })
 })

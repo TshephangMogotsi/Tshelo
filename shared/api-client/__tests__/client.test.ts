@@ -49,6 +49,26 @@ describe('shared Tshelo API client', () => {
     ])
   })
 
+  it('submits a structured authenticated support report', async () => {
+    const fetchMock = jest.fn(async () => success({}))
+    const client = createTsheloApiClient({ baseUrl: 'https://api.example', getAccessToken: async () => 'token', fetch: fetchMock as typeof fetch })
+
+    await client.users.submitSupportReport({
+      category: 'technical',
+      description: 'The app closed after I opened a report.',
+      platform: 'android',
+    })
+
+    const [url, options] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.example/api/v1/users/me/support-reports')
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body as string)).toEqual({
+      category: 'technical',
+      description: 'The app closed after I opened a report.',
+      platform: 'android',
+    })
+  })
+
   it('serializes the event file upload, finalise, access, and removal operations', async () => {
     const fetchMock = jest.fn(async () => success({}))
     const client = createTsheloApiClient({ baseUrl: 'https://api.example', getAccessToken: async () => 'token', fetch: fetchMock as typeof fetch })

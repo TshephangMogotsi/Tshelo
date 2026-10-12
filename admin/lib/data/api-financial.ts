@@ -308,6 +308,7 @@ export async function parseApiReceipt(
   const items = Array.isArray(parsed.items) ? parsed.items : []
   return dataSuccess({
     object_path: objectPath,
+    ...(typeof parsed.audit_id === 'string' ? { audit_id: parsed.audit_id } : {}),
     is_receipt: parsed.is_receipt !== false,
     vendor: typeof parsed.vendor === 'string' ? parsed.vendor : null,
     date: typeof parsed.date === 'string' ? parsed.date : null,
@@ -318,5 +319,15 @@ export async function parseApiReceipt(
       if (typeof row.name !== 'string') return []
       return [{ name: row.name, amount: money(row.amount), category: typeof row.category === 'string' ? row.category : null }]
     }),
+    review_required: parsed.review_required === true,
+    review_reasons: Array.isArray(parsed.review_reasons)
+      ? parsed.review_reasons.filter((reason): reason is string => typeof reason === 'string').slice(0, 3)
+      : [],
   })
+}
+
+export async function completeApiReceiptScan(client: SupabaseClient, auditId: string, userEdits: Record<string, unknown>): Promise<ApiDataResult<Record<string, never>>> {
+  const { error } = await client.rpc('complete_receipt_scan', { p_audit_id: auditId, p_user_edits: userEdits })
+  if (error) return dataFailure({ kind: 'database', error })
+  return dataSuccess({})
 }

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
+import { createHash, randomBytes } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { getSupabaseConfig } from '@/lib/config'
+import { getSupabaseAdminConfig } from '@/lib/config'
 
 export const runtime = 'nodejs'
 
@@ -34,40 +35,30 @@ function allowedToSubmit(ip: string) {
   return true
 }
 
-async function sendReceipt(email: string, phone: string, notes: string, ticketNumber: string | null) {
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+async function sendVerification(email: string, verificationUrl: string) {
   const apiKey = process.env.RESEND_ACCOUNT_DELETION_API_KEY ?? process.env.RESEND_EVENT_INVITE_API_KEY
   if (!apiKey) return false
 
   const safeEmail = escapeHtml(email)
-  const safePhone = escapeHtml(phone || 'Not provided')
-  const safeNotes = escapeHtml(notes || 'Not provided')
-  const ticketLine = ticketNumber ? `Reference: ${ticketNumber}` : 'Reference: Account deletion request'
+  const safeVerificationUrl = escapeHtml(verificationUrl)
   const from = process.env.RESEND_FROM_EMAIL || 'Tshelo <no-reply@tshelo.com>'
-  const deliveries = [
-    {
+  const response = await fetch(RESEND_EMAILS_ENDPOINT, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from,
       to: [email],
-      subject: 'We received your Tshelo account deletion request',
-      text: `We received your Tshelo account deletion request. ${ticketLine}\n\nWe will verify ownership before closing anything. Our target for a straightforward, verified request is 30 days. Do not send passwords, one-time codes, or bank details.\n\nNeed help? ${SUPPORT_EMAIL}`,
-      html: `<p>We received your <strong>Tshelo account deletion request</strong>.</p><p>${escapeHtml(ticketLine)}</p><p>We will verify ownership before closing anything. Our target for a straightforward, verified request is 30 days.</p><p>Do not send passwords, one-time codes, or bank details.</p><p>Need help? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>`,
-    },
-    {
-      to: [SUPPORT_EMAIL],
-      subject: `Account deletion request${ticketNumber ? ` · ${ticketNumber}` : ''}`,
-      text: `A public account deletion request was submitted.\n${ticketLine}\nContact email: ${email}\nTshelo mobile: ${phone || 'Not provided'}\nNotes: ${notes || 'Not provided'}\n\nVerify ownership before taking any account action.`,
-      html: `<p>A public account deletion request was submitted.</p><p><strong>${escapeHtml(ticketLine)}</strong></p><ul><li>Contact email: ${safeEmail}</li><li>Tshelo mobile: ${safePhone}</li><li>Notes: ${safeNotes}</li></ul><p>Verify ownership before taking any account action.</p>`,
-    },
-  ]
-
-  const results = await Promise.allSettled(deliveries.map(async delivery => {
-    const response = await fetch(RESEND_EMAILS_ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, ...delivery }),
-      signal: AbortSignal.timeout(12_000),
-    })
-    if (!response.ok) throw new Error(`Resend rejected the request (HTTP ${response.status}).`)
-  }))
-  return results[0]?.status === 'fulfilled'
+      subject: 'Confirm your Tshelo account deletion request',
+      text: `Confirm your Tshelo account deletion request by opening this link:\n${verificationUrl}\n\nThis link expires in 30 minutes. It does not delete your account; it only confirms that you control this email address. Do not share this link.\n\nNeed help? ${SUPPORT_EMAIL}`,
+      html: `<p>Confirm your Tshelo account deletion request by opening the link below.</p><p><a href="${safeVerificationUrl}">Confirm deletion request</a></p><p>This link expires in 30 minutes. It does not delete your account; it only confirms that you control this email address. Do not share this link.</p><p>Need help? <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>`,
+    }),
+    signal: AbortSignal.timeout(12_000),
+  })
+  return response.ok
 }
 
 export async function POST(request: Request) {
@@ -87,19 +78,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Please provide a valid email address and confirm the acknowledgement.' }, { status: 400 })
   }
 
-  const { url, key } = getSupabaseConfig()
-  const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-  const { data, error } = await supabase.rpc('submit_public_account_closure_request', {
-    p_contact_email: email,
-    p_account_phone: phone || null,
-    p_notes: notes || null,
-  })
-  if (error) {
-    console.error('Unable to record public account deletion request', { code: error.code, message: error.message })
-    return NextResponse.json({ message: 'We could not record the request. Please email support@tshelo.co.bw.' }, { status: 503 })
+  try {
+    const { url, key } = getSupabaseAdminConfig()
+    const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+    const { data: emailMatch, error: emailError } = await supabase
+      .from('users')
+      .select('id')
+      .is('deleted_at', null)
+      .eq('email', email)
+      .limit(1)
+      .maybeSingle()
+    if (emailError) throw emailError
+    if (emailMatch) {
+      const token = randomBytes(32).toString('base64url')
+      const { error: verificationError } = await supabase.from('account_closure_verifications').insert({
+        contact_email: email,
+        account_phone: phone || null,
+        notes: notes || null,
+        token_hash: hashToken(token),
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      })
+      if (verificationError) throw verificationError
+
+      const verificationUrl = new URL('/legal/account-deletion/verify', request.url)
+      verificationUrl.searchParams.set('token', token)
+      if (!await sendVerification(email, verificationUrl.toString())) {
+        console.error('Unable to send account deletion verification email')
+      }
+    }
+  } catch (error) {
+    console.error('Unable to initiate account deletion verification', error)
+    return NextResponse.json({ message: 'We could not start the verification. Please email support@tshelo.co.bw.' }, { status: 503 })
   }
 
-  const ticketNumber = Array.isArray(data) ? data[0]?.ticket_number : null
-  const receiptSent = await sendReceipt(email, phone, notes, typeof ticketNumber === 'string' ? ticketNumber : null)
-  return NextResponse.json({ ok: true, receiptSent })
+  return NextResponse.json({ ok: true })
 }

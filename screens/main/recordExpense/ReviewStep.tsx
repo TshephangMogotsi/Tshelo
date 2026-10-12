@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from '../../../context/ThemeContext'
 import type { AppColors } from '../../../theme/themes'
 import { makeCommonStyles } from './common'
@@ -38,11 +39,13 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
   const [items, setItems]       = useState<ReviewItem[]>([newReviewItem()])
   const [categoryModalItemId, setCategoryModalItemId] = useState<string | null>(null)
   const [wasPrefilled, setWasPrefilled] = useState(false)
+  const [scanConfirmed, setScanConfirmed] = useState(false)
 
   // Prefill from the scanned receipt, but never overwrite what the user
   // has already typed while the parse was in flight
   useEffect(() => {
     if (!prefill) return
+    setScanConfirmed(false)
     if (prefill.vendor) {
       setShopName(prev => (prev.trim() ? prev : prefill.vendor!))
     }
@@ -68,6 +71,14 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
     shopName.trim().length >= 2 &&
     includedItems.length > 0 &&
     includedItems.every(i => i.name.trim().length > 0 && !isNaN(parseFloat(i.amount)) && parseFloat(i.amount) > 0)
+  const needsScanConfirmation = Boolean(prefill)
+  const canSave = isReviewValid && !isSaving && (!needsScanConfirmation || scanConfirmed)
+  const formattedScanDate = prefill?.date
+    ? new Date(`${prefill.date}T12:00:00`).toLocaleDateString('en-BW', { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'Not found'
+  const formattedScanTotal = prefill?.total === null || prefill?.total === undefined
+    ? 'Not found'
+    : `${currencySymbol} ${prefill.total.toLocaleString('en-BW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   function updateItem(id: string, patch: Partial<ReviewItem>) {
     setItems(prev => prev.map(i => (i.id === id ? { ...i, ...patch } : i)))
@@ -107,6 +118,40 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
           <Text style={styles.bannerHint}>Add the shop and items below</Text>
         </View>
       )}
+
+      {prefill ? (
+        <View style={[styles.scanSummary, prefill.reviewRequired && styles.scanSummaryReview]}>
+          <View style={styles.scanSummaryHeading}>
+            <View style={styles.scanSummaryTitleRow}>
+              <Ionicons
+                name={prefill.reviewRequired ? 'alert-circle' : 'scan-outline'}
+                size={18}
+                color={prefill.reviewRequired ? '#B45309' : colors.primary}
+              />
+              <Text style={[styles.scanSummaryTitle, prefill.reviewRequired && styles.scanSummaryTitleReview]}>
+                {prefill.reviewRequired ? 'Scan needs review' : 'Extracted from receipt'}
+              </Text>
+            </View>
+            {prefill.reviewRequired ? <Text style={styles.reviewBadge}>CHECK</Text> : null}
+          </View>
+
+          <View style={styles.scanDetails}>
+            <ScanDetail label="Vendor" value={prefill.vendor || 'Not found'} uncertain={!prefill.vendor || prefill.reviewRequired} />
+            <ScanDetail label="Amount" value={formattedScanTotal} uncertain={prefill.total === null || prefill.total === undefined || prefill.reviewRequired} />
+            <ScanDetail label="Date" value={formattedScanDate} uncertain={!prefill.date || prefill.reviewRequired} />
+          </View>
+
+          {prefill.reviewRequired ? (
+            <Text style={styles.reviewHint}>
+              {prefill.reviewReasons.length > 0
+                ? prefill.reviewReasons.join(' ')
+                : 'Check the receipt image and correct any missing or inaccurate details below.'}
+            </Text>
+          ) : (
+            <Text style={styles.scanHint}>Confirm these details against the receipt before saving.</Text>
+          )}
+        </View>
+      ) : null}
 
       <View style={common.field}>
         <Text style={common.label}>Shop / Vendor</Text>
@@ -179,17 +224,33 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
         <Text style={styles.totalValue}>{currencySymbol} {reviewTotal.toLocaleString('en-BW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
       </View>
 
+      {needsScanConfirmation ? (
+        <TouchableOpacity
+          style={[styles.confirmScanRow, scanConfirmed && styles.confirmScanRowActive]}
+          onPress={() => setScanConfirmed(previous => !previous)}
+          disabled={isSaving}
+          activeOpacity={0.8}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: scanConfirmed }}
+        >
+          <View style={[styles.confirmCheck, scanConfirmed && styles.confirmCheckActive]}>
+            {scanConfirmed ? <Ionicons name="checkmark" size={15} color="#FFFFFF" /> : null}
+          </View>
+          <Text style={styles.confirmScanText}>I checked the extracted details against the receipt</Text>
+        </TouchableOpacity>
+      ) : null}
+
       <TouchableOpacity
-        style={[common.primaryButton, isReviewValid && !isSaving && common.buttonActive]}
-        activeOpacity={isReviewValid && !isSaving ? 0.85 : 1}
+        style={[common.primaryButton, canSave && common.buttonActive]}
+        activeOpacity={canSave ? 0.85 : 1}
         onPress={() => onSave(shopName, includedItems)}
-        disabled={isSaving || !isReviewValid}
+        disabled={!canSave}
       >
         {isSaving ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text style={[common.primaryButtonText, isReviewValid && common.primaryButtonTextActive]}>
-            Save Expense
+            {needsScanConfirmation ? 'Confirm & Save Expense' : 'Save Expense'}
           </Text>
         )}
       </TouchableOpacity>
@@ -205,6 +266,17 @@ export default function ReviewStep({ fundTitle, receiptUri, currencySymbol, isSa
         onClose={() => setCategoryModalItemId(null)}
       />
     </>
+  )
+}
+
+function ScanDetail({ label, value, uncertain }: { label: string; value: string; uncertain: boolean }) {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
+  return (
+    <View style={styles.scanDetail}>
+      <Text style={styles.scanDetailLabel}>{label}</Text>
+      <Text style={[styles.scanDetailValue, uncertain && styles.scanDetailValueUncertain]} numberOfLines={1}>{value}</Text>
+    </View>
   )
 }
 
@@ -241,6 +313,27 @@ function makeStyles(colors: AppColors) {
       fontSize: 12,
       color: colors.textSecondary,
     },
+    scanSummary: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.primary + '44',
+      backgroundColor: colors.primaryLight,
+      padding: 14,
+      marginBottom: 20,
+    },
+    scanSummaryReview: { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' },
+    scanSummaryHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    scanSummaryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
+    scanSummaryTitle: { fontSize: 14, fontWeight: '800', color: colors.primary },
+    scanSummaryTitleReview: { color: '#92400E' },
+    reviewBadge: { fontSize: 10, fontWeight: '900', letterSpacing: 0.6, color: '#92400E', backgroundColor: '#FDE68A', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
+    scanDetails: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    scanDetail: { flex: 1, minWidth: 0 },
+    scanDetailLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: colors.textMuted, marginBottom: 3 },
+    scanDetailValue: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
+    scanDetailValueUncertain: { color: '#92400E' },
+    scanHint: { marginTop: 11, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
+    reviewHint: { marginTop: 11, fontSize: 12, lineHeight: 17, fontWeight: '600', color: '#92400E' },
     itemsHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -351,5 +444,20 @@ function makeStyles(colors: AppColors) {
       fontWeight: '800',
       color: colors.primary,
     },
+    confirmScanRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 13,
+      marginBottom: 14,
+      backgroundColor: colors.surface,
+    },
+    confirmScanRowActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+    confirmCheck: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.textMuted, alignItems: 'center', justifyContent: 'center' },
+    confirmCheckActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+    confirmScanText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: colors.textPrimary },
   })
 }

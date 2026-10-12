@@ -15,6 +15,9 @@ export type ParsedReceipt = {
   total:  number | null
   items:  ParsedReceiptItem[]
   objectPath: string
+  reviewRequired: boolean
+  reviewReasons: string[]
+  auditId?: string
 }
 
 export async function pickFromLibrary(): Promise<string | null> {
@@ -73,17 +76,39 @@ export async function parseReceipt(uri: string, fundId: string): Promise<ParsedR
     )
     const objectPath = await uploadNormalisedReceipt(fundId, resized.uri)
     const data = await api.receipts.parse({ fund_id: fundId, object_path: objectPath })
-    if (!data.is_receipt) return null
+    if (!data.is_receipt) {
+      return {
+        vendor: null,
+        date: null,
+        total: null,
+        items: [],
+        objectPath,
+        reviewRequired: true,
+        auditId: typeof data.audit_id === 'string' ? data.audit_id : undefined,
+        reviewReasons: Array.isArray(data.review_reasons) && data.review_reasons.length > 0
+          ? data.review_reasons
+          : ['We could not confidently read this image as a receipt.'],
+      }
+    }
     return {
       vendor: data.vendor ?? null,
       date:   data.date ?? null,
       total:  data.total === null ? null : Number(data.total),
       items:  data.items.map(item => ({ ...item, amount: Number(item.amount) })),
       objectPath,
+      reviewRequired: data.review_required || !data.vendor || !data.date || data.total === null,
+      auditId: typeof data.audit_id === 'string' ? data.audit_id : undefined,
+      // Older API deployments do not yet return the optional scan-review
+      // fields. Missing key details still trigger the local review state.
+      reviewReasons: Array.isArray(data.review_reasons) ? data.review_reasons : [],
     }
   } catch {
     return null
   }
+}
+
+export async function completeReceiptScan(auditId: string, userEdits: Record<string, unknown>) {
+  await api.receipts.completeScan({ audit_id: auditId, user_edits: userEdits })
 }
 
 export async function uploadReceipt(fundId: string, uri: string): Promise<string | null> {

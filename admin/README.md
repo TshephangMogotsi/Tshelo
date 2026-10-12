@@ -56,8 +56,9 @@ Create a Vercel project from the existing `Tshelo` repository and set:
 - Root Directory: `admin`
 - Production Branch: `main`
 - Framework Preset: Next.js
-- Environment variables: `NEXT_PUBLIC_SUPABASE_URL` and
-  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- Environment variables: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the server-only Vercel Secret
+  `SUPABASE_SERVICE_ROLE_KEY` (required for verified account-closure requests).
 - Optional token checkout: `NEXT_PUBLIC_TOKEN_PORTAL_URL` must be an HTTPS
   checkout URL. The checkout service must create the order and only credit
   tokens after its verified payment webhook completes.

@@ -21,6 +21,11 @@ export type ParseReceiptRequest = {
   object_path: string
 }
 
+export type CompleteReceiptScanRequest = {
+  audit_id: Uuid
+  user_edits: Record<string, unknown>
+}
+
 export type ParsedReceiptItem = {
   name: string
   amount: MoneyAmount
@@ -29,9 +34,12 @@ export type ParsedReceiptItem = {
 
 export type ParsedReceipt = {
   object_path: string
+  audit_id?: string
   is_receipt: boolean
   vendor: string | null
   date: IsoDate | null
   total: MoneyAmount | null
   items: ParsedReceiptItem[]
+  review_required: boolean
+  review_reasons: string[]
 }

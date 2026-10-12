@@ -8,7 +8,6 @@ type FormState = 'idle' | 'submitting' | 'success' | 'error'
 export function AccountDeletionRequestForm() {
   const [state, setState] = useState<FormState>('idle')
   const [error, setError] = useState('')
-  const [receiptSent, setReceiptSent] = useState(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -35,8 +34,6 @@ export function AccountDeletionRequestForm() {
       return
     }
 
-    const body = await response.json().catch(() => null) as { receiptSent?: boolean } | null
-    setReceiptSent(body?.receiptSent === true)
     setState('success')
   }
 
@@ -46,7 +43,7 @@ export function AccountDeletionRequestForm() {
         <CheckCircle2 size={22} />
         <div>
           <h2>Request received</h2>
-          <p>We have recorded your request. {receiptSent ? 'A receipt is on its way to your email address.' : 'Please contact support to confirm receipt.'} We will verify account ownership before closing anything. If you need help, email <a href="mailto:support@tshelo.co.bw">support@tshelo.co.bw</a>.</p>
+          <p>If the details match an active Tshelo account, we have sent a verification link to the email address provided. Open that link to confirm your request. We will verify account ownership and any retention obligations before closing anything. If you need help, email <a href="mailto:support@tshelo.co.bw">support@tshelo.co.bw</a>.</p>
         </div>
       </section>
     )
@@ -62,7 +59,7 @@ export function AccountDeletionRequestForm() {
       <label>
         <span>Email address <b>*</b></span>
         <input name="email" type="email" autoComplete="email" maxLength={255} required placeholder="you@example.com" />
-        <small>We send your receipt and any follow-up here.</small>
+        <small>We send a verification link and any follow-up here.</small>
       </label>
       <label>
         <span>Tshelo mobile number</span>

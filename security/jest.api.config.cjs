@@ -3,7 +3,10 @@ module.exports = {
   rootDir: '..',
   testEnvironment: 'node',
   modulePathIgnorePatterns: ['<rootDir>/.claude/'],
-  testMatch: ['<rootDir>/security/api/**/*.api-test.ts'],
+  testMatch: [
+    '<rootDir>/security/api/**/*.api-test.ts',
+    '<rootDir>/security/__tests__/**/*.test.ts',
+  ],
   moduleNameMapper: {
     '^@shared/(.*)$': '<rootDir>/shared/$1',
     '^@/(.*)$': '<rootDir>/admin/$1',

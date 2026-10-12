@@ -2,6 +2,7 @@ import type {
   AdminAuditEntry,
   AccountClosureRequest,
   ConnectionSummary,
+  CreateSupportReportRequest,
   Contribution,
   ContributionSummary,
   ContributorPledgeBalance,
@@ -78,6 +79,7 @@ import type {
   Notification,
   Paginated,
   PlatformAdmin,
+  CompleteReceiptScanRequest,
   ParsedReceipt,
   ParseReceiptRequest,
   PledgeAllocation,
@@ -98,6 +100,7 @@ import type {
   SearchConnectionsRequest,
   SyncOrganiserInvitesResult,
   SupportTicketSummary,
+  SupportReportReceipt,
   SponsorshipAllocation,
   UpdateSupportTicketRequest,
   UpdateCurrentUserRequest,
@@ -353,6 +356,13 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
         return request<AccountClosureRequest>('/api/v1/users/me/closure-request', {
           ...call,
           method: 'POST',
+        })
+      },
+      submitSupportReport(input: CreateSupportReportRequest, call?: ApiCallOptions) {
+        return request<SupportReportReceipt>('/api/v1/users/me/support-reports', {
+          ...call,
+          method: 'POST',
+          body: input,
         })
       },
     },
@@ -657,6 +667,9 @@ export function createTsheloApiClient(options: TsheloApiClientOptions) {
       },
       parse(input: ParseReceiptRequest, call?: ApiCallOptions) {
         return request<ParsedReceipt>('/api/v1/receipts/parse', { ...call, method: 'POST', body: input })
+      },
+      completeScan(input: CompleteReceiptScanRequest, call?: ApiCallOptions) {
+        return request<Record<string, never>>('/api/v1/receipts/scan-completion', { ...call, method: 'POST', body: input })
       },
     },
     richAuntie: {
