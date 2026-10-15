@@ -1,6 +1,6 @@
 # Remaining security work
 
-Updated: 12 October 2026. This checklist records outstanding work from the
+Updated: 15 October 2026. This checklist records outstanding work from the
 security remediation discussion; unchecked items are not yet verified complete.
 
 ## Priority 1 — Public entry points and database defaults
@@ -13,7 +13,9 @@ security remediation discussion; unchecked items are not yet verified complete.
 - [x] Normalize contacts and handle duplicates without exposing existing entries.
 - [x] Add durable rate limits for IP/contact identity and server-validated CAPTCHA code.
 - [x] Confirm the 12-month retention period and implement dedicated daily database cleanup.
-- [ ] Verify the cleanup job's first scheduled execution and monitor subsequent failures.
+- [x] Verify the cleanup job's first scheduled execution: 13 October at 04:15
+      Botswana time; runs on 14 and 15 October also succeeded.
+- [ ] Monitor subsequent cleanup failures and establish ongoing alerting.
 - [x] Test invalid input, repeated submissions, abuse limits and denied direct access.
 - [x] Deploy and verify database permissions and server-only RPCs.
 - [ ] Configure Turnstile/secrets, deploy web routes and test real public submissions.
@@ -30,10 +32,16 @@ security remediation discussion; unchecked items are not yet verified complete.
 
 ### Supabase leaked-password protection
 
-- [ ] Inspect the live Auth setting and project support for leaked-password protection.
-- [ ] Enable the protection where supported and verify the effective setting.
-- [ ] Test relevant password sign-up/reset flows and understandable rejection messages.
-- [ ] Document applicability to Tshelo's phone/OTP and admin authentication flows.
+- [x] Inspect the live Auth setting and project support for leaked-password protection.
+- [x] Enable the protection where supported and verify the effective setting.
+- [x] Test live password sign-up rejection and the returned error message; the current
+      app has no password-reset/change UI to exercise.
+- [x] Document applicability to Tshelo's phone/OTP and admin authentication flows.
+
+Enabled and verified on 15 October 2026. The public Auth API rejected a synthetic
+sign-up with HTTP 422, `weak_password`, reason `pwned`. Password-change/reset
+completion and existing-user login were not exercised. Evidence and scope:
+[leaked-password protection](leaked-password-protection-2026-10-15.md).
 
 ## Priority 2 — Membership authorization
 
@@ -46,6 +54,28 @@ security remediation discussion; unchecked items are not yet verified complete.
 - [ ] Smoke-test organization/group UI when those currently unused features are implemented.
 
 Phase 2 implementation and rollout details: [handoff](security-phase-two-2026-10-12.md).
+
+### Fund membership and consent — live verification, 15 October
+
+- [x] Verify joined/pending/left/unrelated access across the 13 assessed shared-data
+      tables, plus vote/vouch/report inserts and the actual leave RPC.
+- [ ] Resolve personal-vouch read access retained after leaving; it is an explicit
+      policy exception to the requested joined-only rule.
+- [ ] Confirm the intended fund-row visibility for pending invitees.
+- [x] Verify consent RPC audit creation, database timestamps, client-write denial
+      and cross-user log isolation using rolled-back fixtures.
+- [x] Record first-time explicit processing acceptance even for legacy true flags;
+      new profiles default false, without backfilling historical acceptance.
+- [x] Audit channel-only email/SMS/push marketing preference changes.
+- [x] Make aggregate marketing withdrawal disable every channel, including when
+      the same payload contains a conflicting channel opt-in.
+- [ ] Verify consent recording through released registration/preferences flows;
+      the real consent log is still empty.
+
+Evidence and reproducible script:
+[membership/consent verification](membership-consent-verification-2026-10-15.md).
+The three consent fixes were applied and regression-tested live on 15 October:
+[migration and verification](consent-fixes-2026-10-15.md).
 
 ## Priority 3 — Admin access and financial identifiers
 
@@ -132,9 +162,24 @@ message/error text is discarded by a deployed database trigger.
       verification and receipt scan-completion routes; check required server secrets.
 - [ ] Include the mobile receipt-review/audit integration in the next app build and smoke-test it.
 
+Live status checked 15 October: receipt database migration and audit-enabled
+parser v8 are deployed; the audit table is empty. Production web/API is still on
+`91421bb` and `/api/v1/receipts/scan-completion` returns 404. Latest recorded
+production mobile builds also reference `91421bb`; no production OTA updates
+exist. See [receipt deployment and cleanup evidence](receipt-and-waitlist-status-2026-10-15.md).
+
 ## Completed baseline
 
+- [x] Item 1 database checks: 30 explicit protected assignments and all 53
+      nonallowlisted-column updates denied; permitted own-profile edits,
+      cross-user isolation, payment verification resets and owner notification
+      creation verified live on 15 October with rolled-back fixtures.
+      Full item closure still requires released app/web and ownership
+      re-verification checks. [Evidence](protected-profile-verification-2026-10-15.md).
 - [x] Client creation/modification of mobile-money verification records blocked.
+      Reconfirmed live on 15 October: 11 client operations denied, owner-only
+      reads and service-role writes verified, fixtures rolled back.
+      [Item 2 update and evidence](mobile-money-verification-recheck-2026-10-15.md).
 - [x] Client SMS-log writes and reads blocked.
 - [x] Future SMS raw-body and free-text error retention prevented.
 - [x] Live SMS table reviewed: empty at the time of review.
