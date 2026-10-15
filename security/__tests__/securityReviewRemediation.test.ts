@@ -6,6 +6,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('5 October security review remediation', () => {
   const migration = read('supabase/migrations/20261009110000_close_profile_receipt_and_membership_gaps.sql')
+  const encryptionMigration = read('supabase/migrations/20261013100000_encrypt_payment_identifiers.sql')
   const parser = read('supabase/functions/parse-receipt/index.ts')
   const financialApi = read('admin/lib/data/api-financial.ts')
 
@@ -50,5 +51,19 @@ describe('5 October security review remediation', () => {
     expect(migration).toContain('reported_by = auth.uid()')
     expect(migration).toContain('voter_user_id = auth.uid()')
     expect(migration).toContain('voucher_user_id = auth.uid()')
+  })
+
+  it('encrypts payment identifiers with a Vault-owned key and removes plaintext', () => {
+    expect(encryptionMigration).toContain("payment_identifiers_encryption_v1")
+    expect(encryptionMigration).toContain('extensions.gen_random_bytes(32)')
+    expect(encryptionMigration).toContain('extensions.pgp_sym_encrypt')
+    expect(encryptionMigration).toContain('cipher-algo=aes256')
+    expect(encryptionMigration).toContain('mobile_money_number_ciphertext')
+    expect(encryptionMigration).toContain('bank_account_number_ciphertext')
+    expect(encryptionMigration).toContain('mobile_money_number = NULL')
+    expect(encryptionMigration).toContain('bank_account_number = NULL')
+    expect(encryptionMigration).toContain("auth.role() IS DISTINCT FROM 'service_role'")
+    expect(encryptionMigration).toContain('REVOKE ALL ON FUNCTION public.decrypt_payment_identifier(bytea)')
+    expect(encryptionMigration).not.toContain('GRANT EXECUTE ON FUNCTION public.decrypt_payment_identifier')
   })
 })

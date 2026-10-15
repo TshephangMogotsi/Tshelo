@@ -60,15 +60,26 @@ Phase 2 implementation and rollout details: [handoff](security-phase-two-2026-10
 
 ### Bank and mobile-money account-number encryption
 
-- [ ] Inventory reads, writes, exports, logs and reports containing account numbers.
-- [ ] Confirm which flows require full numbers, masking or exact-match lookup.
-- [ ] Select key management, rotation and recovery arrangements.
-- [ ] Add encrypted storage and, only if needed, a keyed exact-match lookup hash.
-- [ ] Update server write/read paths and limit decryption to authorized purposes.
-- [ ] Backfill and verify existing records using a controlled migration process.
-- [ ] Check audit history, exports, telemetry and backup handling for plaintext exposure.
+- [x] Inventory active application reads and writes: payment updates are routed through
+      `update_own_payment_details`; the client profile response does not return identifiers.
+- [x] Confirm no approved exact-match lookup needs either identifier; no correlation hash was added.
+- [x] Select Supabase Vault for database-generated key management; document rotation and recovery.
+- [x] Add randomized AES-256 encrypted storage for bank-account and mobile-money numbers.
+- [x] Update server write/read boundaries: only payment routines can decrypt, and plaintext retrieval is service-role-only.
+- [x] Apply the atomic ciphertext backfill/legacy-plaintext clearing migration to the linked project.
+- [x] Verify controlled service-role decrypt samples, existing ciphertext decryption,
+      and zero non-null legacy plaintext values (15 October).
+- [x] Review current audit/export/notification paths and API error logging for identifiers;
+      record backup exposure and recovery requirements in the encryption runbook.
+- [ ] Complete historical provider/telemetry-log review and isolated backup recovery validation.
 - [ ] Retire plaintext columns after validating compatibility and recovery procedures.
-- [ ] Verify key rotation, authorization and the deployed payment-detail flows.
+- [x] Verify a rotation round trip without changing the live key, browser-role denial,
+      and payment RPC writes/resets/notifications in a rolled-back live transaction.
+- [x] Deploy the follow-up revocation of inherited authenticated EXECUTE on the
+      service retrieval function (`20261015210000`).
+- [ ] Verify released web/mobile payment-detail flows end to end after the held release.
+
+Implementation: [`payment-identifier-encryption.md`](payment-identifier-encryption.md).
 
 ## Provider/product-dependent work
 
