@@ -17,6 +17,8 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:3100',
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
     browserName: 'chromium',
     channel: 'chrome',
     // Traces/screenshots can contain TOTP setup keys, OTPs and access tokens.

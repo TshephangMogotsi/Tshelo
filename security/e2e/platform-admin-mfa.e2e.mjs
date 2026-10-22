@@ -38,7 +38,13 @@ async function api(page, token, path, body) {
 async function primaryLogin(page, index) {
   await page.goto('/login')
   await page.getByLabel('Phone number', { exact: true }).fill(fixturePhone(index).slice(3))
+  const sent = page.waitForResponse(response => response.url().startsWith(`${url}/auth/v1/otp`) && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Send secure code', exact: true }).click()
+  const otpResponse = await sent
+  if (!otpResponse.ok()) {
+    const failure = await otpResponse.json()
+    throw new Error(`Synthetic primary OTP request failed (${otpResponse.status()}: ${failure.error_code ?? failure.code ?? 'unknown'})`)
+  }
   await page.getByLabel('Verification code', { exact: true }).fill('123456')
   const response = page.waitForResponse(response => response.url() === `${url}/auth/v1/verify` && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Continue to dashboard', exact: true }).click()
