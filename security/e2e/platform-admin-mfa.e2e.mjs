@@ -70,11 +70,11 @@ test.beforeAll(async () => {
     must(!error && data.user, `Could not create disposable MFA fixture ${index}`)
     const id = data.user.id
     fixtures.push({ id, index })
-    const profile = await operator.from('users').update({
-      name: `Disposable MFA CI ${index}`, profile_completed: true,
+    const profile = await operator.from('users').upsert({
+      id, phone: fixturePhone(index), name: `Disposable MFA CI ${index}`, profile_completed: true,
       onboarding_completed: true, notifications_enabled: false,
-    }).eq('id', id).select('id').single()
-    must(!profile.error && profile.data?.id === id, `Could not prepare disposable profile ${index}`)
+    }, { onConflict: 'id' }).select('id').single()
+    must(!profile.error && profile.data?.id === id, `Could not prepare disposable profile ${index} (${profile.error?.code ?? 'missing row'})`)
     if (index <= roles.length) {
       const grant = await operator.from('platform_admins').insert({ user_id: id, role: roles[index - 1], is_active: true })
       must(!grant.error, `Could not prepare disposable role ${index}`)
