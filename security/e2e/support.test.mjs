@@ -24,6 +24,8 @@ test('disposable config enables real TOTP and limits primary OTP fixtures to six
   assert.ok(config.includes('project_id = "tshelo-mfa-ci"'))
   assert.ok(config.includes('[auth.mfa.totp]\nenroll_enabled = true\nverify_enabled = true'))
   assert.equal((config.match(/= "123456"/g) ?? []).length, 6)
+  assert.ok(config.includes('[auth.sms.twilio]\nenabled = true'))
+  assert.ok(config.includes('nonfunctional-ci-placeholder'))
   assert.equal(fixturePhone(1), '26770000001')
   assert.equal(fixturePhone(6), '26770000006')
 })

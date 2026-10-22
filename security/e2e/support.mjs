@@ -46,6 +46,15 @@ enable_signup = true
 enable_confirmations = true
 max_frequency = "1s"
 
+# The CLI disables phone login unless a provider is configured, even when
+# fixed test OTPs are present. These nonfunctional placeholders are never used:
+# every allowed test number must return GoTrue's "test-otp" message ID.
+[auth.sms.twilio]
+enabled = true
+account_sid = "AC00000000000000000000000000000000"
+message_service_sid = "MG00000000000000000000000000000000"
+auth_token = "nonfunctional-ci-placeholder"
+
 [auth.sms.test_otp]
 ${Array.from({ length: 6 }, (_, index) => `"${fixturePhone(index + 1)}" = "123456"`).join('\n')}
 

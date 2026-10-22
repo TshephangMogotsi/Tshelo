@@ -45,6 +45,8 @@ async function primaryLogin(page, index) {
     const failure = await otpResponse.json()
     throw new Error(`Synthetic primary OTP request failed (${otpResponse.status()}: ${failure.error_code ?? failure.code ?? 'unknown'})`)
   }
+  const sentBody = await otpResponse.json()
+  must(sentBody.message_id === 'test-otp', 'Primary login did not use the local fixed-OTP transport')
   await page.getByLabel('Verification code', { exact: true }).fill('123456')
   const response = page.waitForResponse(response => response.url() === `${url}/auth/v1/verify` && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Continue to dashboard', exact: true }).click()
