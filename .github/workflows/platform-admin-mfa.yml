@@ -55,9 +55,13 @@ jobs:
       - name: Prepare isolated stack configuration
         run: node security/e2e/prepare-stack.mjs
       - name: Start disposable Auth and migrated database
-        run: >-
-          supabase start --workdir "$RUNNER_TEMP/tshelo-mfa-stack"
-          --exclude studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
+        run: |
+          if ! supabase start --workdir "$RUNNER_TEMP/tshelo-mfa-stack" \
+            --exclude studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta \
+            > "$RUNNER_TEMP/mfa-supabase-start.log" 2>&1; then
+            node security/e2e/report-start-failure.mjs
+            exit 1
+          fi
       - name: Read disposable credentials without printing them
         run: >-
           supabase status --workdir "$RUNNER_TEMP/tshelo-mfa-stack"

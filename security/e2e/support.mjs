@@ -54,3 +54,8 @@ enroll_enabled = true
 verify_enabled = true
 `
 }
+
+export function redactCredentials(text) {
+  return text.replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted JWT]')
+    .replace(/\bsb_(?:secret|publishable)_[A-Za-z0-9_-]+\b/g, '[redacted key]')
+}

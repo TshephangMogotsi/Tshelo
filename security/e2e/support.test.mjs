@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ciSupabaseConfig, fixturePhone, invalidTotp, requireLocalUrl, totp } from './support.mjs'
+import { ciSupabaseConfig, fixturePhone, invalidTotp, requireLocalUrl, totp, redactCredentials } from './support.mjs'
 
 test('only the exact disposable loopback endpoint is accepted', () => {
   assert.equal(requireLocalUrl('http://127.0.0.1:54321', 54321), 'http://127.0.0.1:54321')
@@ -26,4 +26,9 @@ test('disposable config enables real TOTP and limits primary OTP fixtures to six
   assert.equal((config.match(/= "123456"/g) ?? []).length, 6)
   assert.equal(fixturePhone(1), '26770000001')
   assert.equal(fixturePhone(6), '26770000006')
+})
+
+test('startup failure diagnostics remove disposable credentials', () => {
+  const log = 'migration failed; eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature sb_secret_example sb_publishable_example'
+  assert.equal(redactCredentials(log), 'migration failed; [redacted JWT] [redacted key] [redacted key]')
 })
