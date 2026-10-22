@@ -58,6 +58,9 @@ auth_token = "nonfunctional-ci-placeholder"
 [auth.sms.test_otp]
 ${Array.from({ length: 6 }, (_, index) => `"${fixturePhone(index + 1)}" = "123456"`).join('\n')}
 
+[auth.mfa]
+max_enrolled_factors = 10
+
 [auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true

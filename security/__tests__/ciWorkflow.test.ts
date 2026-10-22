@@ -13,9 +13,14 @@ describe('release verification workflow', () => {
   })
 
   it('runs database assertions only against the disposable local database', () => {
-    expect(workflow.match(/--host 127\.0\.0\.1/g)).toHaveLength(2)
-    expect(workflow.match(/--port 54322/g)).toHaveLength(2)
-    expect(workflow.match(/--set ON_ERROR_STOP=1/g)).toHaveLength(2)
+    const databaseCommands = workflow.match(/psql\b[\s\S]*?--file\s+\S+/g) ?? []
+    expect(databaseCommands.length).toBeGreaterThanOrEqual(2)
+    for (const command of databaseCommands) {
+      expect(command).toContain('--host 127.0.0.1')
+      expect(command).toContain('--port 54322')
+      expect(command).toContain('--set ON_ERROR_STOP=1')
+      expect(command).toMatch(/--file supabase\/tests\/[\w_]+\.sql$/)
+    }
     expect(workflow).not.toContain('--linked')
     expect(workflow).not.toContain('supabase db push')
     expect(workflow).toContain('supabase/tests/fund_admin_permission_matrix.sql')

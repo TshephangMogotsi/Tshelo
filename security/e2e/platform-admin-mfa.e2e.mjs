@@ -143,7 +143,13 @@ for (const [index, role] of roles.entries()) {
     }
     record(role, 'aal1 blocked at page, API read/write, RLS and four direct admin RPCs; own-profile access retained')
 
+    const enrollmentResponse = page.waitForResponse(response => response.url() === `${url}/auth/v1/factors` && response.request().method() === 'POST')
     await page.getByRole('button', { name: 'Set up authenticator', exact: true }).click()
+    const enrolled = await enrollmentResponse
+    if (!enrolled.ok()) {
+      const failure = await enrolled.json()
+      throw new Error(`Authenticator enrollment failed (${enrolled.status()}: ${failure.error_code ?? failure.code ?? 'unknown'})`)
+    }
     const key = page.locator('details code')
     await expect(key).toBeAttached()
     const secret = await key.textContent()
