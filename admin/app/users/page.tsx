@@ -11,11 +11,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const rawQuery = (await searchParams).q ?? ''
   const query = rawQuery.replace(/[,%()]/g, '').trim().slice(0, 60)
   const supabase = await createClient()
-  const adminPromise = requirePlatformAdmin(supabase)
-  const [admin, { items: users, hasError }] = await Promise.all([
-    adminPromise,
-    getOperationsUsers(supabase, query),
-  ])
+  const admin = await requirePlatformAdmin(supabase)
+  const { items: users, hasError } = await getOperationsUsers(supabase, query)
 
   return (
     <AppShell admin={admin} title="Users" description="Search and review registered Tshelo accounts." action={<SearchForm defaultValue={query} placeholder="Search users" />}>

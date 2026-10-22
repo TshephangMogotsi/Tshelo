@@ -1,0 +1,83 @@
+name: Platform Admin MFA E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'admin/**'
+      - 'shared/**'
+      - 'supabase/migrations/**'
+      - 'security/e2e/**'
+      - '.github/workflows/platform-admin-mfa.yml'
+  push:
+    branches: [main, codex/platform-admin-mfa-ci]
+    paths:
+      - 'admin/**'
+      - 'shared/**'
+      - 'supabase/migrations/**'
+      - 'security/e2e/**'
+      - '.github/workflows/platform-admin-mfa.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-admin-mfa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-auth-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            admin/package-lock.json
+            security/e2e/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix admin
+      - run: npm ci --prefix security/e2e
+      - name: Verify local-only test safeguards
+        run: npm run check --prefix security/e2e
+      - name: Install Chromium
+        working-directory: security/e2e
+        run: npx playwright install --with-deps chromium
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.113.0
+      - name: Prepare isolated stack configuration
+        run: node security/e2e/prepare-stack.mjs
+      - name: Start disposable Auth and migrated database
+        run: >-
+          supabase start --workdir "$RUNNER_TEMP/tshelo-mfa-stack"
+          --exclude studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
+      - name: Read disposable credentials without printing them
+        run: >-
+          supabase status --workdir "$RUNNER_TEMP/tshelo-mfa-stack"
+          --output json > "$RUNNER_TEMP/mfa-supabase.json"
+      - name: Configure app and tests for loopback services
+        run: node security/e2e/export-env.mjs
+      - name: Build admin app against disposable Supabase
+        env:
+          NODE_OPTIONS: --max-old-space-size=3072
+        run: npm run build --prefix admin
+      - name: Verify browser MFA, API and database enforcement
+        run: npm test --prefix security/e2e
+      - name: Upload sanitized test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-admin-mfa-evidence
+          path: security/e2e/mfa-e2e-evidence.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Stop disposable stack
+        if: always()
+        run: supabase stop --workdir "$RUNNER_TEMP/tshelo-mfa-stack" --no-backup

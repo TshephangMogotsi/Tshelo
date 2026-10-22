@@ -4,3 +4,8 @@ project_id = "albihofmlafjzbusancu"
 # deliberately narrow find_fund_by_code RPC and never exposes fund records.
 [functions.fund-preview]
 verify_jwt = false
+
+# Platform-admin authenticator enrollment and verification.
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
