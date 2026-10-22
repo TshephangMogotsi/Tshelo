@@ -144,7 +144,7 @@ for (const [index, role] of roles.entries()) {
     must((await api(page, primaryToken, 'admin/audit')).status() === 403, 'Invalid authenticator code unlocked admin API')
     record(role, 'incorrect authenticator code denied')
 
-    const verifiedToken = await submitMfa(page, secret)
+    let verifiedToken = await submitMfa(page, secret)
     const verifiedCounter = Math.floor(Date.now() / 30000)
     must((await api(page, verifiedToken, 'admin/audit')).status() === 200, 'aal2 admin API read failed')
     const high = caller(verifiedToken)
@@ -171,14 +171,14 @@ for (const [index, role] of roles.entries()) {
       if (Math.floor(Date.now() / 30000) <= verifiedCounter) {
         await new Promise(resolve => setTimeout(resolve, (verifiedCounter + 1) * 30000 - Date.now() + 1100))
       }
-      await submitMfa(page, secret)
+      verifiedToken = await submitMfa(page, secret)
       record(role, 'sign-out and repeat OTP login required existing-factor challenge without re-enrollment')
     }
 
     const disabled = await operator.from('platform_admins').update({ is_active: false }).eq('user_id', subject.id)
     must(!disabled.error, 'Could not disable disposable admin')
     must((await api(page, verifiedToken, 'admin/audit')).status() === 403, 'Inactive admin retained API privileges')
-    const inactive = await high.rpc('is_platform_admin')
+    const inactive = await caller(verifiedToken).rpc('is_platform_admin')
     must(!inactive.error && inactive.data === false, 'Inactive admin retained database privileges')
     await page.goto('/users')
     await expect(page).toHaveURL(/\/unauthorized$/)
