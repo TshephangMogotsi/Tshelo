@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   browser-auth-database:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       NEXT_TELEMETRY_DISABLED: '1'
@@ -46,9 +46,8 @@ jobs:
       - run: npm ci --prefix security/e2e
       - name: Verify local-only test safeguards
         run: npm run check --prefix security/e2e
-      - name: Install Chromium
-        working-directory: security/e2e
-        run: npx playwright install --with-deps chromium
+      - name: Verify runner Chrome
+        run: google-chrome --version
       - uses: supabase/setup-cli@v1
         with:
           version: 2.113.0
@@ -62,6 +61,15 @@ jobs:
             node security/e2e/report-start-failure.mjs
             exit 1
           fi
+      - name: Inspect required profile grants
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql --host 127.0.0.1 --port 54322 --username postgres --dbname postgres
+          --set ON_ERROR_STOP=1 --command
+          "SELECT has_table_privilege('service_role','public.users','SELECT') AS service_read,
+          has_table_privilege('service_role','public.users','UPDATE') AS service_update,
+          has_table_privilege('authenticated','public.users','SELECT') AS caller_read;"
       - name: Read disposable credentials without printing them
         run: >-
           supabase status --workdir "$RUNNER_TEMP/tshelo-mfa-stack"

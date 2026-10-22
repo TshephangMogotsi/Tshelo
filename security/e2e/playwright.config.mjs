@@ -18,6 +18,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:3100',
     browserName: 'chromium',
+    channel: 'chrome',
     // Traces/screenshots can contain TOTP setup keys, OTPs and access tokens.
     trace: 'off', screenshot: 'off', video: 'off',
   },

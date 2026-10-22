@@ -3,7 +3,7 @@
 Run by `.github/workflows/platform-admin-mfa.yml` on a disposable GitHub-hosted
 Ubuntu runner. No hosted Supabase project or production credentials are needed.
 
-The workflow installs Chromium, starts local Supabase Auth/PostgREST/Postgres,
+The workflow uses the runner’s installed Chrome, starts local Supabase Auth/PostgREST/Postgres,
 applies the committed migration history, builds the admin app against that stack
 and runs five serial browser scenarios. The first failure stops later scenarios.
 
@@ -30,7 +30,7 @@ API and direct database checks use the tested user's JWT.
 
 Screenshots, video and traces are disabled because they can expose setup keys or
 tokens. Only `mfa-e2e-evidence.json` is uploaded: source SHA, scenario outcomes,
-sanitized check names and cleanup status. No raw provider errors, session tokens,
+sanitized check names and cleanup status. No raw provider error objects, session tokens,
 OTP values or setup keys are included. The stack is removed in an always-run step.
 
 Local prerequisite checks (no Docker or secrets):
