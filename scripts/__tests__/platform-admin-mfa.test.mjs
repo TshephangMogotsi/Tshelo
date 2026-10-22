@@ -17,12 +17,12 @@ before(async () => {
     GRANT USAGE ON SCHEMA public,auth TO authenticated,anon,service_role;
     CREATE TABLE users(id uuid PRIMARY KEY, name text, is_flagged boolean DEFAULT false, is_banned boolean DEFAULT false, banned_at timestamptz, banned_reason text, banned_by uuid, deleted_at timestamptz, updated_at timestamptz);
     ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-    GRANT SELECT ON users TO authenticated;
     CREATE POLICY own_profile ON users FOR SELECT TO authenticated USING (id=auth.uid());
   `)
   for (const table of ['funds','events','support_tickets','disputes','fraud_signals','contributions','expenses','audit_log']) {
     await db.exec(`CREATE TABLE ${table}(id uuid PRIMARY KEY); ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY; GRANT SELECT ON ${table} TO authenticated`)
   }
+  await db.exec(await migration('20261022110000_explicit_profile_api_grants.sql'))
   await db.exec(await migration('20260814120000_platform_admin_console.sql'))
   // Exercise the real public moderation RPC, including its nested authorization
   // and atomic audit write, with only unrelated application columns stubbed.
@@ -95,4 +95,16 @@ test('downgrading a verified session closes platform access again', async () => 
   await session('super_admin','aal1')
   assert.equal((await read('SELECT * FROM funds')).length,0)
   assert.equal((await read('SELECT * FROM users')).length,1)
+})
+
+
+test('explicit profile grants preserve anonymous denial and restricted client writes', async () => {
+  await db.exec('RESET ROLE')
+  const grants = await read(`SELECT
+    has_table_privilege('anon','public.users','SELECT') AS anonymous_read,
+    has_table_privilege('authenticated','public.users','UPDATE') AS client_update,
+    has_table_privilege('service_role','public.users','SELECT,INSERT,UPDATE,DELETE') AS server_access`)
+  assert.equal(grants[0].anonymous_read,false)
+  assert.equal(grants[0].client_update,false)
+  assert.equal(grants[0].server_access,true)
 })
