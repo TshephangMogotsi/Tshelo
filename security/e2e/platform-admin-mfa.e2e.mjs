@@ -48,12 +48,15 @@ async function primaryLogin(page, index) {
   const sentBody = await otpResponse.json()
   must(sentBody.message_id === 'test-otp', 'Primary login did not use the local fixed-OTP transport')
   await page.getByLabel('Verification code', { exact: true }).fill('123456')
+  const profileResponse = page.waitForResponse(response => response.url().endsWith('/api/v1/users/me') && response.request().method() === 'GET')
   const response = page.waitForResponse(response => response.url() === `${url}/auth/v1/verify` && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Continue to dashboard', exact: true }).click()
   const verified = await response
   must(verified.ok(), 'Primary OTP verification failed')
   const body = await verified.json()
   must(typeof body.access_token === 'string' && aal(body.access_token) === 'aal1', 'Primary login did not produce aal1')
+  const profile = await profileResponse
+  must(profile.ok(), `Primary login profile request failed (${profile.status()})`)
   return body.access_token
 }
 
