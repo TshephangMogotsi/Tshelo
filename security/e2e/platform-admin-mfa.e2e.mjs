@@ -24,11 +24,15 @@ function aal(token) {
 function record(role, check) { evidence.push({ role, check, result: 'pass' }) }
 
 async function api(page, token, path, body) {
-  return page.request.fetch(`/api/v1/${path}`, {
+  try {
+    return await page.request.fetch(`/api/v1/${path}`, {
     method: body ? 'POST' : 'GET',
     headers: { authorization: `Bearer ${token}` },
-    ...(body ? { data: body } : {}),
-  })
+      ...(body ? { data: body } : {}),
+    })
+  } catch {
+    throw new Error('Local API request failed before a response was received')
+  }
 }
 
 async function primaryLogin(page, index) {
