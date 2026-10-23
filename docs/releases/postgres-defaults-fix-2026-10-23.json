@@ -1,0 +1,223 @@
+{
+  "date": "2026-10-23",
+  "project_ref": "albihofmlafjzbusancu",
+  "applied": {
+    "creator": "postgres",
+    "existing_public_acls_unchanged": true,
+    "explicit_grants_work": true,
+    "future_clients_denied": true,
+    "managed_defaults_unchanged": true,
+    "migration": "20261023160000",
+    "probes_rolled_back": true,
+    "result": "PASS",
+    "service_role_preserved": true
+  },
+  "remaining_client_defaults": [
+    {
+      "creator": "supabase_admin",
+      "grantee": "PUBLIC",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "global"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "USAGE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "USAGE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "INSERT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "DELETE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRUNCATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "REFERENCES",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRIGGER",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "MAINTAIN",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "INSERT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "DELETE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRUNCATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "REFERENCES",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRIGGER",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "MAINTAIN",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "public schema"
+    }
+  ],
+  "public_table_count": 111,
+  "tables_without_rls": 0,
+  "existing_acl_fingerprints": {
+    "functions": "01f23dc8957400caee51a05fabebc4b3",
+    "tables_and_sequences": "ada66a3038fb530305f24e75c3fcc2aa"
+  }
+}
