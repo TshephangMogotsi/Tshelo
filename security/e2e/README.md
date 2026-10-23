@@ -48,3 +48,5 @@ This does not test SMS delivery, cross-domain production cookies, natural sessio
 expiry, factor-reset recovery, or enrollment by actual platform administrators.
 Those remain coordinated rollout checks. The fixed primary OTP configuration is
 created only under RUNNER_TEMP and must never be applied to a hosted project.
+
+TOTP enrollment requires a confirmed Auth email address, including for phone-login administrators. Fixtures have confirmed synthetic emails; production owners must arrange verified admin emails before rollout. Email delivery and verification are not exercised by this suite.

@@ -75,6 +75,7 @@ test.beforeAll(async () => {
   for (let index = 1; index <= 6; index++) {
     const { data, error } = await operator.auth.admin.createUser({
       phone: fixturePhone(index), phone_confirm: true,
+      email: `mfa-ci-${index}@example.com`, email_confirm: true,
       user_metadata: { name: `Disposable MFA CI ${index}` },
       app_metadata: { synthetic_mfa_ci: true },
     })

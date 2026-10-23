@@ -16,5 +16,20 @@ export default async function MfaPage() {
   if (roleError || !admin) redirect('/unauthorized')
   if (data.claims.aal === 'aal2') redirect('/')
 
+  const { data: identity, error: identityError } = await client.auth.getUser()
+  if (identityError || !identity.user) redirect('/login')
+  if (!identity.user.email || !identity.user.email_confirmed_at) {
+    return (
+      <main className="login-form-panel">
+        <section className="login-card">
+          <h1>Confirm an email address before MFA setup</h1>
+          <p>Authenticator enrollment requires a confirmed email address on your sign-in account.
+            Contact your designated platform administrator to arrange email verification, then sign in again.</p>
+          <form action="/logout" method="post"><button type="submit">Sign out</button></form>
+        </section>
+      </main>
+    )
+  }
+
   return <MfaForm />
 }
