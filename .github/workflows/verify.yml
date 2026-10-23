@@ -29,6 +29,8 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: bundle-check-public-key
           EXPO_PUBLIC_API_BASE_URL: https://api-bundle-check.invalid
         run: npm run bundle:size
+      - name: Reject high-severity website runtime advisories
+        run: npm audit --prefix admin --omit=dev --audit-level=high
       - name: Reject high-severity dependency advisories
         run: npm audit --audit-level=high
       - name: Reject high-severity website runtime advisories
