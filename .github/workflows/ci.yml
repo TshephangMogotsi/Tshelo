@@ -1,0 +1,35 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, codex/cicd-release-gates]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  application:
+    uses: ./.github/workflows/verify.yml
+  website:
+    uses: ./.github/workflows/admin-verify.yml
+  mfa:
+    uses: ./.github/workflows/platform-admin-mfa.yml
+  ready:
+    name: Release readiness
+    if: always()
+    needs: [application, website, mfa]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - run: node --test scripts/__tests__/release-gate.test.mjs
+      - name: Require every verification job to pass
+        env:
+          APPLICATION: ${{ needs.application.result }}
+          WEBSITE: ${{ needs.website.result }}
+          MFA: ${{ needs.mfa.result }}
+        run: test "$APPLICATION" = success && test "$WEBSITE" = success && test "$MFA" = success

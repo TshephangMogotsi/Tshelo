@@ -1,0 +1,117 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Approved release operation
+        required: true
+        type: choice
+        options: [web, mobile-android, mobile-ios]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+jobs:
+  eligible:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - run: node scripts/release-gate.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+  web:
+    if: inputs.target == 'web'
+    needs: eligible
+    environment: production-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Recheck tested main after approval
+        run: node scripts/release-gate.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Require configured deployment target
+        run: test -n "$VERCEL_ORG_ID" && test -n "$VERCEL_PROJECT_ID" && test -n "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - run: npm install --global vercel@59.5.0
+      - name: Pull production build configuration
+        run: vercel pull --yes --environment=production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Build production candidate
+        run: vercel build --prod
+      - name: Stage without assigning production domains
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployment_url="$(vercel deploy --prebuilt --prod --skip-domain)"
+          DEPLOYMENT_URL="$deployment_url" node -e 'const u=new URL(process.env.DEPLOYMENT_URL); if(u.protocol!=="https:" || u.origin!==process.env.DEPLOYMENT_URL || !u.hostname.endsWith(".vercel.app")) process.exit(1)'
+          printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Verify staged deployment before promotion
+        run: node scripts/release-smoke.mjs
+        env:
+          DEPLOYMENT_URL: ${{ steps.stage.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Recheck main before assigning domains
+        run: node scripts/release-gate.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Promote the tested production build
+        run: vercel promote "$DEPLOYMENT_URL" --yes
+        env:
+          DEPLOYMENT_URL: ${{ steps.stage.outputs.url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Record released commit and deployment
+        env:
+          DEPLOYMENT_URL: ${{ steps.stage.outputs.url }}
+        run: printf 'Released `%s` to %s\n' "$GITHUB_SHA" "$DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
+  mobile:
+    if: startsWith(inputs.target, 'mobile-')
+    needs: eligible
+    environment: production-mobile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - name: Recheck tested main after approval
+        run: node scripts/release-gate.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: npm ci
+      - run: npm install --global eas-cli@25.3.0
+      - name: Require Expo credentials
+        run: test -n "$EXPO_TOKEN"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Build and wait for the actual native result
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          TARGET: ${{ inputs.target }}
+        run: eas build --platform "${TARGET#mobile-}" --profile production --non-interactive --wait
