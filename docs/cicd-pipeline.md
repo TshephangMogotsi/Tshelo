@@ -12,6 +12,11 @@ in this change deploys production automatically or applies hosted migrations.
 
 ## Activation
 
+Deployments are deliberately disabled: repository variable RELEASES_ENABLED is
+false, and no deployment secrets were added. CI remains active. Enable releases
+only after completing the setup below and explicitly deciding to activate them.
+
+
 - Protect main with the `Release readiness` check and require pull requests.
 - Configure `production-web` and `production-mobile` with an approval reviewer
   and deployment branch restricted to main. Initially the repository owner is the
@@ -23,6 +28,7 @@ in this change deploys production automatically or applies hosted migrations.
   as an environment secret. Smoke requests fail closed if protection blocks them.
 - Store EXPO_TOKEN in production-mobile. Existing Expo signing credentials and
   production environment values must be configured in EAS for the chosen platform.
+- Set repository variable RELEASES_ENABLED to true only after release authorization.
 - Merge this branch and verify main's entire CI run before dispatching Release.
 - Coordinate MFA admin enrollment, recovery arrangements and the matching database
   migration before approving a production release containing MFA enforcement.
