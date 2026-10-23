@@ -14,6 +14,8 @@ import type { ApiError } from '@shared/contracts/common'
 import { getSupabaseConfig } from '@/lib/config'
 
 export type ApiAuthContext = {
+  /** Assurance from the verified JWT, never from request input. */
+  assuranceLevel?: string
   actor: AuthenticatedApiActor
   /** Database client scoped to the caller's JWT so Row Level Security applies. */
   supabase: SupabaseClient
@@ -100,6 +102,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
   return {
     ok: true,
     auth: {
+      assuranceLevel: typeof claims.aal === 'string' ? claims.aal : undefined,
       actor: {
         user_id: claims.sub,
         role: SUPABASE_AUTHENTICATED_ROLE,

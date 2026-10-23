@@ -67,6 +67,10 @@ export async function authorizePlatformAdminRead(
     return failure(403, 'FORBIDDEN', 'Platform administrator access is required.')
   }
 
+  if (auth.assuranceLevel !== 'aal2') {
+    return failure(403, 'FORBIDDEN', 'Multi-factor verification is required for administrator access.')
+  }
+
   return { ok: true, data: { userId: auth.actor.user_id, role: data.role } }
 }
 

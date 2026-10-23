@@ -17,13 +17,14 @@
     "test:event-files-db": "node scripts/test-event-files-db.mjs",
     "test:metro-security": "node --test scripts/__tests__/metro-security.test.mjs",
     "test:db-bootstrap": "node --test scripts/__tests__/database-bootstrap.test.mjs",
+    "test:platform-admin-mfa": "node --test scripts/__tests__/platform-admin-mfa.test.mjs",
     "test:phase-one-security": "node --test scripts/__tests__/phase-one-security.test.mjs",
     "test:phase-two-security": "node --test scripts/__tests__/phase-two-security.test.mjs",
     "test:consent-security": "node --test scripts/__tests__/consent-security.test.mjs",
-    "test:dependency-security": "node --test scripts/__tests__/dependency-security.test.mjs",
+    "test:dependency-security": "node --test scripts/__tests__/dependency-security.test.mjs scripts/__tests__/upstream-security-fixes.test.mjs",
     "test:ios-simulator": "node --test scripts/__tests__/ios-simulator.test.mjs",
     "verify:api": "node scripts/verify-api.mjs",
-    "verify": "npm run typecheck && npm run test:phase-one-security && npm run test:phase-two-security && npm run test:consent-security && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security && npm run test:db-bootstrap && npm run test:dependency-security && npm run test:ios-simulator",
+    "verify": "npm run typecheck && npm run test:platform-admin-mfa && npm run test:phase-one-security && npm run test:phase-two-security && npm run test:consent-security && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security && npm run test:db-bootstrap && npm run test:dependency-security && npm run test:ios-simulator",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "provision:google-play-reviewer": "node scripts/provision-google-play-reviewer.mjs",
@@ -90,7 +91,8 @@
     "jest": "^29.7.0",
     "jest-expo": "~54.0.18",
     "patch-package": "^8.0.1",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "braces": "file:vendor/tshelo-braces-3.0.3-patched.1.tgz"
   },
   "overrides": {
     "js-yaml": "3.15.2",
@@ -116,7 +118,9 @@
     "metro-source-map": "0.83.8",
     "metro-symbolicate": "0.83.8",
     "metro-transform-plugins": "0.83.8",
-    "metro-transform-worker": "0.83.8"
+    "metro-transform-worker": "0.83.8",
+    "braces": "$braces",
+    "node-forge": "https://codeload.github.com/digitalbazaar/forge/tar.gz/85446800199c4995d3cd4b0ab5a8409df4455859"
   },
   "private": true
 }

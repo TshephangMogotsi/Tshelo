@@ -11,11 +11,8 @@ export default async function FundsPage({ searchParams }: { searchParams: Promis
   const rawQuery = (await searchParams).q ?? ''
   const query = rawQuery.replace(/[,%()]/g, '').trim().slice(0, 60)
   const supabase = await createClient()
-  const adminPromise = requirePlatformAdmin(supabase)
-  const [admin, { items: funds, hasError }] = await Promise.all([
-    adminPromise,
-    getOperationsFunds(supabase, query),
-  ])
+  const admin = await requirePlatformAdmin(supabase)
+  const { items: funds, hasError } = await getOperationsFunds(supabase, query)
 
   return (
     <AppShell admin={admin} title="Funds" description="Review funds and their current operating status." action={<SearchForm defaultValue={query} placeholder="Search funds" />}>

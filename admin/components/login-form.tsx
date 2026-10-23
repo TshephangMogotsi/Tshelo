@@ -94,7 +94,7 @@ export function LoginForm({ nextPath }: { nextPath?: string | null }) {
       window.location.replace(onboardingPathFor(invitation.path))
       return
     }
-    window.location.replace(appUser && continuation ? continuation : admin ? '/' : '/account/overview')
+    window.location.replace(appUser && continuation ? continuation : admin ? '/mfa' : '/account/overview')
   }
 
   return (

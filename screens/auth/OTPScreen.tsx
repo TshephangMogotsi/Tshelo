@@ -104,18 +104,14 @@ export default function OTPScreen({ navigation, route }: Props) {
     if (!userId) { setLoading(false); return }
 
     if (registration) {
-      const now = new Date().toISOString()
       try {
         await api.users.updateMe({
           name: registration.name,
           country_code: registration.countryCode,
           preferred_currency: registration.currency,
-          terms_accepted_at: now,
           terms_version: '1.0',
-          privacy_accepted_at: now,
           privacy_version: '1.0',
           data_processing_consent: true,
-          data_processing_consent_at: now,
         })
       } catch (profileError) {
         Alert.alert('Registration error', toApiUiError(profileError).message)

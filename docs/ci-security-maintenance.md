@@ -125,3 +125,11 @@ malformed unsupported image data. The audit is not filtered or allowlisted.
 The complete SQL integration jobs require Docker and run on GitHub Actions.
 Mobile bundle exports do not replace the user's device smoke testing. Do not
 launch a simulator for this release; the user is handling that check.
+
+## October 2026: unpublished upstream security fixes
+
+The CI audit subsequently found two unreleased upstream fixes. See
+[CI/CD pipeline](cicd-pipeline.md) and `vendor/braces/README.md` for provenance,
+maintenance obligations, scanner limitations and replacement criteria. Root
+`test:dependency-security` now runs exploit regressions and Expo signing
+compatibility against the actual pinned dependency consumers.

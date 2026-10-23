@@ -57,3 +57,8 @@ supabase/.temp/
 /modules/sms-listener/android/build/
 .vercel
 .env*
+
+# MFA browser-test outputs.
+security/e2e/test-results/
+security/e2e/playwright-report/
+security/e2e/mfa-e2e-evidence.json

@@ -11,11 +11,8 @@ export default async function SupportPage({ searchParams }: { searchParams: Prom
   const rawQuery = (await searchParams).q ?? ''
   const query = rawQuery.replace(/[,%()]/g, '').trim().slice(0, 60)
   const supabase = await createClient()
-  const adminPromise = requirePlatformAdmin(supabase)
-  const [admin, { items: tickets, hasError }] = await Promise.all([
-    adminPromise,
-    getSupportTickets(supabase, query),
-  ])
+  const admin = await requirePlatformAdmin(supabase)
+  const { items: tickets, hasError } = await getSupportTickets(supabase, query)
 
   return (
     <AppShell admin={admin} title="Support" description="Review the latest member support requests." action={<SearchForm defaultValue={query} placeholder="Search tickets" />}>

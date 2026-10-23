@@ -13,10 +13,10 @@ export type PlatformAdmin = {
 
 export async function requirePlatformAdmin(client?: ServerClient): Promise<PlatformAdmin> {
   const supabase = client ?? await createClient()
-  const { data: auth } = await supabase.auth.getClaims()
+  const { data: auth, error: authError } = await supabase.auth.getClaims()
   const userId = auth?.claims.sub
 
-  if (!userId) redirect('/login')
+  if (authError || !userId) redirect('/login')
 
   const [{ data: admin }, { data: profile }] = await Promise.all([
     supabase
@@ -33,6 +33,7 @@ export async function requirePlatformAdmin(client?: ServerClient): Promise<Platf
   ])
 
   if (!admin) redirect('/unauthorized')
+  if (auth.claims.aal !== 'aal2') redirect('/mfa')
 
   return {
     userId,

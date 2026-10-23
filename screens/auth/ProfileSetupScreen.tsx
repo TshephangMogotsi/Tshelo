@@ -65,7 +65,6 @@ export default function ProfileSetupScreen({ navigation }: Props) {
       return
     }
 
-    const now = new Date().toISOString()
     try {
       await api.users.updateMe({
         name: displayName.trim(),
@@ -75,12 +74,9 @@ export default function ProfileSetupScreen({ navigation }: Props) {
         bank_account_number: bank.accountNumber,
         profile_completed: true,
         onboarding_completed: true,
-        terms_accepted_at: now,
         terms_version: '1.0',
-        privacy_accepted_at: now,
         privacy_version: '1.0',
         data_processing_consent: true,
-        data_processing_consent_at: now,
       })
     } catch (profileError) {
       setLoading(false)
