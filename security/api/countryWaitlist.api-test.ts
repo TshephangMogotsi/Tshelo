@@ -16,6 +16,7 @@ const request = (overrides = {}, headers = {}) => new Request('https://app.tshel
 })
 
 beforeEach(() => {
+  process.env = { ...env }
   jest.clearAllMocks()
   Object.assign(process.env, { WAITLIST_ENABLED:'true',VERCEL:'1',WAITLIST_TURNSTILE_SECRET_KEY:'secret',WAITLIST_RATE_LIMIT_KEY:'hash-key',WAITLIST_TURNSTILE_HOSTNAME:'app.tshelo.com',WAITLIST_CLEANUP_SECRET:'cleanup-secret' })
   rpc.mockImplementation((name: string) => Promise.resolve({data:name==='consume_country_waitlist_limits'?true:null,error:null}))
@@ -60,6 +61,23 @@ it('submits normalized contacts only after successful CAPTCHA',async()=>{
   expect(result.status).toBe(200)
   expect(rpc).toHaveBeenLastCalledWith('submit_country_waitlist',{p_country:'KEN',p_email:'test@example.com',p_phone:null})
   expect(await result.json()).toEqual({message:'Your request has been received.'})
+})
+it('uses the existing Cloudflare secret variable without exposing it to callers',async()=>{
+  delete process.env.WAITLIST_TURNSTILE_SECRET_KEY
+  process.env.TURNSTILE_SECRET_KEY='existing-widget-secret'
+  const result=await POST(request())
+  expect(result.status).toBe(200)
+  expect(fetchMock.mock.calls[0][1].body.get('secret')).toBe('existing-widget-secret')
+  expect(JSON.stringify(await result.json())).not.toContain('existing-widget-secret')
+})
+it('fails closed when the secret, expected hostname or rate-limit key is absent',async()=>{
+  for(const name of ['WAITLIST_TURNSTILE_SECRET_KEY','WAITLIST_TURNSTILE_HOSTNAME','WAITLIST_RATE_LIMIT_KEY']) {
+    const saved=process.env[name]
+    delete process.env[name]; delete process.env.TURNSTILE_SECRET_KEY
+    expect((await POST(request())).status).toBe(503)
+    process.env[name]=saved
+  }
+  expect(rpc).not.toHaveBeenCalled()
 })
 it('protects cleanup with a secret and calls only the purge RPC',async()=>{
   expect((await cleanup(new Request('https://app.test',{method:'POST'}))).status).toBe(403)

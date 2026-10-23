@@ -162,7 +162,7 @@ export function toUser(row: UserRow): User {
     marketing_consent_at: row.marketing_consent_at ?? null,
     marketing_email_enabled: Boolean(row.marketing_email_enabled),
     marketing_sms_enabled: Boolean(row.marketing_sms_enabled),
-    data_processing_consent: row.data_processing_consent ?? true,
+    data_processing_consent: row.data_processing_consent ?? false,
     data_processing_consent_at: row.data_processing_consent_at ?? null,
     last_active_at: row.last_active_at,
     updated_at: row.updated_at,
