@@ -75,3 +75,23 @@ validated before push; the combined GitHub run is the integration evidence.
 Deployment activation and a production release rehearsal require environment
 secrets and explicit approval. Preparing these workflows is not evidence that a
 production deployment or native build has run.
+
+## Verification status — 23 October 2026
+
+PR #2: https://github.com/TshephangMogotsi/Tshelo/pull/2
+The first combined run passed the full application verification and size checks,
+website build/API checks, website runtime audit and all five MFA scenarios. The
+root dependency audit correctly failed, and the disposable consent test exposed
+a missing explicit SELECT grant. A follow-up migration declares that grant while
+retaining own-user RLS and denying direct writes; compatible lockfile updates
+remove the fixable findings.
+
+The remaining root audit findings originate in `braces` and `node-forge`. Their
+reviewed advisories list no patched versions:
+- https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+- https://github.com/advisories/GHSA-86w9-cpqp-85rv
+
+The audit threshold remains enforced. Do not force a downgrade/major SDK change,
+suppress these advisories, bypass branch protection, or claim a green pipeline.
+Merge remains blocked until compatible patched dependencies or a reviewed
+replacement are available. Deployments remain explicitly disabled.
