@@ -86,12 +86,31 @@ a missing explicit SELECT grant. A follow-up migration declares that grant while
 retaining own-user RLS and denying direct writes; compatible lockfile updates
 remove the fixable findings.
 
-The remaining root audit findings originate in `braces` and `node-forge`. Their
-reviewed advisories list no patched versions:
-- https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
-- https://github.com/advisories/GHSA-86w9-cpqp-85rv
+The two remaining upstream vulnerabilities are addressed by reviewed source fixes:
 
-The audit threshold remains enforced. Do not force a downgrade/major SDK change,
-suppress these advisories, bypass branch protection, or claim a green pipeline.
-Merge remains blocked until compatible patched dependencies or a reviewed
-replacement are available. Deployments remain explicitly disabled.
+- `braces`: local unpublished `@tshelo/braces` fork, packaged as a committed
+  integrity-locked tarball. Upstream proposed fix:
+  https://github.com/micromatch/braces/pull/88 at
+  `a795ee83ecd011131b2d618fe754ac5a8e124dae`. It bounds parser nesting and validates
+  all supplied ASTs for safe depth and cycles before recursive traversal.
+- `node-forge`: upstream source archive pinned to
+  `85446800199c4995d3cd4b0ab5a8409df4455859`, proposed fix
+  https://github.com/digitalbazaar/forge/pull/1161. Compared with the installed
+  registry release, the runtime library changes only `lib/rsa.js`: reject extra
+  nested DigestAlgorithm elements and nonempty NULL parameters.
+
+These are proposed upstream patches, not released or merged upstream versions.
+The project temporarily owns their review and maintenance. No audit threshold,
+branch requirement or advisory allowlist was weakened. The local fork has a new
+package identity, so npm cannot monitor its original advisory identity; source
+integrity and explicit vulnerability regression tests are mandatory in CI.
+
+Six regression checks fail against the original vulnerable packages and pass
+against the patched sources. Ten focused checks cover those failures, normal
+globs and ASTs, canonical RSA signatures, altered-message rejection and real
+Expo certificate/signing compatibility. Tests also check all locked copies,
+source/archive integrity and actual dependency consumer resolution.
+
+Replace these pins with compatible official releases after the fixes are
+published and verified. Do not remove the regression tests when updating.
+Deployments remain explicitly disabled. PR #2 must pass combined CI before merge.
