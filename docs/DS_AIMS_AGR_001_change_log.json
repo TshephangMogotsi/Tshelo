@@ -1,0 +1,242 @@
+{
+  "source_document": "DS_AIMS_AGR_001_Digital_Natives_Services_Agreement_v1_1.docx",
+  "instruction": "Apply these changes to the source document in one final batch only after all sections have been reviewed and approved.",
+  "changes": [
+    {
+      "section": "1. Background and status of this agreement",
+      "status": "agreed",
+      "change": "Clarify the May 2026 start of the general Tshelo development services and state that the initial services did not include development of the Tshelo AI receipt-scanning system.",
+      "proposed_text": "The Supplier began providing general Tshelo development services to Data Sentinels on or around May 2026 under an informal arrangement agreed verbally and through messaging, email and Slack. Those initial services did not include development of the Tshelo AI receipt-scanning system."
+    },
+    {
+      "section": "1. Background and status of this agreement",
+      "status": "agreed",
+      "change": "Record that no end-user personal information or receipt data was received before signature, but an Anthropic Claude API credential was received.",
+      "proposed_text": "Before signature, the Supplier received no end-user personal information or receipt data. The only Data Sentinels information received was an API credential for the Anthropic Claude service. That credential is Confidential Information and is not User Data."
+    },
+    {
+      "section": "3. Term, fees and invoicing",
+      "status": "agreed",
+      "change": "Record the prior agreement that Data Sentinels pays the Claude Haiku API usage charges for the receipt-scanning function.",
+      "proposed_text": "Data Sentinels will provide and pay for all Anthropic Claude Haiku API usage required by the System's receipt-scanning function. Those third-party API charges are Data Sentinels' responsibility and are not included in the Fees payable to the Supplier."
+    },
+    {
+      "section": "Annex C3. Disclosure",
+      "status": "agreed",
+      "change": "Disclose the AI service used inside the System.",
+      "fields": {
+        "tool_service": "Claude Haiku API",
+        "provider": "Anthropic",
+        "used_for": "In the System - receipt image extraction",
+        "user_data": "Y"
+      }
+    },
+    {
+      "section": "2. Services and Annex A. Scope of Work",
+      "status": "agreed",
+      "change": "Define the deliverable as the complete Tshelo AI receipt-scanning feature.",
+      "included_deliverables": [
+        "Receipt-image upload and storage",
+        "Claude Haiku receipt-extraction service",
+        "Mobile and web screens for reviewing and correcting extracted data",
+        "Saving corrected receipt data into Tshelo",
+        "Testing and bug fixing",
+        "Documentation, deployment scripts and handover"
+      ],
+      "proposed_text": "The Services cover the complete Tshelo AI receipt-scanning feature, including receipt-image upload and storage; the Claude Haiku receipt-extraction service; mobile and web review and correction screens; saving corrected receipt data into Tshelo; testing and bug fixing; and documentation, deployment scripts and handover."
+    },
+    {
+      "section": "2. Services and Annex A. Scope of Work",
+      "status": "agreed",
+      "change": "Define the exclusion from scope.",
+      "proposed_text": "Anything not involving the Tshelo AI receipt-scanning feature is outside the scope of the Services, including unrelated Tshelo fund or event-platform features, payment processing and unrelated enhancements."
+    },
+    {
+      "section": "11A. Operating period and transfer",
+      "status": "agreed",
+      "change": "Confirm that the six-month post-launch operation and maintenance period forms part of this Agreement.",
+      "proposed_text": "The six-month post-launch operation and maintenance period forms part of the Services and this Agreement."
+    },
+    {
+      "section": "2, 10, 11 and Annex A. Scope, acceptance and handover",
+      "status": "pending_input",
+      "change": "Name the Data Sentinels Delivery Lead, Internal System Owner and receiving engineer.",
+      "fields": {
+        "delivery_lead": "",
+        "internal_system_owner": "",
+        "receiving_engineer": ""
+      },
+      "note": "These are Data Sentinels appointments and can remain blank until Data Sentinels confirms the names and contact details."
+    },
+    {
+      "section": "10. Human oversight and Annex A. Scope of Work",
+      "status": "pending_input",
+      "change": "Record the low-confidence receipt-scan acceptance rule and confidence threshold in the build record.",
+      "proposed_text": "A receipt extraction below the agreed confidence threshold must be routed to the user for review and correction and must not be committed as final data without human confirmation. The numeric threshold and any additional acceptance metrics remain to be agreed and recorded in the build record.",
+      "note": "A practical default would be to agree a percentage threshold after testing representative receipts; no number has been assumed here."
+    },
+    {
+      "section": "3. Term, fees and invoicing",
+      "status": "pending_input",
+      "owner": "Data Sentinels / commercial and legal decision-makers",
+      "change": "Confirm the payment split, invoice timing, invoice recipient and VAT treatment.",
+      "questions": [
+        "Is the BWP 4,000 payment split correct: BWP 1,000 at initial handover acceptance, BWP 2,000 at transfer of operations and up to BWP 1,000 for the six-month operating period?",
+        "When should each invoice be issued?",
+        "Who should receive invoices and what email or address should be listed?",
+        "Is VAT included in the BWP 4,000 or added separately?"
+      ],
+      "note": "Developer input is not required; leave these fields blank until the relevant parties confirm them."
+    },
+    {
+      "section": "4. Confidentiality, 6. Data protection and Annex C. AI disclosures",
+      "status": "pending_input",
+      "owner": "Data Sentinels / legal and system owner",
+      "change": "Confirm approval and disclosure of Anthropic as a third-party AI service provider, and identify any other third parties that may receive confidential information or User Data.",
+      "proposed_treatment": "Anthropic should be listed as the provider of the Claude Haiku API in the AI-service/subprocessor disclosures. It is not a Data Sentinels group company or affiliate; it is an external service provider.",
+      "questions": [
+        "Has Data Sentinels approved Anthropic for the receipt-scanning service and any transfer of receipt images or extracted User Data?",
+        "Are there other hosting, storage, cloud, analytics or subcontractor providers that should also be disclosed?"
+      ]
+    },
+    {
+      "section": "4. Confidentiality and 11. Handover",
+      "status": "agreed_developer_statement",
+      "change": "Record the information held by Digital Natives at handover.",
+      "proposed_text": "Digital Natives does not hold any Data Sentinels information, end-user personal information or real receipt data, apart from the Data Sentinels Anthropic API credential stored in the environment file. Any test receipt images used during development are owned by Digital Natives and are not Data Sentinels or end-user data. At handover, Digital Natives will return or delete the API credential and remove any copies under its control."
+    },
+    {
+      "section": "4. Confidentiality, 6. Data protection and Annex C. AI disclosures",
+      "status": "agreed_developer_statement_pending_client_confirmation",
+      "change": "Identify the third-party services used by the receipt-scanning feature.",
+      "services": [
+        {
+          "provider": "Anthropic",
+          "service": "Claude Haiku API",
+          "function": "Receipt-image extraction"
+        },
+        {
+          "provider": "Supabase",
+          "service": "Receipt-image storage",
+          "function": "Store receipt images"
+        }
+      ],
+      "proposed_text": "The receipt-scanning feature uses Anthropic's Claude Haiku API for receipt-image extraction and Supabase for receipt-image storage. Both services are operated and controlled through Data Sentinels' client accounts and infrastructure. Data Sentinels must confirm legal approval and the applicable data-processing, location and retention terms."
+    },
+    {
+      "section": "5. Intellectual property and Annex A2. Pre-existing Material",
+      "status": "agreed_developer_statement",
+      "change": "Record the pre-existing-material and code-origin position for the receipt-scanning feature.",
+      "position": {
+        "existing_digital_natives_code_or_reusable_components": "None",
+        "existing_prompts_schemas_scripts_or_utilities": "None",
+        "copied_or_adapted_code_from_another_project": "None",
+        "third_party_library_or_open_source_package": "None identified; Claude Haiku is an external AI service/API, not a library or open-source package",
+        "existing_model": "Claude Haiku is used through Anthropic's API and is not owned by Digital Natives",
+        "ai_generated_code": "Some receipt-scanning implementation code was generated with Codex and then used/reviewed for the feature; it is newly created project deliverable code, not pre-existing material"
+      },
+      "proposed_text": "No pre-existing Digital Natives code, reusable components, prompts, schemas, scripts or utilities were incorporated, and no code was copied or adapted from another project. Claude Haiku is used as an external service through Anthropic's API. Some implementation code was generated with Codex as a coding assistant and reviewed for use in the receipt-scanning feature."
+    },
+    {
+      "section": "7. AI tools and Annex C2. Coding assistants",
+      "status": "pending_input",
+      "owner": "Developer to confirm; Data Sentinels/legal to review disclosure",
+      "change": "Disclose Codex as a coding assistant used to generate some receipt-scanning implementation code.",
+      "fields": {
+        "tool_service": "Codex",
+        "provider": "OpenAI",
+        "used_for": "Generating implementation code for the receipt-scanning feature",
+        "user_data_or_credentials_provided": "No"
+      },
+      "note": "No receipt images, User Data, API keys, production configuration or other confidential information was provided to Codex."
+    },
+    {
+      "section": "8. Security",
+      "status": "partially_agreed_pending_confirmation",
+      "change": "Record the current developer security controls for the receipt-scanning feature.",
+      "controls": {
+        "mfa_on_developer_and_production_accounts": "Yes",
+        "personal_devices_or_personal_cloud_storage": "No",
+        "api_key_storage": "Environment variables only",
+        "api_key_storage_compliance": "To confirm whether these are managed deployment secrets or a local .env file; a local .env file would not satisfy the Agreement's managed-secret requirement",
+        "current_state": "Production API key is currently stored in a local .env file",
+        "ideal_answer": "Production API keys will be stored in an approved managed secret store. Local .env files may be used only for development, must not be committed to source control, and must not contain or replace the production key.",
+        "access_revocation": "Yes; accounts are tied to employee accounts, and revoking the employee account revokes access to connected services",
+        "supabase_encryption": "Supabase documentation states that data is encrypted in transit and at rest",
+        "anthropic_encryption": "API traffic uses HTTPS/TLS; exact at-rest and retention configuration for Data Sentinels' commercial account requires confirmation from the Anthropic account/DPA"
+      },
+      "proposed_text": "Digital Natives uses MFA, does not use personal devices or personal cloud storage for the Services, stores production API keys in managed deployment secret storage, and can revoke access through employee-account deactivation. Local .env files may be used only for local development, must not be committed to source control, and must not contain or replace the production secret. Supabase provides encryption in transit and at rest. Anthropic API traffic is sent over HTTPS/TLS; Data Sentinels must confirm the applicable Anthropic at-rest encryption and retention terms for its account.",
+      "required_follow_up": "Move the production Anthropic key from the local .env file into the approved managed secret store and rotate the key if it has been exposed or shared."
+    },
+    {
+      "section": "8. Security",
+      "status": "pending_input",
+      "owner": "Digital Natives management / Data Sentinels",
+      "change": "Confirm the incident-notification process required by the Agreement.",
+      "current_position": "Not yet confirmed that Digital Natives has a documented process capable of notifying Data Sentinels within 24 hours.",
+      "recommended_process": "Any suspected security incident is escalated immediately to the responsible lead; Data Sentinels is notified within 24 hours; relevant credentials are revoked or rotated; and logs/evidence are preserved.",
+      "ideal_contract_answer": "Yes. Digital Natives will notify Data Sentinels without undue delay and within 24 hours of becoming aware of a suspected or confirmed security incident affecting the Services.",
+      "note": "Management must approve this contractual commitment and name the contact/escalation path. The developer can implement detection, immediate escalation, credential rotation and evidence preservation, but cannot make the company-wide contractual commitment alone."
+    },
+    {
+      "section": "10. Human oversight",
+      "status": "partially_agreed_pending_engineering_change",
+      "change": "Record the current human-review controls and identify the missing low-confidence routing control.",
+      "current_controls": {
+        "extracted_fields_shown_before_save": "Yes",
+        "user_can_edit_before_save": "Yes",
+        "low_confidence_or_incomplete_scans_flagged_for_mandatory_review": "No",
+        "original_extraction_preserved_with_corrections_as_audit_trail": "Yes",
+        "ai_only_prepares_receipt_data": "Yes"
+      },
+      "gap": "The parser currently returns no confidence score or explicit review_required flag, and the review UI does not separately identify low-confidence or incomplete extraction.",
+      "proposed_engineering_change": "Add a confidence/review signal to the receipt parser response, make the threshold configurable, flag low-confidence or incomplete results in the review UI, and require explicit user confirmation before saving those results.",
+      "note": "This can be implemented in a day as an initial version, but the numeric threshold and final acceptance rule must be approved by Data Sentinels/system ownership."
+    },
+    {
+      "section": "11. Handover and transfer of operations",
+      "status": "partially_agreed_pending_handover_documentation",
+      "change": "Record the current handover position for the receipt-scanning feature.",
+      "answers": {
+        "source_code_git_repository_accessible_to_data_sentinels": "Yes",
+        "build_and_deployment_scripts": "Partly available: the repository contains package build/test scripts and EAS, Expo and Supabase build/deployment configuration, but there is not yet one consolidated deployment script or handover procedure",
+        "operating_instructions_or_runbook": "Not yet; the app is still in testing and a runbook should be prepared before handover",
+        "thirty_days_defect_support_after_handover": "Yes",
+        "ai_handover_details": "Yes; Claude model/version, prompt, extraction schema and configuration can be provided",
+        "anthropic_supabase_and_deployment_accounts_controlled_by_data_sentinels": "Yes"
+      },
+      "proposed_text": "The source code is maintained in a Git repository accessible to Data Sentinels. The repository includes the relevant build and deployment configuration and scripts, including the EAS/Expo and Supabase configuration, but a consolidated handover procedure and operating runbook will be prepared before handover. Digital Natives will provide the Claude model/version, prompt, extraction schema and configuration, and will provide 30 days of defect support after handover. Anthropic, Supabase and deployment accounts are controlled by Data Sentinels."
+    },
+    {
+      "section": "6. Data protection and Annex B. Data Processing Terms",
+      "status": "pending_legal_confirmation",
+      "owner": "Data Sentinels / legal and system owner",
+      "change": "Record the test-data position.",
+      "current_position": "Testing uses real receipts belonging to Digital Natives developers. These are not Data Sentinels' real end-user receipts, but they may still contain personal or financial information about the developers or third parties named on the receipts.",
+      "proposed_text": "Before production use, testing data will be limited to receipts owned or lawfully provided by Digital Natives developers, with unnecessary personal and financial information minimized or redacted where practicable. No Data Sentinels end-user receipts are used unless Data Sentinels gives the required written approval and lawful basis.",
+      "questions_for_data_sentinels_legal": [
+        "Are the developers' receipts being used with the developers' consent and under an approved testing purpose?",
+        "What data location and retention period should apply to these test images in Supabase and to data sent to Anthropic?",
+        "Should test images be deleted after testing or retained as controlled test evidence?"
+      ]
+    }
+  ],
+  "leave_blank_for_relevant_parties": [
+    "Digital Natives legal name",
+    "Digital Natives registration number",
+    "Digital Natives address",
+    "Digital Natives country of establishment",
+    "Digital Natives contact person and email",
+    "Digital Natives authorised signatory and title",
+    "Invoicing arrangements",
+    "Liability, insurance and cyber-liability terms",
+    "Scope milestones and acceptance details",
+    "Receiving Data Sentinels engineer",
+    "Pre-existing material and licence position",
+    "Approved data locations and retention period",
+    "Additional AI-tool disclosures",
+    "Personnel access and IP-assignment evidence",
+    "Group, affiliate and conflict disclosures",
+    "Individual device declarations and signatures"
+  ]
+}

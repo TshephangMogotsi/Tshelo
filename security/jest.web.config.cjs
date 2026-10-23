@@ -6,6 +6,7 @@ module.exports = {
   modulePathIgnorePatterns: ['<rootDir>/.claude/'],
   testMatch: ['<rootDir>/security/web/**/*.web-test.js'],
   moduleNameMapper: {
+    '\\.module\\.css$': '<rootDir>/security/web/style-mock.cjs',
     '^@shared/(.*)$': '<rootDir>/shared/$1',
     '^@/(.*)$': '<rootDir>/admin/$1',
     '^react$': '<rootDir>/node_modules/react',

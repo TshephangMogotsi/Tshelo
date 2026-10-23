@@ -11,11 +11,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const adminPromise = requirePlatformAdmin(supabase)
-  const [admin, overview] = await Promise.all([
-    adminPromise,
-    getOperationsOverview(supabase),
-  ])
+  const admin = await requirePlatformAdmin(supabase)
+  const overview = await getOperationsOverview(supabase)
 
   const stats = [
     { label: 'Platform users', value: overview.counts.users, hint: 'Registered accounts', icon: Users, tone: 'purple' },

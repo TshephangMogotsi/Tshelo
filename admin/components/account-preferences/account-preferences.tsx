@@ -142,7 +142,6 @@ export function AccountPreferences() {
   async function saveCommunications() {
     if (!user || !draft) return
     const marketingConsent = draft.marketingEmailEnabled || draft.marketingSmsEnabled
-    const startedMarketingConsent = marketingConsent && !user.marketing_consent
     setSaving(true)
     setError('')
     setNotice('')
@@ -153,7 +152,6 @@ export function AccountPreferences() {
         marketing_consent: marketingConsent,
         marketing_email_enabled: draft.marketingEmailEnabled,
         marketing_sms_enabled: draft.marketingSmsEnabled,
-        ...(startedMarketingConsent ? { marketing_consent_at: new Date().toISOString() } : {}),
       })
       setUser(updated)
       setDraft(draftFromUser(updated))

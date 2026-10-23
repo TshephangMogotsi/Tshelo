@@ -66,6 +66,10 @@ export type SupportTicketSummary = {
   ticket_number: string
   category: string
   subject: string
+  /** Present on the support queue; omitted by compact dashboard previews. */
+  description?: string
+  /** Internal resolution context, visible only to platform support staff. */
+  resolution_note?: string | null
   priority: SupportTicketPriority
   status: SupportTicketStatus
   assigned_to: string | null

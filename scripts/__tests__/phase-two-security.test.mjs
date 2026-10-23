@@ -118,3 +118,45 @@ test('Phase 2 membership, future-table defaults and waitlist controls', async ()
     assert.deepEqual((await db.query('SELECT email FROM country_waitlist')).rows,[{email:'fresh@example.test'}])
   } finally { await db.close() }
 })
+
+test('postgres future-object defaults close client access without changing existing ACLs or managed defaults', async () => {
+  const db = new PGlite()
+  try {
+    await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE ROLE supabase_admin;
+      CREATE SCHEMA other;
+      CREATE TABLE public.existing_acl_probe(id int);
+      CREATE SEQUENCE public.existing_seq_probe;
+      CREATE FUNCTION public.existing_fn_probe() RETURNS int LANGUAGE sql AS 'SELECT 1';
+      GRANT SELECT ON public.existing_acl_probe TO anon;
+      GRANT USAGE ON SEQUENCE public.existing_seq_probe TO authenticated;`)
+    for (const owner of ['postgres','supabase_admin']) for (const kind of ['TABLES','SEQUENCES','FUNCTIONS']) {
+      await db.exec(`ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} GRANT ALL ON ${kind} TO anon,authenticated;
+        ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA public GRANT ALL ON ${kind} TO anon,authenticated,service_role;`)
+    }
+    const snapshot = async () => (await db.query(`SELECT 'relation' kind,relname name,relacl::text acl FROM pg_class WHERE relname IN ('existing_acl_probe','existing_seq_probe')
+      UNION ALL SELECT 'function',proname,proacl::text FROM pg_proc WHERE proname='existing_fn_probe'
+      UNION ALL SELECT 'managed',defaclnamespace::text||defaclobjtype::text,defaclacl::text FROM pg_default_acl WHERE defaclrole='supabase_admin'::regrole ORDER BY 1,2`)).rows
+    const before = await snapshot()
+    const migration = await readFile(new URL('../../supabase/migrations/20261023160000_close_postgres_future_object_defaults.sql',import.meta.url),'utf8')
+    await db.exec(migration)
+    await db.exec(migration)
+    assert.deepEqual(await snapshot(),before)
+    await db.exec(`CREATE TABLE public.future_acl_probe(id int);
+      CREATE SEQUENCE public.future_seq_probe;
+      CREATE FUNCTION public.future_fn_probe() RETURNS int LANGUAGE sql AS 'SELECT 1';
+      CREATE FUNCTION other.future_fn_probe() RETURNS int LANGUAGE sql AS 'SELECT 1';`)
+    for (const role of ['anon','authenticated']) {
+      const row=(await db.query(`SELECT has_table_privilege($1,'public.future_acl_probe','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') t,
+        has_sequence_privilege($1,'public.future_seq_probe','USAGE,SELECT,UPDATE') s,
+        has_function_privilege($1,'public.future_fn_probe()','EXECUTE') f,
+        has_function_privilege($1,'other.future_fn_probe()','EXECUTE') other_f`,[role])).rows[0]
+      assert.deepEqual(row,{t:false,s:false,f:false,other_f:false})
+    }
+    const service=(await db.query(`SELECT has_table_privilege('service_role','public.future_acl_probe','SELECT') t,
+      has_sequence_privilege('service_role','public.future_seq_probe','USAGE') s,
+      has_function_privilege('service_role','public.future_fn_probe()','EXECUTE') f`)).rows[0]
+    assert.deepEqual(service,{t:true,s:true,f:true})
+    await db.exec('GRANT SELECT ON public.future_acl_probe TO authenticated; GRANT EXECUTE ON FUNCTION public.future_fn_probe() TO authenticated')
+    assert.equal((await db.query(`SELECT has_table_privilege('authenticated','public.future_acl_probe','SELECT') AND has_function_privilege('authenticated','public.future_fn_probe()','EXECUTE') allowed`)).rows[0].allowed,true)
+  } finally { await db.close() }
+})

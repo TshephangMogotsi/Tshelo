@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
+import { TABLET_SMALLEST_WIDTH } from '../../lib/useTabletLayout'
 
 const GRADIENT_START = '#7657F0'
 const GRADIENT_END   = '#8874E1'
@@ -61,7 +62,9 @@ type Props = { onDone: (dest?: 'CountrySelect' | 'Login') => void }
 export default function OnboardingScreen({ onDone }: Props) {
   const { isDark } = useTheme()
   const insets = useSafeAreaInsets()
-  const { width: W } = useWindowDimensions()
+  const { width: W, height: H } = useWindowDimensions()
+  const isTablet = Math.min(W, H) >= TABLET_SMALLEST_WIDTH
+  const illustrationWidth = isTablet ? Math.min(W * 0.58, 620) : W
   const cardBg      = isDark ? '#1A1C24' : '#FFFFFF'
   const headingColor = isDark ? '#FFFFFF' : '#0D0D0D'
   const bodyColor    = isDark ? 'rgba(255,255,255,0.65)' : '#52525B'
@@ -166,9 +169,9 @@ export default function OnboardingScreen({ onDone }: Props) {
             source={slide.image!}
             style={[
               styles.illustration,
-              { width: W, height: W * 1.1 - 20 },
-              i === 2 && { width: W * 0.8625, height: (W * 1.1 - 20) * 0.8625 },
-              i === 3 && { width: W * 0.6624, height: (W * 1.1 - 20) * 0.6624 },
+              { width: illustrationWidth, height: illustrationWidth * 1.1 - 20 },
+              i === 2 && { width: illustrationWidth * 0.8625, height: (illustrationWidth * 1.1 - 20) * 0.8625 },
+              i === 3 && { width: illustrationWidth * 0.6624, height: (illustrationWidth * 1.1 - 20) * 0.6624 },
               {
                 top: insets.top + 12 + (i === 3 ? 80 : 0),
                 transform: [
@@ -184,7 +187,7 @@ export default function OnboardingScreen({ onDone }: Props) {
       </View>
 
       {/* Card */}
-      <View style={[styles.cardWrap, { backgroundColor: cardBg }]}>
+      <View style={[styles.cardWrap, isTablet && styles.cardWrapTablet, { backgroundColor: cardBg }]}>
         <View style={[styles.card, { paddingBottom: insets.bottom + 20 }]}>
 
           {/* Slide text — all 4 slides use the same animation */}
@@ -254,6 +257,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     overflow: 'hidden',
+  },
+  cardWrapTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   card: {
     paddingHorizontal: 28,

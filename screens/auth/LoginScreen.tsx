@@ -18,6 +18,7 @@ import {
   nationalPhoneDigits,
   phoneInputConfig,
 } from '../../lib/phoneNumbers'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>
@@ -25,6 +26,7 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const { isDark } = useTheme()
+  const { isTablet } = useTabletLayout()
   const requireOnline = useRequireOnline()
   const bg       = isDark ? '#1A1C24' : '#F4F2EB'
   const inputBg  = isDark ? '#2D2E41' : '#FFFFFF'
@@ -68,7 +70,7 @@ export default function LoginScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -169,6 +171,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 48,
+  },
+  scrollTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 40,
   },
   backButton: {
     width: 40,

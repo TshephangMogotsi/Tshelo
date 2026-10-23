@@ -1,0 +1,73 @@
+{
+  "deployment_id": "dpl_6RCb45M48KH64ZdEYKYi4DcEotR5",
+  "canonical_url": "https://tshelo-admin.vercel.app/waitlist",
+  "immutable_url": "https://tshelo-admin-jx2eiwzdd-diginav.vercel.app",
+  "target": "production",
+  "status": "READY",
+  "collection_enabled": true,
+  "live_checks": [
+    {
+      "path": "/waitlist",
+      "status": 200,
+      "expected": 200,
+      "form_present": true,
+      "collection_disabled": false
+    },
+    {
+      "path": "/api/country-waitlist",
+      "status": 400,
+      "expected": 400,
+      "case": "missing CAPTCHA payload after activation"
+    },
+    {
+      "path": "/api/country-waitlist",
+      "status": 200,
+      "expected": 200,
+      "case": "approved synthetic browser submission",
+      "request_id": "9l9ls-1792495523104-b085b5d9c134"
+    },
+    {
+      "path": "/api/country-waitlist",
+      "status": 400,
+      "expected": 400,
+      "case": "invalid CAPTCHA token"
+    }
+  ],
+  "browser_widget_result": "Success! observed in Safari on the canonical hostname; no challenge was clicked or bypassed.",
+  "production_token_validation_and_persistence": "PASS; real browser form submission and QA-only database verification",
+  "runtime_error_check": {
+    "available": true,
+    "returned_records": 0,
+    "limit": 100,
+    "window": "15 minutes",
+    "deployment_id": "dpl_6RCb45M48KH64ZdEYKYi4DcEotR5"
+  },
+  "tests": {
+    "waitlist_api": 8,
+    "website": 61,
+    "isolated_typecheck_lint_build": "PASS",
+    "existing_lint_warnings": 2,
+    "runtime_dependency_vulnerabilities": 0
+  },
+  "initial_setup_deployment_id": "dpl_7UsDMtRZXSrq7PasnostWhHehWHA",
+  "launch_approved": true,
+  "prior_approval_block": "Automatic approval review rejected enabling public collection before end-to-end verification; collection remains disabled.",
+  "approval_resolution": "User explicitly approved collection and a labeled synthetic QA test. Activation was then performed.",
+  "live_qa_evidence": "2026-10-20-turnstile-live-qa.json",
+  "initial_setup_guard_checks": {
+    "deployment_id": "dpl_7UsDMtRZXSrq7PasnostWhHehWHA",
+    "checks": [
+      {
+        "path": "/login",
+        "status": 200,
+        "expected": 200
+      },
+      {
+        "path": "/api/v1/receipts/scan-completion",
+        "status": 401,
+        "expected": 401
+      }
+    ]
+  },
+  "synthetic_rows_retained": 1
+}

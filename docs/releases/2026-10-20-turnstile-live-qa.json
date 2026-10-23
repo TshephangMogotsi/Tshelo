@@ -1,0 +1,71 @@
+{
+  "approved_public_collection": true,
+  "qa_email": "synthetic-waitlist-qa-20261020-467d7041@example.invalid",
+  "qa_country": "KEN",
+  "synthetic_only": true,
+  "before_rows_matching": 0,
+  "browser_cloudflare": "Success! without manual challenge interaction",
+  "browser_submission": "Your request has been received. Thank you for your interest in Tshelo.",
+  "positive_http_status": 200,
+  "missing_captcha_status": 400,
+  "invalid_captcha_status": 400,
+  "invalid_token_rejected_by_verifier": true,
+  "database": {
+    "notified": false,
+    "signed_up": false,
+    "country_valid": true,
+    "rows_matching": 1,
+    "no_phone_collected": true,
+    "expires_after_12_months": true
+  },
+  "test_row_retained": true,
+  "production_token_validation_and_persistence": "PASS",
+  "positive_request_id": "9l9ls-1792495523104-b085b5d9c134",
+  "deployment": {
+    "id": "dpl_6RCb45M48KH64ZdEYKYi4DcEotR5",
+    "url": "tshelo-admin-jx2eiwzdd-diginav.vercel.app",
+    "readyState": "READY",
+    "target": "production",
+    "source": "cli",
+    "meta": {
+      "actor": "codex",
+      "lambdaRuntimeStats": "{\"nodejs\":3}",
+      "bundler": "turbopack",
+      "action": "redeploy",
+      "originalDeploymentId": "dpl_7UsDMtRZXSrq7PasnostWhHehWHA"
+    }
+  },
+  "runtime_request_evidence": {
+    "waitlist_requests": [
+      {
+        "id": "2gjfh-1792495577301-5feb4e96b63c",
+        "requestPath": "/api/country-waitlist",
+        "requestMethod": "POST",
+        "responseStatusCode": 400,
+        "timestamp": 1792495577301,
+        "level": "info"
+      },
+      {
+        "id": "9l9ls-1792495523104-b085b5d9c134",
+        "requestPath": "/api/country-waitlist",
+        "requestMethod": "POST",
+        "responseStatusCode": 200,
+        "timestamp": 1792495523104,
+        "level": "info"
+      },
+      {
+        "id": "t4x6m-1792495420925-7787cd03e3be",
+        "requestPath": "/api/country-waitlist",
+        "requestMethod": "POST",
+        "responseStatusCode": 400,
+        "timestamp": 1792495420925,
+        "level": "info"
+      }
+    ],
+    "successful_post_count": 1,
+    "returned_error_records": 0,
+    "window": "15 minutes",
+    "limit": 100,
+    "limit_reached": false
+  }
+}

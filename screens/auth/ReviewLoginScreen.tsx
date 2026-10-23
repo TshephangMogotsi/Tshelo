@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/colors'
 import { fonts } from '../../theme/typography'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ReviewLogin'>
@@ -26,6 +27,7 @@ function isReviewerAccount(appMetadata: unknown) {
 
 export default function ReviewLoginScreen({ navigation }: Props) {
   const { isDark } = useTheme()
+  const { isTablet } = useTabletLayout()
   const { refreshProfile } = useAuth()
   const requireOnline = useRequireOnline()
   const [email, setEmail] = useState('')
@@ -67,7 +69,7 @@ export default function ReviewLoginScreen({ navigation }: Props) {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]}
             onPress={() => navigation.goBack()}
@@ -136,6 +138,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
+  scrollTablet: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 0, paddingTop: 40 },
   backButton: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 36, borderWidth: 1 },
   header: { marginBottom: 24 },
   heading: { fontSize: 30, fontFamily: fonts.display.bold, color: '#9D86FF', marginBottom: 8 },

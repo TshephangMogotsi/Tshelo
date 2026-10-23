@@ -13,7 +13,7 @@ import { api } from '../../lib/api'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import type { AppColors } from '../../theme/themes'
 import { CategoryOption, MAX_EXPENSE_BWP } from './recordExpense/categories'
-import { parseReceipt, pickFromLibrary, takePhoto, uploadReceipt, type ParsedReceipt } from './recordExpense/receipt'
+import { completeReceiptScan, parseReceipt, pickFromLibrary, takePhoto, uploadReceipt, type ParsedReceipt } from './recordExpense/receipt'
 import ChooseMethodStep from './recordExpense/ChooseMethodStep'
 import ManualEntryStep, { PayerOption } from './recordExpense/ManualEntryStep'
 import ReviewStep, { ReviewItem } from './recordExpense/ReviewStep'
@@ -50,6 +50,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   const [isSaving, setIsSaving]       = useState(false)
   const [isParsing, setIsParsing]     = useState(false)
   const [parsedReceipt, setParsedReceipt] = useState<ParsedReceipt | null>(null)
+  const completedReceiptReview = useRef<{ auditId: string; edits: string } | null>(null)
   const [payers, setPayers]           = useState<PayerOption[]>([])
 
   // ── Manual entry state ──────────────────────────────────
@@ -118,6 +119,7 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
   // Show the review screen immediately and parse in the background —
   // the user can start typing while Claude reads the receipt
   function startReview(uri: string) {
+    completedReceiptReview.current = null
     setReceiptUri(uri)
     setParsedReceipt(null)
     setStep('review')
@@ -214,6 +216,21 @@ export default function RecordExpenseScreen({ navigation, route }: Props) {
         } : {}),
       }))
 
+      if (parsedReceipt?.auditId) {
+        const userEdits = {
+          vendor: shopName.trim(),
+          items: includedItems.map(item => ({ name: item.name.trim(), category: item.category?.value ?? null, amount: Number(item.amount) })),
+        }
+        const edits = JSON.stringify(userEdits)
+        if (completedReceiptReview.current?.auditId === parsedReceipt.auditId) {
+          if (completedReceiptReview.current.edits !== edits) {
+            throw new Error('Restore the confirmed receipt details to retry, or go back and start a new scan.')
+          }
+        } else {
+          await completeReceiptScan(parsedReceipt.auditId, userEdits)
+          completedReceiptReview.current = { auditId: parsedReceipt.auditId, edits }
+        }
+      }
       const result = await api.expenses.create({
         fund_id: fundId,
         items: rows,

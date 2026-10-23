@@ -8,7 +8,7 @@ const response = (status: number, message: string) => Response.json({ message },
 
 export async function POST(request: Request) {
   // Explicit rollout gate: CAPTCHA, trusted proxy and cleanup must be ready.
-  const secret = process.env.WAITLIST_TURNSTILE_SECRET_KEY
+  const secret = process.env.WAITLIST_TURNSTILE_SECRET_KEY || process.env.TURNSTILE_SECRET_KEY
   const hashKey = process.env.WAITLIST_RATE_LIMIT_KEY
   const hostname = process.env.WAITLIST_TURNSTILE_HOSTNAME
   if (process.env.WAITLIST_ENABLED !== 'true' || process.env.VERCEL !== '1' || !secret || !hashKey || !hostname) {

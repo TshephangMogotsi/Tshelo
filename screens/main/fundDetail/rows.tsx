@@ -18,6 +18,21 @@ function formatRowMoney(amount: number, currencyCode: string) {
   return formatMoney(amount, currencyCode).replace(/^P\s/, 'P')
 }
 
+function formatExpenseCategory(category: string | null) {
+  return category
+    ? category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    : 'Uncategorised'
+}
+
+function initials(name: string) {
+  const letters = name.trim().split(/\s+/).filter(Boolean).map(word => word[0]).join('')
+  return letters.slice(0, 2).toUpperCase() || '?'
+}
+
+function formatCompactDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-BW', { day: 'numeric', month: 'short' })
+}
+
 export function ContributionRow({ item, currencyCode, onPress }: { item: Contribution; currencyCode: string; onPress?: () => void }) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
@@ -99,46 +114,50 @@ export function ContributionRow({ item, currencyCode, onPress }: { item: Contrib
 export function ExpenseRow({ item, currencyCode, onPress }: { item: Expense; currencyCode: string; onPress?: () => void }) {
   const { colors } = useTheme()
   const styles = makeStyles(colors)
+  const title = item.vendor_name?.trim() || item.description?.trim() || 'Expense'
+  const categoryLabel = item.custom_category?.trim() || formatExpenseCategory(item.category)
+  const recorderName = item.recorded_by_name?.trim() || 'Unknown recorder'
+  const metadata = [categoryLabel, `By ${recorderName}`, formatCompactDate(item.created_at), item.receipt_path ? 'Receipt attached' : null]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
-    <TouchableOpacity style={styles.listRow} onPress={onPress} disabled={!onPress} activeOpacity={0.7}>
-      <View style={[styles.providerDot, { backgroundColor: colors.errorLight }]}>
-        <Text style={[styles.providerDotText, { color: item.is_sponsored ? colors.accent : colors.error }]}>
-          {item.is_sponsored ? '♛' : '↑'}
-        </Text>
+    <TouchableOpacity
+      style={[styles.expenseRow, item.has_open_query && styles.expenseRowQueried]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={onPress ? 0.72 : 1}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${title}, ${formatRowMoney(item.amount, currencyCode)}`}
+    >
+      <View style={styles.expenseRecorder}>
+        <Text style={styles.expenseRecorderInitials}>{initials(recorderName)}</Text>
       </View>
 
-      <View style={styles.listRowBody}>
-        <View style={styles.listRowTop}>
-          <Text style={styles.listRowName} numberOfLines={1}>{item.description}</Text>
-          <Text style={[styles.listRowAmount, { color: item.is_sponsored ? colors.accent : colors.error }]}>
-            {item.is_sponsored ? '' : '−'}{formatRowMoney(item.amount, currencyCode)}
+      <View style={styles.expenseBody}>
+        <View style={styles.expenseHeading}>
+          <View style={styles.expenseTitleWrap}>
+            <Text style={styles.expenseTitle} numberOfLines={1}>{title}</Text>
+          </View>
+          <Text style={[styles.expenseAmount, { color: item.is_sponsored ? colors.accent : colors.error }]} numberOfLines={1}>
+            {formatRowMoney(item.amount, currencyCode)}
           </Text>
         </View>
-        <View style={styles.listRowBottom}>
-          <Text style={styles.listRowDate}>{formatDate(item.created_at)}</Text>
-          {item.vendor_name ? (
-            <Text style={styles.listRowVendor} numberOfLines={1}>· {item.vendor_name}</Text>
-          ) : null}
-          {item.category ? (
-            <View style={styles.categoryChip}>
-              <Text style={styles.categoryChipText}>{item.category}</Text>
-            </View>
-          ) : null}
+        <View style={styles.expenseMeta}>
+          <Text style={styles.expenseMetaText} numberOfLines={1}>{metadata}</Text>
           {item.has_open_query ? (
-            <View style={styles.disputedBadge}>
-              <Text style={styles.disputedBadgeText}>Queried</Text>
+            <View style={styles.expenseQueryBadge}>
+              <Text style={styles.expenseQueryText}>Review</Text>
             </View>
           ) : null}
           {item.is_sponsored ? (
-            <View style={styles.categoryChip}>
-              <Text style={[styles.categoryChipText, { color: colors.accent }]}>
-                Sponsored{item.sponsored_by_name ? ` by ${item.sponsored_by_name}` : ''}
+            <View style={styles.expenseSponsoredBadge}>
+              <Text style={styles.expenseSponsoredText} numberOfLines={1}>
+                Sponsored
               </Text>
             </View>
           ) : null}
         </View>
-        {item.notes ? <Text style={styles.listRowNote}>{item.notes}</Text> : null}
       </View>
     </TouchableOpacity>
   )
@@ -306,6 +325,109 @@ function makeStyles(colors: AppColors) {
       gap: 10,
       borderWidth: 1,
       borderColor: '#D9D9D9',
+    },
+    expenseRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 64,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      paddingHorizontal: 10,
+      paddingVertical: 9,
+      marginBottom: 7,
+      gap: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    expenseRowQueried: {
+      borderColor: colors.error,
+      borderWidth: 1.25,
+    },
+    expenseRecorder: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      backgroundColor: colors.primaryLight,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    expenseRecorderInitials: {
+      fontSize: 12,
+      lineHeight: 14,
+      fontFamily: fonts.inter.extraBold,
+      color: colors.primary,
+    },
+    expenseBody: {
+      flex: 1,
+      minWidth: 0,
+      gap: 3,
+    },
+    expenseHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    expenseTitleWrap: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    expenseTitle: {
+      fontSize: 13,
+      lineHeight: 16,
+      fontFamily: fonts.inter.bold,
+      color: colors.textPrimary,
+    },
+    expenseAmount: {
+      flexShrink: 0,
+      fontSize: 13,
+      lineHeight: 16,
+      fontFamily: fonts.inter.extraBold,
+      textAlign: 'right',
+    },
+    expenseMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      minWidth: 0,
+    },
+    expenseMetaText: {
+      flexShrink: 1,
+      fontSize: 10,
+      lineHeight: 12,
+      fontFamily: fonts.inter.regular,
+      color: colors.textMuted,
+    },
+    expenseQueryBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 5,
+      backgroundColor: colors.errorLight,
+    },
+    expenseQueryText: {
+      fontSize: 10,
+      lineHeight: 12,
+      fontFamily: fonts.inter.bold,
+      color: colors.error,
+    },
+    expenseSponsoredBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 5,
+      backgroundColor: colors.accentLight,
+    },
+    expenseSponsoredText: {
+      fontSize: 10,
+      lineHeight: 12,
+      fontFamily: fonts.inter.semiBold,
+      color: colors.accent,
     },
     richAuntieRow: {
       backgroundColor: '#FFF3C4',

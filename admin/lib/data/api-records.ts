@@ -2,7 +2,7 @@ import type { SupportTicketSummary } from '@shared/contracts/admin'
 import type { Contribution, ContributionSummary } from '@shared/contracts/contributions'
 import type { Event, EventGuest, EventSummary } from '@shared/contracts/events'
 import type { Fund, FundSummary } from '@shared/contracts/funds'
-import type { User, UserSummary } from '@shared/contracts/users'
+import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences, type User, type UserSummary } from '@shared/contracts/users'
 
 export type EventRow = Omit<Event, 'estimated_spend_amount'> & {
   estimated_spend_amount: number | string | null
@@ -152,13 +152,17 @@ export function toUser(row: UserRow): User {
     token_balance: row.token_balance ?? 0,
     onboarding_completed: Boolean(row.onboarding_completed),
     notifications_enabled: Boolean(row.notifications_enabled),
+    notification_preferences: {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      ...((row.notification_preferences ?? {}) as Partial<NotificationPreferences>),
+    },
     privacy_accepted_at: row.privacy_accepted_at ?? null,
     privacy_version: row.privacy_version ?? null,
     marketing_consent: Boolean(row.marketing_consent),
     marketing_consent_at: row.marketing_consent_at ?? null,
     marketing_email_enabled: Boolean(row.marketing_email_enabled),
     marketing_sms_enabled: Boolean(row.marketing_sms_enabled),
-    data_processing_consent: row.data_processing_consent ?? true,
+    data_processing_consent: row.data_processing_consent ?? false,
     data_processing_consent_at: row.data_processing_consent_at ?? null,
     last_active_at: row.last_active_at,
     updated_at: row.updated_at,
@@ -201,6 +205,8 @@ export function toSupportTicketSummary(row: SupportTicketSummary): SupportTicket
     ticket_number: row.ticket_number,
     category: row.category,
     subject: row.subject,
+    ...(typeof row.description === 'string' ? { description: row.description } : {}),
+    ...(row.resolution_note === null || typeof row.resolution_note === 'string' ? { resolution_note: row.resolution_note } : {}),
     priority: row.priority,
     status: row.status,
     assigned_to: row.assigned_to,

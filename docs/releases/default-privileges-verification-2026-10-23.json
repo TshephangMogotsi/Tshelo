@@ -1,0 +1,242 @@
+{
+  "date": "2026-10-23",
+  "project_ref": "albihofmlafjzbusancu",
+  "result": "PARTIAL_CHANGE_REMAINING_DEFAULT_GRANTS",
+  "public_table_count": 111,
+  "tables_without_rls": 0,
+  "client_default_grants": [
+    {
+      "creator": "supabase_admin",
+      "grantee": "PUBLIC",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "global"
+    },
+    {
+      "creator": "postgres",
+      "grantee": "PUBLIC",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "global"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "USAGE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "sequences",
+      "privilege_type": "USAGE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "INSERT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "DELETE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRUNCATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "REFERENCES",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRIGGER",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "MAINTAIN",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "INSERT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "SELECT",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "UPDATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "DELETE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRUNCATE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "REFERENCES",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "TRIGGER",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "tables",
+      "privilege_type": "MAINTAIN",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "anon",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "public schema"
+    },
+    {
+      "creator": "supabase_admin",
+      "grantee": "authenticated",
+      "is_grantable": false,
+      "object_type": "functions",
+      "privilege_type": "EXECUTE",
+      "scope": "public schema"
+    }
+  ],
+  "smoke_checks": {
+    "assurance": "aal1",
+    "event_read": "PASS",
+    "fund_read": "PASS",
+    "pending_contribution_insert": "PASS",
+    "role": "authenticated",
+    "synthetic_only": true,
+    "transaction": "ROLLBACK"
+  },
+  "qa_rows_remaining": {
+    "contributions": 0,
+    "events": 0,
+    "funds": 0,
+    "users": 0
+  },
+  "acl_unchanged_during_inspection": true,
+  "acl_fingerprints": {
+    "functions": "01f23dc8957400caee51a05fabebc4b3",
+    "tables_and_sequences": "ada66a3038fb530305f24e75c3fcc2aa"
+  },
+  "limits": [
+    "Database role smoke tests, not browser/native UI or full API/Auth tests",
+    "No pre-coworker-change ACL snapshot available to independently prove historical grants unchanged",
+    "Permissions were inspected, not modified"
+  ]
+}

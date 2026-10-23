@@ -229,6 +229,9 @@ export default function SecurityScreen({ navigation }: Props) {
               <Text style={styles.detailLabel}>Verified login number</Text>
               <Text style={styles.phoneValue} selectable>{details.phone ? formatPhone(details.phone) : 'Unavailable'}</Text>
             </View>
+            <TouchableOpacity accessibilityRole="button" style={styles.retryButton} onPress={() => navigation.navigate('ChangePhone')}>
+              <Text style={styles.retryButtonText}>Change phone number</Text>
+            </TouchableOpacity>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Verified on</Text>
               <Text style={styles.detailValue}>{formatDateTime(details.phoneConfirmedAt)}</Text>

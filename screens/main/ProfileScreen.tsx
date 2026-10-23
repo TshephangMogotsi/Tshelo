@@ -202,12 +202,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               ))}
             </View>
           </View>
-          <SettingsRow icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
+          <SettingsRow icon="notifications-outline" label="Notification settings" onPress={() => navigation.navigate('NotificationSettings')} />
         </View>
 
         {/* ── Information ───────────────────────── */}
         <Text style={styles.sectionLabel}>Information</Text>
         <View style={styles.section}>
+          <SettingsRow icon="bug-outline" label="Report a Problem" onPress={() => navigation.navigate('Support')} />
           <SettingsRow icon="information-circle-outline" label="About & Legal"  onPress={() => navigation.navigate('AboutLegal')} />
         </View>
 
@@ -288,7 +289,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               <View style={[styles.fieldInput, styles.fieldReadOnly]}>
                 <Text style={styles.fieldReadOnlyText}>{profile.phone || '—'}</Text>
               </View>
-              <Text style={styles.fieldHint}>Phone number is your login identifier and cannot be changed here.</Text>
+              <Text style={styles.fieldHint}>To change your sign-in number, open Security → Change phone number.</Text>
 
               {/* Save button */}
               <TouchableOpacity

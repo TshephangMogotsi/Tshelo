@@ -3,7 +3,7 @@ import 'server-only'
 import type { ServerClient } from './client'
 import { invitationContinuation, onboardingPathFor } from '@/lib/post-login'
 
-export type SignedInDestination = '/' | '/account/overview' | `/account${string}` | `/onboarding${string}` | null
+export type SignedInDestination = '/mfa' | '/' | '/account/overview' | `/account${string}` | `/onboarding${string}` | null
 
 export async function getSignedInDestination(client: ServerClient, requestedPath?: `/account${string}` | null): Promise<SignedInDestination> {
   const {
@@ -34,7 +34,10 @@ export async function getSignedInDestination(client: ServerClient, requestedPath
     }
     return requestedPath
   }
-  if (admin) return '/'
+  if (admin) {
+    const { data, error } = await client.auth.mfa.getAuthenticatorAssuranceLevel()
+    return !error && data?.currentLevel === 'aal2' ? '/' : '/mfa'
+  }
   if (appUser) return '/account/overview'
   return null
 }

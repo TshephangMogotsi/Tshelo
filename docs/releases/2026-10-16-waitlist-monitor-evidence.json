@@ -1,0 +1,97 @@
+{
+  "jobs": [
+    {
+      "name": "tshelo-country-waitlist-cleanup",
+      "active": true,
+      "job_id": 1,
+      "schedule": "15 2 * * *",
+      "username": "postgres"
+    },
+    {
+      "name": "tshelo-country-waitlist-monitor",
+      "active": true,
+      "job_id": 6,
+      "schedule": "*/15 * * * *",
+      "username": "postgres"
+    }
+  ],
+  "health": {
+    "issues": [],
+    "singleton": true,
+    "checked_at": "2026-10-16T08:08:00.095964+00:00",
+    "expected_run_at": "2026-10-16T02:15:00+00:00",
+    "last_success_at": "2026-10-16T02:15:00.548756+00:00"
+  },
+  "rls_enabled": true,
+  "cleanup_runs": [
+    {
+      "runid": 4,
+      "status": "succeeded",
+      "end_time": "2026-10-16T02:15:00.548756+00:00",
+      "start_time": "2026-10-16T02:15:00.462358+00:00"
+    },
+    {
+      "runid": 3,
+      "status": "succeeded",
+      "end_time": "2026-10-15T02:15:00.462322+00:00",
+      "start_time": "2026-10-15T02:15:00.329297+00:00"
+    },
+    {
+      "runid": 2,
+      "status": "succeeded",
+      "end_time": "2026-10-14T02:15:00.31108+00:00",
+      "start_time": "2026-10-14T02:15:00.226829+00:00"
+    },
+    {
+      "runid": 1,
+      "status": "succeeded",
+      "end_time": "2026-10-13T02:15:00.360927+00:00",
+      "start_time": "2026-10-13T02:15:00.300827+00:00"
+    }
+  ],
+  "open_incidents": 0,
+  "migration_recorded": true,
+  "client_access_denied": true,
+  "test_cron_history_rows_remaining": 0,
+  "scheduled_canary_run": {
+    "runid": 5,
+    "status": "succeeded",
+    "start_time": "2026-10-16 08:08:00.095933+00",
+    "end_time": "2026-10-16 08:08:00.109851+00"
+  },
+  "canary_note": "Only the monitor was temporarily scheduled every minute for its first observed cron run, then restored to */15 * * * *. Cleanup schedule unchanged.",
+  "live_rollback_regression": {
+    "result": "PASS",
+    "fixtures_rolled_back": true,
+    "checks": [
+      "healthy",
+      "UTC deadline",
+      "failed",
+      "deduplicated",
+      "private errors omitted",
+      "recovery",
+      "intervening failure",
+      "disabled",
+      "configuration drift",
+      "missing",
+      "overdue",
+      "history enabled",
+      "role boundaries"
+    ]
+  },
+  "local_checks": {
+    "monitor_tests_passed": 2,
+    "ci_workflow_tests_passed": 3,
+    "history_disabled_branch_tested_without_server_restart": true
+  },
+  "migration_file": "supabase/migrations/20261016120000_monitor_waitlist_cleanup.sql",
+  "migration_sha256": "b695793dcea54659c93cbfd806ba44db6991b0c3ec0da3f0b6c205805c6d6ea0",
+  "operator_command": {
+    "command": "npm run monitor:waitlist",
+    "result": "PASS",
+    "fresh": true,
+    "latest_monitor_run_status": "succeeded",
+    "monitor_scheduled": true,
+    "open_incidents": 0
+  }
+}

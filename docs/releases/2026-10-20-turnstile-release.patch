@@ -1,0 +1,179 @@
+--- a/admin/app/api/country-waitlist/route.ts
++++ b/admin/app/api/country-waitlist/route.ts
+@@ -8,7 +8,7 @@
+ 
+ export async function POST(request: Request) {
+   // Explicit rollout gate: CAPTCHA, trusted proxy and cleanup must be ready.
+-  const secret = process.env.WAITLIST_TURNSTILE_SECRET_KEY
++  const secret = process.env.WAITLIST_TURNSTILE_SECRET_KEY || process.env.TURNSTILE_SECRET_KEY
+   const hashKey = process.env.WAITLIST_RATE_LIMIT_KEY
+   const hostname = process.env.WAITLIST_TURNSTILE_HOSTNAME
+   if (process.env.WAITLIST_ENABLED !== 'true' || process.env.VERCEL !== '1' || !secret || !hashKey || !hostname) {
+--- /dev/null
++++ b/admin/app/waitlist/page.tsx
+@@ -0,0 +1,43 @@
++import type { Metadata } from 'next'
++import { createClient } from '@supabase/supabase-js'
++import { getSupabaseConfig } from '@/lib/config'
++import { CountryWaitlistForm } from '@/components/country-waitlist-form'
++import styles from './waitlist.module.css'
++
++export const dynamic = 'force-dynamic'
++export const metadata: Metadata = {
++  title: { absolute: 'Join the country waitlist · Tshelo' },
++  description: 'Ask to hear when Tshelo becomes available in your country.',
++}
++
++export default async function CountryWaitlistPage() {
++  // The site key is public even when its Vercel entry is stored as sensitive.
++  // Never pass the verifier secret or rate-limit key to the client component.
++  const siteKey = process.env.TURNSTILE_SITE_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
++  const enabled = process.env.WAITLIST_ENABLED === 'true'
++  const configured = siteKey
++    && (process.env.WAITLIST_TURNSTILE_SECRET_KEY || process.env.TURNSTILE_SECRET_KEY)
++    && process.env.WAITLIST_TURNSTILE_HOSTNAME && process.env.WAITLIST_RATE_LIMIT_KEY
++  let countries: { code: string; name: string }[] = []
++  if (configured) {
++    try {
++      const { url, key } = getSupabaseConfig()
++      const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
++      const result = await client.from('countries').select('code,name').eq('is_launch_country', false).order('name')
++      if (!result.error) countries = (result.data ?? []).filter(country => typeof country.code === 'string' && typeof country.name === 'string')
++    } catch { /* Fail closed without exposing configuration or database details. */ }
++  }
++  return (
++    <main className={styles.page}>
++      <section className={styles.card} aria-labelledby="waitlist-title">
++        <p className={styles.brand}>Tshelo</p>
++        <p className={styles.eyebrow}>Growing together</p>
++        <h1 id="waitlist-title">Let us know where to go next.</h1>
++        <p>Choose your country and we’ll let you know when Tshelo is available there.</p>
++        {configured && countries.length > 0
++          ? <CountryWaitlistForm siteKey={siteKey!} countries={countries} enabled={enabled} />
++          : <p role="status">The waitlist is currently unavailable. Please check back later.</p>}
++      </section>
++    </main>
++  )
++}
+--- /dev/null
++++ b/admin/app/waitlist/waitlist.module.css
+@@ -0,0 +1,19 @@
++.page { min-height: 100dvh; display: grid; place-items: center; padding: 32px 16px; background: #f6f4fb; color: #26213b; }
++.card { width: 100%; max-width: 560px; padding: clamp(24px, 5vw, 48px); border: 1px solid #e8e1f3; border-radius: 24px; background: white; box-shadow: 0 16px 64px #3924590b; }
++.brand { margin: 0 0 32px; color: #67439b; font-family: var(--font-fraunces), serif; font-size: 32px; font-weight: 650; }
++.eyebrow { color: #67439b; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
++.card h1 { font-family: var(--font-fraunces), serif; font-size: clamp(30px, 6vw, 42px); line-height: 1.12; margin: 12px 0 16px; }
++.card p { line-height: 1.6; }
++.form { display: grid; gap: 20px; margin-top: 28px; }
++.form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 12px; }
++.form label { font-weight: 600; font-size: 14px; }
++.form select, .form input[type=email] { width: 100%; min-height: 48px; padding: 12px; border: 1px solid #bcb2cc; border-radius: 8px; background: white; color: #26213b; font: inherit; margin-bottom: 8px; }
++.form .notice { font-size: 13px; color: #62586f; margin: 4px 0 8px; }
++.notice a { color: #67439b; text-decoration: underline; }
++.form .choice { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; font-weight: 400; }
++.choice input { margin-top: 4px; accent-color: #67439b; }
++.form button { min-height: 48px; border: 0; border-radius: 10px; padding: 12px 16px; background: #67439b; color: white; font: inherit; font-weight: 650; cursor: pointer; }
++.form button:disabled { opacity: .55; cursor: not-allowed; }
++.form :focus-visible { outline: 3px solid #a889d2; outline-offset: 3px; }
++.form [role=alert] { color: #a21c3a; font-size: 14px; margin: 0; }
++.success { padding: 20px; margin-top: 24px; border-radius: 10px; background: #eef7ef; color: #245d32; line-height: 1.6; }
+--- /dev/null
++++ b/admin/components/country-waitlist-form.tsx
+@@ -0,0 +1,97 @@
++'use client'
++
++import Link from 'next/link'
++import Script from 'next/script'
++import { useEffect, useRef, useState, type FormEvent } from 'react'
++import styles from '@/app/waitlist/waitlist.module.css'
++
++type Turnstile = {
++  render: (container: HTMLElement, options: {
++    sitekey: string; action: string; theme: string; size: string
++    callback: (token: string) => void
++    'expired-callback': () => void; 'error-callback': () => void
++  }) => string
++  reset: (id: string) => void
++  remove: (id: string) => void
++}
++declare global { interface Window { turnstile?: Turnstile } }
++
++export function CountryWaitlistForm({ siteKey, countries, enabled }: {
++  siteKey: string; countries: { code: string; name: string }[]; enabled: boolean
++}) {
++  const container = useRef<HTMLDivElement>(null)
++  const widget = useRef<string | null>(null)
++  const submitting = useRef(false)
++  const [ready, setReady] = useState(false)
++  const [token, setToken] = useState('')
++  const [loading, setLoading] = useState(false)
++  const [complete, setComplete] = useState(false)
++  const [message, setMessage] = useState('')
++  const [verificationMessage, setVerificationMessage] = useState('')
++
++  useEffect(() => {
++    if (!ready || complete || !container.current || !window.turnstile) return
++    let active = true
++    try {
++      widget.current = window.turnstile.render(container.current, {
++        sitekey: siteKey, action: 'country_waitlist', theme: 'light', size: container.current.clientWidth < 300 ? 'compact' : 'flexible',
++        callback: value => { if (active) { setToken(value); setVerificationMessage('') } },
++        'expired-callback': () => { if (active) { setToken(''); setVerificationMessage('Verification expired. Please complete it again.') } },
++        'error-callback': () => { if (active) { setToken(''); setVerificationMessage('Verification could not load. Please reload the page and try again.') } },
++      })
++    } catch {
++      queueMicrotask(() => { if (active) setVerificationMessage('Verification could not load. Please reload the page and try again.') })
++    }
++    return () => {
++      active = false
++      if (widget.current !== null) window.turnstile?.remove(widget.current)
++      widget.current = null
++    }
++  }, [ready, siteKey, complete])
++
++  async function submit(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault()
++    if (!enabled || !token || submitting.current || complete) return
++    const data = new FormData(event.currentTarget)
++    submitting.current = true
++    setLoading(true); setMessage(''); setToken('')
++    try {
++      const response = await fetch('/api/country-waitlist', {
++        method: 'POST', headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({ country_code: data.get('country_code'), email: String(data.get('email') ?? '').trim(), captcha_token: token }),
++      })
++      const result = await response.json()
++      if (response.ok) setComplete(true)
++      else setMessage(typeof result.message === 'string' ? result.message : 'We could not accept your request. Please try again.')
++    } catch { setMessage('We could not send your request. Please check your connection and try again.') }
++    finally {
++      submitting.current = false; setLoading(false)
++      // Tokens are single-use, including when a submission fails or is retried.
++      if (widget.current !== null) window.turnstile?.reset(widget.current)
++    }
++  }
++
++  return <>
++    <Script id="country-waitlist-turnstile" src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
++      strategy="afterInteractive" onReady={() => setReady(true)}
++      onError={() => { setToken(''); setVerificationMessage('Verification could not load. Please reload the page and try again.') }} />
++    {complete ? <div role="status" className={styles.success}>Your request has been received. Thank you for your interest in Tshelo.</div>
++      : <form onSubmit={submit} className={styles.form}>
++        {!enabled ? <p role="status">We’re preparing the waitlist. Submissions are not open yet.</p> : null}
++        <fieldset disabled={loading || !enabled}>
++          <label htmlFor="waitlist-country">Country</label>
++          <select id="waitlist-country" name="country_code" defaultValue="" required>
++            <option value="" disabled>Choose your country</option>
++            {countries.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}
++          </select>
++          <label htmlFor="waitlist-email">Email address</label>
++          <input id="waitlist-email" name="email" type="email" autoComplete="email" maxLength={254} required />
++          <p className={styles.notice}>We use your country and email to contact you about availability. We keep your details for up to 12 months and remove them sooner after notification or sign-up. This does not subscribe you to marketing. Read our <Link href="/legal/privacy">privacy policy</Link> for contact and deletion requests.</p>
++          <label className={styles.choice}><input type="checkbox" name="availability_request" required /> Email me when Tshelo becomes available in my country.</label>
++        </fieldset>
++        <div ref={container} aria-label="Cloudflare verification" />
++        {verificationMessage || message ? <p role="alert">{verificationMessage || message}</p> : null}
++        <button type="submit" disabled={!enabled || !token || loading}>{loading ? 'Submitting…' : 'Join the waitlist'}</button>
++      </form>}
++  </>
++}

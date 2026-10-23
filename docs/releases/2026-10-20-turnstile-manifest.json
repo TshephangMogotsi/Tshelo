@@ -1,0 +1,43 @@
+{
+  "baseline_deployment": "dpl_G8PMDw2Uze1ehg2aCkDUardWRi1Z",
+  "production_archive_sha256": "7d3839078b1dd8d3f4d3acff206b65772ff8521bf135fc0e1fbe58b50de759ba",
+  "overlays": [
+    {
+      "path": "admin/app/api/country-waitlist/route.ts",
+      "sha256": "83167f6ac17323a4f5241c239051b04a44c5823ffd48128a26f6f5f046ba4631"
+    },
+    {
+      "path": "admin/app/waitlist/page.tsx",
+      "sha256": "8b9e9ed7edc992f525d411a04db4cae6694fd7da780a597a11758598b9d2f104"
+    },
+    {
+      "path": "admin/app/waitlist/waitlist.module.css",
+      "sha256": "246f04ce79d84c6c4c939153fede0d5e4077e128369e2ff2b64e7412ff4d08d0"
+    },
+    {
+      "path": "admin/components/country-waitlist-form.tsx",
+      "sha256": "0ddf477e8c9525c7aaa8d1bd3bbd348b558761f3ab302b1631db2d65d1585b9a"
+    }
+  ],
+  "baseline_archive_file_id": "1a79734276b94d9dba67d77f404a5d98e27992cc",
+  "waitlist_collection_enabled": true,
+  "required_environment_names": [
+    "TURNSTILE_SITE_KEY",
+    "TURNSTILE_SECRET_KEY",
+    "WAITLIST_TURNSTILE_HOSTNAME",
+    "WAITLIST_RATE_LIMIT_KEY",
+    "WAITLIST_ENABLED"
+  ],
+  "hostname": "tshelo-admin.vercel.app",
+  "tests": {
+    "api": 8,
+    "website": 61,
+    "isolated_typecheck_lint_build": "PASS",
+    "existing_lint_warnings": 2
+  },
+  "cleanup_monitor": "PASS on 20 October 2026",
+  "activated_deployment": "dpl_6RCb45M48KH64ZdEYKYi4DcEotR5",
+  "activation_source_deployment": "dpl_7UsDMtRZXSrq7PasnostWhHehWHA",
+  "activation_source_changed": false,
+  "launch_approved": true
+}
