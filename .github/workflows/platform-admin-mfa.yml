@@ -82,6 +82,9 @@ jobs:
         run: npm run build --prefix admin
       - name: Verify browser MFA, API and database enforcement
         run: npm test --prefix security/e2e
+      - name: Inspect sanitized Auth errors
+        if: failure()
+        run: node security/e2e/report-auth-failure.mjs
       - name: Upload sanitized test evidence
         if: always()
         uses: actions/upload-artifact@v4
