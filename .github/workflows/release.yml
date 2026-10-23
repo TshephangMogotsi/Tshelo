@@ -11,7 +11,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: production-release
+  group: production-release-${{ inputs.target }}
   cancel-in-progress: false
 jobs:
   eligible:
@@ -58,6 +58,8 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Build production candidate
         run: vercel build --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Stage without assigning production domains
         id: stage
         shell: bash
@@ -114,4 +116,4 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           TARGET: ${{ inputs.target }}
-        run: eas build --platform "${TARGET#mobile-}" --profile production --non-interactive --wait
+        run: eas build --platform "${TARGET#mobile-}" --profile production --non-interactive --freeze-credentials --wait

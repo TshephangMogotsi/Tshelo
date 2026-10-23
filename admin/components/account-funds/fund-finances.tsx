@@ -493,6 +493,8 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
   const [payerId, setPayerId] = useState('')
   const [sponsorshipId, setSponsorshipId] = useState('')
   const [receiptPath, setReceiptPath] = useState('')
+  const [receiptAuditId, setReceiptAuditId] = useState('')
+  const [receiptAuditCompleted, setReceiptAuditCompleted] = useState(false)
   const [receiptRows, setReceiptRows] = useState<ReceiptRow[]>([])
   const [manualRows, setManualRows] = useState<ManualExpenseRow[]>([])
   const [receiptStatus, setReceiptStatus] = useState('')
@@ -511,6 +513,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
     event.target.value = ''
     if (!file) return
     setReceiptStatus('Preparing receipt image…'); setError(''); setReceiptRows([]); setManualRows([]); setReceiptPath('')
+    setReceiptAuditId(''); setReceiptAuditCompleted(false)
     try {
       const image = await prepareReceiptImage(file)
       setReceiptStatus('Uploading receipt…')
@@ -520,6 +523,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
       setReceiptPath(session.object_path); setReceiptStatus('Reading receipt…')
       try {
         const parsed = await createApiClient().receipts.parse({ fund_id: workspace.fund.id, object_path: session.object_path })
+        setReceiptAuditId(parsed.audit_id ?? '')
         if (!parsed.is_receipt) { setReceiptStatus('Image attached. It was not recognised as a receipt; enter the details manually.'); return }
         if (parsed.vendor) setVendor(parsed.vendor)
         if (parsed.total) setAmount(parsed.total)
@@ -537,6 +541,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
   function startManualItems() {
     setReceiptRows([])
     setReceiptPath('')
+    setReceiptAuditId(''); setReceiptAuditCompleted(false)
     setReceiptStatus('')
     setManualRows(rows => rows.length ? rows : [{
       ...newManualExpenseRow(),
@@ -562,6 +567,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
   function reset() {
     setVendor(''); setDescription(''); setCategory(''); setCustomCategory(''); setAmount(''); setPayerId(''); setSponsorshipId('')
     setReceiptPath(''); setReceiptRows([]); setManualRows([]); setReceiptStatus('')
+    setReceiptAuditId(''); setReceiptAuditCompleted(false)
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -597,6 +603,18 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
     }]
     setBusy(true); setError('')
     try {
+      if (receiptAuditId && !receiptAuditCompleted) {
+        await createApiClient().receipts.completeScan({
+          audit_id: receiptAuditId,
+          user_edits: {
+            vendor: vendor.trim(),
+            items: rows.map(row => ({ name: row.item_name, amount: Number(row.amount), category: row.category })),
+          },
+        })
+        // Completion is immutable. An expense-save retry must not attempt to
+        // complete the same audit twice.
+        setReceiptAuditCompleted(true)
+      }
       const result = await createApiClient().expenses.create({ fund_id: workspace.fund.id, items: rows, fulfill_sponsorship_item_id: sponsorshipId || null })
       reset(); setBusy(false); reload()
       if (!result.sponsorship_fulfilled) setError('Expenses were saved, but the sponsorship item could not be marked fulfilled.')
@@ -662,6 +680,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
       </div>
       {recording && <FinanceEntryDialog id="record-expense-title" title="Record expense" icon={<WalletCards size={18} />} onClose={() => setRecording(false)}>
         <form className="member-form member-finance-dialog-form" onSubmit={submit}>
+          <fieldset disabled={receiptAuditCompleted} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
           <div className="mbody">
             <div className="member-receipt-actions">
               <input ref={libraryInput} className="member-visually-hidden" type="file" accept="image/jpeg,image/png" capture="environment" onChange={selectReceipt} />
@@ -694,6 +713,7 @@ function ExpenseManager({ data, reload }: { data: WorkspaceData; reload: () => v
             </div>
             {error && <p className="member-form-error" role="alert">{error}</p>}
           </div>
+          </fieldset>
           <footer><button type="button" className="btn ghost" onClick={reset}><RotateCcw size={14} /> Clear</button><button type="submit" className="btn purple" disabled={busy}>{busy ? 'Saving…' : receiptRows.length > 1 ? `Save ${receiptRows.filter(row => row.included).length} expenses` : manualRows.length > 1 ? `Save ${manualRows.length} expenses` : 'Record expense'}</button></footer>
         </form>
       </FinanceEntryDialog>}
