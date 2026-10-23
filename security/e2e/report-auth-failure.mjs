@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { redactCredentials } from './support.mjs'
 
-const output = execFileSync('docker', ['logs', 'supabase_auth_tshelo-mfa-ci'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+const logs = spawnSync('docker', ['logs', 'supabase_auth_tshelo-mfa-ci'], { encoding: 'utf8' })
+const output = `${logs.stdout ?? ''}\n${logs.stderr ?? ''}`
 for (const line of output.split('\n')) {
   let entry
   try { entry = JSON.parse(line) } catch { continue }
