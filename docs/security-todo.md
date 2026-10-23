@@ -1,7 +1,27 @@
 # Remaining security work
 
-Updated: 15 October 2026. This checklist records outstanding work from the
+[Consolidated audit: original review, done and remaining](security-audit-against-original-review-2026-10-16.md).
+
+Updated: 20 October 2026. This checklist records outstanding work from the
 security remediation discussion; unchecked items are not yet verified complete.
+
+20 October: Cloudflare country-waitlist setup and approved activation are complete.
+The live browser submission, stored QA record and invalid-token rejection passed.
+[Evidence](turnstile-waitlist-setup-2026-10-20.md).
+
+Release checks on 16 October: database regressions, website build, mobile JS
+exports and the complete verification chain passed after fixing both
+phone/notification API-boundary failures. The patched website was promoted to
+`tshelo-admin.vercel.app`. Explicitly approved synthetic authenticated live QA
+passed receipt upload → provider parse → review → expense save, encrypted payment
+reset/owner notice, and all three consent regressions. One completed receipt audit
+and nine labeled synthetic consent records are retained. QA account banned,
+sessions/refresh tokens removed, fund completed. `app.tshelo.com` still returns
+404 for completion and needs its owner/correct target resolved. Native/device,
+SMS/push and customer consent history remain unverified.
+[Live QA evidence](live-qa-verification-2026-10-16.md).
+[Deployment evidence](web-release-deployment-2026-10-16.md).
+[Full release checks](release-checks-2026-10-16.md).
 
 ## Priority 1 — Public entry points and database defaults
 
@@ -14,18 +34,27 @@ security remediation discussion; unchecked items are not yet verified complete.
 - [x] Add durable rate limits for IP/contact identity and server-validated CAPTCHA code.
 - [x] Confirm the 12-month retention period and implement dedicated daily database cleanup.
 - [x] Verify the cleanup job's first scheduled execution: 13 October at 04:15
-      Botswana time; runs on 14 and 15 October also succeeded.
-- [ ] Monitor subsequent cleanup failures and establish ongoing alerting.
+      Botswana time; runs on 14, 15 and 16 October also succeeded.
+- [x] Deploy 15-minute failure/overdue/configuration monitoring with private incidents,
+      searchable warnings and a fail-closed operator health command. First scheduled
+      monitor run passed on 16 October. [Evidence](waitlist-cleanup-monitoring.md).
+- [ ] Connect an independent uptime/alert destination for out-of-band notification.
 - [x] Test invalid input, repeated submissions, abuse limits and denied direct access.
 - [x] Deploy and verify database permissions and server-only RPCs.
-- [ ] Configure Turnstile/secrets, deploy web routes and test real public submissions.
-- [ ] Enable collection only after the cleanup schedule and collection notice are ready.
+- [x] Connect the supplied Turnstile keys, hostname and server rate-limit secret;
+      deploy the form/backend with collection disabled. Live widget displayed Success
+      on 20 October. [Setup evidence](turnstile-waitlist-setup-2026-10-20.md).
+- [x] Obtain explicit launch approval and verify one labeled synthetic submission
+      through the live production widget/form and stored contact row on 20 October.
+- [x] Enable collection after cleanup/notice checks and explicit approval; production
+      missing/invalid-token requests were rejected and the positive live test passed.
 
 ### Default table privileges
 
 - [x] Inspect live creator defaults.
 - [x] Remove automatic future-table client grants for application migrations (`postgres`).
-- [ ] Obtain elevated platform access to remove `supabase_admin` public-table client defaults.
+- [x] Close postgres future table/sequence/function defaults, including global PUBLIC function execution; applied and live-verified on 23 October. [Evidence](postgres-defaults-fix-2026-10-23.md).
+- [ ] Authorized managed-role administrator/Supabase support: close the remaining supabase_admin future defaults and verify. [Handoff SQL](supabase-admin-defaults-handoff-2026-10-23.sql).
 - [x] Require explicit grants and RLS policies for new application tables.
 - [x] Add CI/deployment checks for missing RLS, structural grants and grants without policies.
 - [x] Test a newly created table locally and in a rolled-back live transaction.
@@ -59,8 +88,10 @@ Phase 2 implementation and rollout details: [handoff](security-phase-two-2026-10
 
 - [x] Verify joined/pending/left/unrelated access across the 13 assessed shared-data
       tables, plus vote/vouch/report inserts and the actual leave RPC.
-- [ ] Resolve personal-vouch read access retained after leaving; it is an explicit
-      policy exception to the requested joined-only rule.
+- [x] Require joined membership for all vouch reads, including authors/recipients.
+      Migration `20261015230000` applied; 18 relationship/status cases, cross-fund
+      isolation and two actual leave-RPC cases passed live with rolled-back fixtures.
+      [Evidence](vouch-read-fix-2026-10-15.md).
 - [ ] Confirm the intended fund-row visibility for pending invitees.
 - [x] Verify consent RPC audit creation, database timestamps, client-write denial
       and cross-user log isolation using rolled-back fixtures.
@@ -69,8 +100,10 @@ Phase 2 implementation and rollout details: [handoff](security-phase-two-2026-10
 - [x] Audit channel-only email/SMS/push marketing preference changes.
 - [x] Make aggregate marketing withdrawal disable every channel, including when
       the same payload contains a conflicting channel opt-in.
-- [ ] Verify consent recording through released registration/preferences flows;
-      the real consent log is still empty.
+- [x] Verify deployed consent API creation and all three regressions using approved
+      synthetic live QA: nine labeled records retained.
+- [ ] Verify released registration/preferences UI on a controlled device; synthetic
+      API records do not establish customer consent history.
 
 Evidence and reproducible script:
 [membership/consent verification](membership-consent-verification-2026-10-15.md).
@@ -81,12 +114,22 @@ The three consent fixes were applied and regression-tested live on 15 October:
 
 ### Platform-admin MFA
 
-- [ ] Inspect current admin sign-in methods, MFA settings and enrollment status.
-- [ ] Implement enrollment and challenge flows for platform administrators.
-- [ ] Require verified MFA assurance for admin routes and privileged database operations.
-- [ ] Define recovery, re-enrollment and audited emergency access before enforcement.
-- [ ] Enroll administrators and test denial of unenrolled or insufficient-assurance sessions.
-- [ ] Roll out enforcement and verify live privileged access.
+Implementation is complete and all five disposable end-to-end scenarios passed
+on 23 October 2026. Production rollout remains open; see the
+[implementation and rollout record](platform-admin-mfa-2026-10-22.md).
+
+- [x] Implement authenticator enrollment and challenge flows for platform administrators.
+- [x] Require verified MFA assurance for admin pages, APIs and privileged database operations in the implementation.
+- [x] Test all four admin roles, insufficient-assurance denial, existing role permissions and ordinary-user access in disposable Supabase.
+- [ ] Inspect production admin sign-in methods, MFA settings and enrollment status.
+- [ ] Arrange a confirmed Auth email address for every platform administrator, including phone-login accounts; Supabase TOTP enrollment requires one.
+- [ ] Nono: nominate primary and backup recovery owners.
+- [ ] Agree and document recovery approvals, re-enrollment, recovery credential custody and audited emergency access; test the procedure before enforcement.
+- [ ] Coordinate production deployment of the enrollment UI and matching database enforcement migration.
+- [ ] Enroll the nominated administrators and verify their authenticator challenges.
+- [ ] Verify live denial of insufficient-assurance sessions, role permissions and ordinary-user access; obtain release sign-off.
+
+Nothing has been deployed to production as part of this implementation.
 
 ### Bank and mobile-money account-number encryption
 
@@ -101,7 +144,10 @@ The three consent fixes were applied and regression-tested live on 15 October:
       and zero non-null legacy plaintext values (15 October).
 - [x] Review current audit/export/notification paths and API error logging for identifiers;
       record backup exposure and recovery requirements in the encryption runbook.
-- [ ] Complete historical provider/telemetry-log review and isolated backup recovery validation.
+- [x] Review accessible retained Supabase/Vercel/database telemetry for current payment
+      identifiers: no matches; synthetic SQL fixture literals classified.
+      [Evidence and coverage](payment-telemetry-review-2026-10-16.md).
+- [ ] Complete inaccessible provider/drain-history checks and isolated backup recovery validation.
 - [ ] Retire plaintext columns after validating compatibility and recovery procedures.
 - [x] Verify a rotation round trip without changing the live key, browser-role denial,
       and payment RPC writes/resets/notifications in a rolled-back live transaction.
@@ -150,11 +196,23 @@ message/error text is discarded by a deployed database trigger.
 - [ ] Add trusted server logging only when an active processing flow needs it.
 - [ ] Add a minimal, authorized processing-history view only if a user flow requires it.
 
+## CI/CD pipeline
+
+- [x] Prepare combined app/security, database, website/API and MFA CI with one required readiness check.
+- [x] Protect main and configure approval-protected, main-only release environments.
+- [x] Prepare manual Vercel and EAS workflows; explicitly disable deployments with RELEASES_ENABLED=false.
+- [x] Resolve the braces/node-forge blockers with reviewed pinned fixes, pass combined CI and merge [PR #2](https://github.com/TshephangMogotsi/Tshelo/pull/2) (23 October 2026).
+- [ ] Replace temporary source pins/local fork with compatible official patched releases when available; retain exploit regression and source-integrity checks.
+- [ ] Activate and rehearse deployments only when separately authorized; deployment credentials were not added.
+
+Details and recovery procedure: [CI/CD pipeline](cicd-pipeline.md).
+
 ## Verification and release follow-up
 
-- [ ] Resolve existing mobile API-boundary test failures involving `lib/changePhone.ts`
+- [x] Resolve existing mobile API-boundary test failures involving `lib/changePhone.ts`
       and `screens/main/NotificationSettingsScreen.tsx` without weakening the guardrails.
-- [ ] Run the complete applicable verification suite and dependency audits before release.
+- [x] Run applicable verification and runtime dependency audits for the web release.
+      Runtime audit clean; five high development-only ESLint findings remain.
 - [ ] Verify committed changes independently of unrelated worktree changes.
 - [ ] Push the local security commits when preparing the repository release:
       `e02e613`, `f902ea4` and `e2b826b`.
@@ -162,7 +220,8 @@ message/error text is discarded by a deployed database trigger.
       verification and receipt scan-completion routes; check required server secrets.
 - [ ] Include the mobile receipt-review/audit integration in the next app build and smoke-test it.
 
-Live status checked 15 October: receipt database migration and audit-enabled
+Historical snapshot checked 15 October (superseded by the live QA/deployment
+reports above): receipt database migration and audit-enabled
 parser v8 are deployed; the audit table is empty. Production web/API is still on
 `91421bb` and `/api/v1/receipts/scan-completion` returns 404. Latest recorded
 production mobile builds also reference `91421bb`; no production OTA updates
@@ -170,6 +229,11 @@ exist. See [receipt deployment and cleanup evidence](receipt-and-waitlist-status
 
 ## Completed baseline
 
+- [x] Audit service-role exposure in current client configuration, working-tree
+      source/reachable Git history, local builds, latest production iOS/Android
+      archives (including disassembled Hermes strings), and public bundles from
+      three accessible web origins. No privileged keys found in these surfaces.
+      [Evidence and coverage limits](service-role-exposure-audit-2026-10-15.md).
 - [x] Item 1 database checks: 30 explicit protected assignments and all 53
       nonallowlisted-column updates denied; permitted own-profile edits,
       cross-user isolation, payment verification resets and owner notification

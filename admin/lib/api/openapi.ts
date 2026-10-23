@@ -184,6 +184,19 @@ export const tsheloOpenApiDocument = {
         },
       },
     },
+    '/users/me/support-reports': {
+      post: {
+        tags: ['Users'],
+        operationId: 'submitSupportReport',
+        summary: 'Submit an in-app support report',
+        description: 'Creates a support ticket owned by the authenticated member. Do not submit one-time codes, passwords, or payment credentials.',
+        requestBody: jsonBody({ $ref: '#/components/schemas/CreateSupportReportRequest' }),
+        responses: {
+          '200': response('Support report accepted.', success({ $ref: '#/components/schemas/SupportReportReceipt' })),
+          ...standardErrors,
+        },
+      },
+    },
     '/users/connections': {
       get: {
         tags: ['Users'], operationId: 'searchConnections', summary: 'Search relationship-scoped connections',
@@ -1045,10 +1058,9 @@ export const tsheloOpenApiDocument = {
           country_code: { type: 'string' }, preferred_currency: { type: 'string', pattern: '^[A-Z]{3}$' }, notifications_enabled: { type: 'boolean' },
           mobile_money_provider: { type: ['string', 'null'] }, bank_name: { type: ['string', 'null'] }, bank_branch_code: { type: ['string', 'null'] }, bank_account_number: { type: ['string', 'null'] },
           profile_completed: { type: 'boolean' }, onboarding_completed: { type: 'boolean' },
-          terms_accepted_at: { type: 'string', format: 'date-time' }, terms_version: { type: 'string' },
-          privacy_accepted_at: { type: 'string', format: 'date-time' }, privacy_version: { type: 'string' },
-          data_processing_consent: { type: 'boolean' }, data_processing_consent_at: { type: 'string', format: 'date-time' },
-          marketing_consent: { type: 'boolean' }, marketing_consent_at: { type: 'string', format: 'date-time' },
+          terms_version: { type: 'string' }, privacy_version: { type: 'string' },
+          data_processing_consent: { type: 'boolean' },
+          marketing_consent: { type: 'boolean' },
           marketing_email_enabled: { type: 'boolean' }, marketing_sms_enabled: { type: 'boolean' },
         },
       },
@@ -1059,6 +1071,23 @@ export const tsheloOpenApiDocument = {
           id: { type: 'string', format: 'uuid' },
           ticket_number: { type: 'string' },
           status: { type: 'string', enum: ['open', 'pending', 'in_progress'] },
+          created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      CreateSupportReportRequest: {
+        type: 'object', required: ['category', 'description'], additionalProperties: false,
+        properties: {
+          category: { type: 'string', enum: ['sign_in', 'fund_or_event', 'contribution_or_expense', 'report_or_export', 'notifications', 'technical', 'suggestion', 'other'] },
+          description: { type: 'string', minLength: 10, maxLength: 2000 },
+          platform: { type: 'string', enum: ['android', 'ios', 'web'] },
+        },
+      },
+      SupportReportReceipt: {
+        type: 'object', required: ['id', 'ticket_number', 'status', 'created_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          ticket_number: { type: 'string' },
+          status: { type: 'string', enum: ['open'] },
           created_at: { type: 'string', format: 'date-time' },
         },
       },
@@ -1484,7 +1513,7 @@ export const tsheloOpenApiDocument = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' }, ticket_number: { type: 'string' }, category: { type: 'string' },
-          subject: { type: 'string' }, priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
+          subject: { type: 'string' }, description: { type: 'string' }, resolution_note: { type: ['string', 'null'] }, priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
           status: { type: 'string', enum: ['open', 'pending', 'in_progress', 'resolved', 'closed'] },
           assigned_to: { type: ['string', 'null'] }, created_at: { type: 'string', format: 'date-time' },
         },

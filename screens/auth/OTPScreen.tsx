@@ -17,6 +17,7 @@ import { useRequireOnline } from '../../context/ConnectivityContext'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
 import { detectProviderOrUnknown as detectProvider } from '../../lib/providers'
 import { maskedInternationalPhone } from '../../lib/phoneNumbers'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'OTP'>
@@ -26,8 +27,22 @@ type Props = {
 const OTP_LENGTH = 6
 const RESEND_COUNTDOWN = 60
 
+function verificationMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes('expired') || normalized.includes('invalid')) {
+    return 'This code has expired or is no longer valid. Request a new code and try again.'
+  }
+  if (normalized.includes('rate limit') || normalized.includes('too many')) {
+    return 'Too many attempts were made. Wait a moment, then request a new code.'
+  }
+  return message || 'We could not verify that code. Check your connection and try again.'
+}
+
 export default function OTPScreen({ navigation, route }: Props) {
   const { phone, mode, registration, mobileMoneyReturn } = route.params
+  const { isTablet } = useTabletLayout()
   const { refreshProfile } = useAuth()
   const requireOnline = useRequireOnline()
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''))
@@ -45,11 +60,20 @@ export default function OTPScreen({ navigation, route }: Props) {
   }, [countdown])
 
   function handleDigit(value: string, index: number) {
-    const digit = value.replace(/\D/g, '').slice(-1)
+    const incomingDigits = value.replace(/\D/g, '').slice(0, OTP_LENGTH - index)
     const next = [...digits]
-    next[index] = digit
+    if (!incomingDigits) {
+      next[index] = ''
+      setDigits(next)
+      return
+    }
+
+    incomingDigits.split('').forEach((digit, offset) => {
+      next[index + offset] = digit
+    })
     setDigits(next)
-    if (digit && index < OTP_LENGTH - 1) inputRefs.current[index + 1]?.focus()
+    const nextIndex = index + incomingDigits.length
+    if (nextIndex < OTP_LENGTH) inputRefs.current[nextIndex]?.focus()
   }
 
   function handleKeyPress(key: string, index: number) {
@@ -68,11 +92,16 @@ export default function OTPScreen({ navigation, route }: Props) {
     }
 
     if (!requireOnline()) return
-    const { error } = await supabase.auth.signInWithOtp({
-      phone,
-      options: { shouldCreateUser: mode === 'register' },
-    })
-    if (error) { Alert.alert('Error', error.message); return }
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone,
+        options: { shouldCreateUser: mode === 'register' },
+      })
+      if (error) { Alert.alert('Could not send code', verificationMessage(error)); return }
+    } catch (error) {
+      Alert.alert('Could not send code', verificationMessage(error))
+      return
+    }
     setCountdown(RESEND_COUNTDOWN)
     setDigits(Array(OTP_LENGTH).fill(''))
     inputRefs.current[0]?.focus()
@@ -90,18 +119,32 @@ export default function OTPScreen({ navigation, route }: Props) {
     }
 
     if (!requireOnline()) { setLoading(false); return }
-    const { data, error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
+    let data: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>['data']
+    let error: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>['error']
+    try {
+      ({ data, error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' }))
+    } catch (verifyError) {
+      setLoading(false)
+      hapticError()
+      Alert.alert('Could not verify code', verificationMessage(verifyError))
+      return
+    }
 
     if (error) {
       setLoading(false)
       hapticError()
-      Alert.alert('Invalid code', 'The code is incorrect or has expired. Try again.')
+      Alert.alert('Could not verify code', verificationMessage(error))
       return
     }
 
     hapticSuccess()
     const userId = data.user?.id
-    if (!userId) { setLoading(false); return }
+    if (!userId) {
+      setLoading(false)
+      hapticError()
+      Alert.alert('Could not verify code', 'No verified account was returned. Request a new code and try again.')
+      return
+    }
 
     if (registration) {
       try {
@@ -170,7 +213,7 @@ export default function OTPScreen({ navigation, route }: Props) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.container}>
+        <View style={[styles.container, isTablet && styles.containerTablet]}>
           <TouchableOpacity style={[styles.backButton, { backgroundColor: inputBg, borderColor: borderCol }]} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={20} color={textCol} />
           </TouchableOpacity>
@@ -186,7 +229,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           </View>
 
           {/* OTP boxes */}
-          <View style={styles.otpRow}>
+          <View style={[styles.otpRow, isTablet && styles.otpRowTablet]}>
             {digits.map((digit, i) => (
               <TextInput
                 key={i}
@@ -196,10 +239,12 @@ export default function OTPScreen({ navigation, route }: Props) {
                 onChangeText={v => handleDigit(v, i)}
                 onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
                 keyboardType="number-pad"
-                maxLength={1}
+                maxLength={i === 0 ? OTP_LENGTH : 1}
                 textContentType="oneTimeCode"
                 autoComplete="sms-otp"
                 selectTextOnFocus
+                autoFocus={i === 0}
+                accessibilityLabel={`Verification digit ${i + 1} of ${OTP_LENGTH}`}
               />
             ))}
           </View>
@@ -254,6 +299,13 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 40,
   },
+  containerTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 40,
+  },
   backButton: {
     width: 40,
     height: 40,
@@ -286,6 +338,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 28,
+  },
+  otpRowTablet: {
+    justifyContent: 'center',
+    gap: 12,
   },
   otpBox: {
     width: 48,

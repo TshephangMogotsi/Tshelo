@@ -24,7 +24,7 @@ const BAR_W = 11
 type Period = '1M' | '3M' | '6M' | '1Y'
 type EntryType = 'contribution' | 'expense'
 
-type FundOption = { id: string; title: string; currency: string }
+type FundOption = { id: string; title: string; currency: string; createdAt: string }
 type LedgerEntry = {
   id: string
   fundId: string
@@ -55,6 +55,10 @@ function startOfPeriod(period: Period) {
   return new Date(now.getFullYear(), now.getMonth() - PERIOD_MONTHS[period] + 1, 1)
 }
 
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
 function money(amount: number, currency: string) {
   const symbol = currency === 'BWP' ? 'P' : currency
   return `${symbol} ${amount.toLocaleString('en-BW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -76,15 +80,16 @@ function loadReportLogoDataUri() {
   return reportLogoPromise
 }
 
-function BarChart({ data, colors }: { data: ChartPoint[]; colors: AppColors }) {
+function BarChart({ data, colors, slots }: { data: ChartPoint[]; colors: AppColors; slots: number }) {
   const maxVal = Math.max(1, ...data.flatMap(point => [point.contributions, point.expenses]))
+  const columnWidth = `${100 / Math.max(data.length, slots)}%` as `${number}%`
   return (
     <View style={stylesForChart.chart}>
       {data.map(point => {
         const contributedHeight = point.contributions > 0 ? Math.max(4, point.contributions / maxVal * CHART_H) : 0
         const expenseHeight = point.expenses > 0 ? Math.max(4, point.expenses / maxVal * CHART_H) : 0
         return (
-          <View key={point.key} style={stylesForChart.column}>
+          <View key={point.key} style={[stylesForChart.column, { width: columnWidth }]}>
             <View style={stylesForChart.bars}>
               <View style={[stylesForChart.bar, { height: contributedHeight, backgroundColor: colors.primary }]} />
               <View style={[stylesForChart.bar, { height: expenseHeight, backgroundColor: colors.error }]} />
@@ -98,8 +103,8 @@ function BarChart({ data, colors }: { data: ChartPoint[]; colors: AppColors }) {
 }
 
 const stylesForChart = StyleSheet.create({
-  chart: { flexDirection: 'row', alignItems: 'flex-end', height: CHART_H + 22 },
-  column: { flex: 1, alignItems: 'center' },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-start', height: CHART_H + 22 },
+  column: { alignItems: 'center' },
   bars: { height: CHART_H, flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   bar: { width: BAR_W, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
   label: { fontSize: 9, marginTop: 5 },
@@ -156,7 +161,12 @@ export default function ReportsScreen() {
         if (!active) return
 
         reportByFundRef.current = new Map(reports.map(report => [report.fund.id, report]))
-        setFunds(reports.map(report => ({ id: report.fund.id, title: report.fund.title, currency: report.fund.currency_code })))
+        setFunds(reports.map(report => ({
+          id: report.fund.id,
+          title: report.fund.title,
+          currency: report.fund.currency_code,
+          createdAt: report.fund.created_at,
+        })))
         const contributionEntries: LedgerEntry[] = reports.flatMap(report => report.contributions
           .filter(row => row.status === 'confirmed' && !row.is_refunded && row.confirmed_at)
           .map(row => ({
@@ -190,7 +200,7 @@ export default function ReportsScreen() {
 
   const selectedFund = funds.find(fund => fund.id === fundId)
   const currency = selectedFund?.currency ?? funds[0]?.currency ?? 'BWP'
-  const fundOptions = useMemo(() => [{ id: 'all', title: 'All funds', currency }, ...funds], [currency, funds])
+  const fundOptions = useMemo(() => [{ id: 'all', title: 'All funds', currency, createdAt: '' }, ...funds], [currency, funds])
   const filteredEntries = useMemo(() => {
     const start = startOfPeriod(period).getTime()
     return entries.filter(entry => (fundId === 'all' || entry.fundId === fundId) && new Date(entry.date).getTime() >= start)
@@ -201,9 +211,22 @@ export default function ReportsScreen() {
   }, [pledges, fundId, period])
 
   const chartData = useMemo(() => {
-    const now = new Date()
-    return Array.from({ length: PERIOD_MONTHS[period] }, (_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - PERIOD_MONTHS[period] + 1 + index, 1)
+    const rangeStart = startOfPeriod(period)
+    const relevantFunds = fundId === 'all' ? funds : selectedFund ? [selectedFund] : []
+    const firstFundCreatedAt = relevantFunds
+      .map(fund => new Date(fund.createdAt))
+      .filter(date => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())[0]
+    const firstVisibleMonth = firstFundCreatedAt && firstFundCreatedAt > rangeStart
+      ? startOfMonth(firstFundCreatedAt)
+      : rangeStart
+    // When reporting begins after the selected range start, keep the selected
+    // number of month slots and extend the labels forward. This anchors real
+    // activity at the left without inventing inactive history before the fund.
+    const monthCount = PERIOD_MONTHS[period]
+
+    return Array.from({ length: monthCount }, (_, index) => {
+      const date = new Date(firstVisibleMonth.getFullYear(), firstVisibleMonth.getMonth() + index, 1)
       const key = monthKey(date)
       const monthEntries = filteredEntries.filter(entry => monthKey(new Date(entry.date)) === key)
       return {
@@ -213,7 +236,7 @@ export default function ReportsScreen() {
         expenses: monthEntries.filter(entry => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0),
       }
     })
-  }, [filteredEntries, period])
+  }, [filteredEntries, fundId, funds, period, selectedFund])
 
   const totalContributed = filteredEntries.filter(entry => entry.type === 'contribution').reduce((sum, entry) => sum + entry.amount, 0)
   const totalPledged = filteredPledges.reduce((sum, entry) => sum + entry.amount, 0)
@@ -377,7 +400,7 @@ export default function ReportsScreen() {
         {loadError ? <View style={styles.emptyState}><Ionicons name="cloud-offline-outline" size={28} color={colors.textMuted} /><Text style={styles.emptyTitle}>Couldn’t load reports</Text><Text style={styles.emptyText}>Check your connection and try again.</Text></View> : <>
           <View style={styles.chartCard}>
             <View style={styles.chartTop}><Text style={styles.chartTitle}>Money movement</Text><View style={styles.chartLegend}><View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.primary }]} /><Text style={styles.legendText}>In</Text></View><View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.error }]} /><Text style={styles.legendText}>Out</Text></View></View></View>
-            <BarChart data={chartData} colors={colors} />
+            <BarChart data={chartData} colors={colors} slots={PERIOD_MONTHS[period]} />
           </View>
 
           <View style={styles.statsGrid}>

@@ -205,6 +205,8 @@ export function toSupportTicketSummary(row: SupportTicketSummary): SupportTicket
     ticket_number: row.ticket_number,
     category: row.category,
     subject: row.subject,
+    ...(typeof row.description === 'string' ? { description: row.description } : {}),
+    ...(row.resolution_note === null || typeof row.resolution_note === 'string' ? { resolution_note: row.resolution_note } : {}),
     priority: row.priority,
     status: row.status,
     assigned_to: row.assigned_to,

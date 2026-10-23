@@ -19,6 +19,7 @@ type AuthContextType = {
   preferredCurrency: string | null
   tokenBalance: number
   trustScore: number
+  notificationsEnabled: boolean
   isGooglePlayReviewer: boolean
   refreshProfile: () => Promise<void>
   loadSecuritySession: () => Promise<SecuritySessionDetails>
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [preferredCurrency, setPreferredCurrency] = useState<string | null>(null)
   const [tokenBalance, setTokenBalance] = useState(0)
   const [trustScore, setTrustScore] = useState(0)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [isGooglePlayReviewer, setIsGooglePlayReviewer] = useState(false)
 
   const checkProfile = useCallback(async (uid: string, googlePlayReviewer = false) => {
@@ -59,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       )
       setTokenBalance(profile.token_balance ?? 0)
       setTrustScore(profile.trust_score ?? 0)
+      setNotificationsEnabled(profile.notifications_enabled !== false)
     } catch {
       // Keep the existing auth state; a foreground refresh can retry the API.
     }
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPreferredCurrency(null)
         setTokenBalance(0)
         setTrustScore(0)
+        setNotificationsEnabled(true)
         setIsGooglePlayReviewer(false)
       }
     })
@@ -124,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPreferredCurrency(null)
     setTokenBalance(0)
     setTrustScore(0)
+    setNotificationsEnabled(true)
     setIsGooglePlayReviewer(false)
   }, [])
 
@@ -137,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       preferredCurrency,
       tokenBalance,
       trustScore,
+      notificationsEnabled,
       isGooglePlayReviewer,
       refreshProfile,
       loadSecuritySession,

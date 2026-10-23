@@ -38,6 +38,7 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://app.tshelo.com",
         "EXPO_PUBLIC_TERMS_OF_SERVICE_URL": "https://app.tshelo.com/legal/terms",

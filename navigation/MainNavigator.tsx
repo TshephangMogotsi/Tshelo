@@ -25,8 +25,10 @@ import AssignContributionScreen from '../screens/main/AssignContributionScreen'
 import RecordExpenseScreen      from '../screens/main/RecordExpenseScreen'
 import TokenPurchaseScreen      from '../screens/main/TokenPurchaseScreen'
 import SecurityScreen           from '../screens/main/SecurityScreen'
+import ChangePhoneScreen        from '../screens/main/ChangePhoneScreen'
 import AboutLegalScreen         from '../screens/main/AboutLegalScreen'
 import NotificationsScreen      from '../screens/main/NotificationsScreen'
+import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen'
 import SupportScreen            from '../screens/support/SupportScreen'
 import FundCreatedScreen        from '../screens/main/FundCreatedScreen'
 import MemberDetailsScreen      from '../screens/main/MemberDetailsScreen'
@@ -165,8 +167,10 @@ export default function MainNavigator() {
       <Stack.Screen name="RecordExpense"      component={RecordExpenseScreen}     />
       <Stack.Screen name="TokenPurchase"      component={TokenPurchaseScreen}     />
       <Stack.Screen name="Security"           component={SecurityScreen}          />
+      <Stack.Screen name="ChangePhone"        component={ChangePhoneScreen}       />
       <Stack.Screen name="AboutLegal"         component={AboutLegalScreen}        />
       <Stack.Screen name="Notifications"      component={NotificationsScreen}     />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="MemberDetails"      component={MemberDetailsScreen}     />
       <Stack.Screen name="AwardRichAuntie"    component={AwardRichAuntieScreen}   />
       <Stack.Screen name="RichAuntieCelebration" component={RichAuntieCelebrationScreen} />

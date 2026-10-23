@@ -5,7 +5,13 @@ project_id = "albihofmlafjzbusancu"
 [functions.fund-preview]
 verify_jwt = false
 
-# Platform-admin authenticator enrollment and verification.
+# Database Webhooks authenticate this function with PUSH_WEBHOOK_SECRET rather
+# than a user JWT.
+[functions.send-push]
+verify_jwt = false
+
+# Authenticator-app MFA used by platform administrators. Hosted settings must
+# also be checked before rollout; local config does not change hosted Auth.
 [auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true

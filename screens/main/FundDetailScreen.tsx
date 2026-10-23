@@ -36,6 +36,16 @@ import SponsorshipBoard from './fundDetail/SponsorshipBoard'
 import FundActionMenu from './fundDetail/FundActionMenu'
 import AdminPermissionEditorModal from './fundDetail/AdminPermissionEditorModal'
 import { calculateFundFinancialSummary, isFundReadOnly, isVisibleInFundMoneyView, prioritiseRichAunties } from './fundDetail/finance'
+import ListSearchFilters, { type FilterOption } from './fundDetail/ListSearchFilters'
+import {
+  expenseCategoryLabel,
+  filterContributions,
+  filterExpenses,
+  filterMembers,
+  type ContributionListFilter,
+  type ExpenseListFilter,
+  type MemberListFilter,
+} from './fundDetail/listFilters'
 import LoadingOverlay from '../../components/LoadingOverlay'
 import InviteDetailsModal from '../../components/InviteDetailsModal'
 import { FUND_PERMISSION_KEYS, type FundPermission } from '../../lib/fundPermissions'
@@ -82,6 +92,12 @@ export default function FundDetailScreen({
   const [memberPermissionRows, setMemberPermissionRows] = useState<Record<string, FundPermission[]>>({})
   const [isLoadingMemberPermissions, setIsLoadingMemberPermissions] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
+  const [contributionQuery, setContributionQuery] = useState('')
+  const [contributionFilter, setContributionFilter] = useState<ContributionListFilter>('all')
+  const [expenseQuery, setExpenseQuery] = useState('')
+  const [expenseFilter, setExpenseFilter] = useState<ExpenseListFilter>('all')
+  const [memberQuery, setMemberQuery] = useState('')
+  const [memberFilter, setMemberFilter] = useState<MemberListFilter>('all')
   const { can, isLoading: permissionsLoading } = useFundPermissions(fundId)
   const canRecordContributions = can('record_contributions')
   const canEditContributions = can('edit_contributions')
@@ -434,6 +450,18 @@ export default function FundDetailScreen({
 
   const visibleContributions = contributions.filter(isVisibleInFundMoneyView)
   const displayedMembers = prioritiseRichAunties(members, richAuntieUserIds)
+  const filteredContributions = filterContributions(visibleContributions, contributionQuery, contributionFilter)
+  const filteredExpenses = filterExpenses(expenses, expenseQuery, expenseFilter)
+  const filteredMembers = filterMembers(displayedMembers, memberQuery, memberFilter)
+  const expenseCategoryOptions: FilterOption<ExpenseListFilter>[] = [
+    { id: 'all', label: 'All' },
+    { id: 'recorded', label: 'Recorded' },
+    { id: 'sponsored', label: 'Sponsored' },
+    { id: 'needs_review', label: 'Needs review' },
+    ...Array.from(new Set(expenses.map(expenseCategoryLabel)))
+      .sort((left, right) => left.localeCompare(right))
+      .map(category => ({ id: `category:${category}` as ExpenseListFilter, label: category })),
+  ]
   const financialSummary = calculateFundFinancialSummary({
     goalAmount: fund?.goal_amount ?? 0,
     totalIn: fund?.total_contributions ?? 0,
@@ -575,13 +603,33 @@ export default function FundDetailScreen({
 
         {activeTab === 'contributions' && (
           <>
+            <ListSearchFilters
+              query={contributionQuery}
+              filter={contributionFilter}
+              placeholder="Search contributions"
+              options={[
+                { id: 'all', label: 'All' },
+                { id: 'received', label: 'Received' },
+                { id: 'pledged', label: 'Pledged' },
+                { id: 'member', label: 'Members' },
+                { id: 'guest', label: 'Guests' },
+                { id: 'refunded', label: 'Refunded' },
+              ] satisfies FilterOption<ContributionListFilter>[]}
+              onQueryChange={setContributionQuery}
+              onFilterChange={setContributionFilter}
+            />
             {visibleContributions.length === 0 ? (
               <View style={styles.emptyTab}>
                 <Text style={styles.emptyTabEmoji}>💰</Text>
                 <Text style={styles.emptyTabText}>No contributions recorded yet.</Text>
               </View>
+            ) : filteredContributions.length === 0 ? (
+              <View style={styles.emptyTab}>
+                <Ionicons name="search-outline" size={28} color={colors.textMuted} style={styles.emptyTabIcon} />
+                <Text style={styles.emptyTabText}>No contributions match this view.</Text>
+              </View>
             ) : (
-              visibleContributions.map(c => (
+              filteredContributions.map(c => (
                 <ContributionRow
                   key={c.id}
                   item={c}
@@ -608,13 +656,26 @@ export default function FundDetailScreen({
                 </Text>
               )}
             </View>
+            <ListSearchFilters
+              query={expenseQuery}
+              filter={expenseFilter}
+              placeholder="Search expenses"
+              options={expenseCategoryOptions}
+              onQueryChange={setExpenseQuery}
+              onFilterChange={setExpenseFilter}
+            />
             {expenses.length === 0 ? (
               <View style={styles.emptyTab}>
                 <Ionicons name="receipt-outline" size={28} color={colors.textMuted} style={styles.emptyTabIcon} />
                 <Text style={styles.emptyTabText}>No expenses recorded yet.</Text>
               </View>
+            ) : filteredExpenses.length === 0 ? (
+              <View style={styles.emptyTab}>
+                <Ionicons name="search-outline" size={28} color={colors.textMuted} style={styles.emptyTabIcon} />
+                <Text style={styles.emptyTabText}>No expenses match this view.</Text>
+              </View>
             ) : (
-              expenses.map(e => (
+              filteredExpenses.map(e => (
                 <ExpenseRow
                   key={e.id}
                   item={e}
@@ -681,7 +742,25 @@ export default function FundDetailScreen({
                 {formatFundMemberCount(members.length)}
               </Text>
             </View>
-            {displayedMembers.map(m => (
+            <ListSearchFilters
+              query={memberQuery}
+              filter={memberFilter}
+              placeholder="Search members"
+              options={[
+                { id: 'all', label: 'All' },
+                { id: 'organisers', label: 'Organisers' },
+                { id: 'admins', label: 'Admins' },
+                { id: 'members', label: 'Members' },
+              ] satisfies FilterOption<MemberListFilter>[]}
+              onQueryChange={setMemberQuery}
+              onFilterChange={setMemberFilter}
+            />
+            {filteredMembers.length === 0 ? (
+              <View style={styles.emptyTab}>
+                <Ionicons name="search-outline" size={28} color={colors.textMuted} style={styles.emptyTabIcon} />
+                <Text style={styles.emptyTabText}>No members match this view.</Text>
+              </View>
+            ) : filteredMembers.map(m => (
               <MemberRow
                 key={m.id}
                 item={m}
