@@ -1,0 +1,123 @@
+{
+  "source": "775f1a9de82789f8bd11dfe403e815b8f1d01a17",
+  "runId": "39893841865",
+  "environment": "disposable-loopback-supabase",
+  "primaryLogin": "synthetic phone OTP supplied by local Supabase test_otp configuration; no SMS delivery",
+  "secondFactor": "real Supabase TOTP enrollment and verification; codes calculated from the UI setup key",
+  "recovery": "not exercised; ownership and production procedure pending",
+  "cleanupPassed": true,
+  "results": [
+    {
+      "scenario": "support: browser enrollment, API and database MFA enforcement",
+      "status": "passed"
+    },
+    {
+      "scenario": "operations: browser enrollment, API and database MFA enforcement",
+      "status": "passed"
+    },
+    {
+      "scenario": "finance: browser enrollment, API and database MFA enforcement",
+      "status": "passed"
+    },
+    {
+      "scenario": "super_admin: browser enrollment, API and database MFA enforcement",
+      "status": "passed"
+    },
+    {
+      "scenario": "ordinary app user retains account access and cannot open administrator MFA",
+      "status": "passed"
+    }
+  ],
+  "evidence": [
+    {
+      "role": "support",
+      "check": "aal1 blocked at page, API read/write, RLS and four direct admin RPCs; own-profile access retained",
+      "result": "pass"
+    },
+    {
+      "role": "support",
+      "check": "incorrect authenticator code denied",
+      "result": "pass"
+    },
+    {
+      "role": "support",
+      "check": "real aal2 JWT unlocked platform reads and preserved API/database role matrix and mutation audit",
+      "result": "pass"
+    },
+    {
+      "role": "support",
+      "check": "sign-out and repeat OTP login required existing-factor challenge without re-enrollment",
+      "result": "pass"
+    },
+    {
+      "role": "support",
+      "check": "role deactivation revoked page/API/database privileges even with aal2",
+      "result": "pass"
+    },
+    {
+      "role": "operations",
+      "check": "aal1 blocked at page, API read/write, RLS and four direct admin RPCs; own-profile access retained",
+      "result": "pass"
+    },
+    {
+      "role": "operations",
+      "check": "incorrect authenticator code denied",
+      "result": "pass"
+    },
+    {
+      "role": "operations",
+      "check": "real aal2 JWT unlocked platform reads and preserved API/database role matrix and mutation audit",
+      "result": "pass"
+    },
+    {
+      "role": "operations",
+      "check": "role deactivation revoked page/API/database privileges even with aal2",
+      "result": "pass"
+    },
+    {
+      "role": "finance",
+      "check": "aal1 blocked at page, API read/write, RLS and four direct admin RPCs; own-profile access retained",
+      "result": "pass"
+    },
+    {
+      "role": "finance",
+      "check": "incorrect authenticator code denied",
+      "result": "pass"
+    },
+    {
+      "role": "finance",
+      "check": "real aal2 JWT unlocked platform reads and preserved API/database role matrix and mutation audit",
+      "result": "pass"
+    },
+    {
+      "role": "finance",
+      "check": "role deactivation revoked page/API/database privileges even with aal2",
+      "result": "pass"
+    },
+    {
+      "role": "super_admin",
+      "check": "aal1 blocked at page, API read/write, RLS and four direct admin RPCs; own-profile access retained",
+      "result": "pass"
+    },
+    {
+      "role": "super_admin",
+      "check": "incorrect authenticator code denied",
+      "result": "pass"
+    },
+    {
+      "role": "super_admin",
+      "check": "real aal2 JWT unlocked platform reads and preserved API/database role matrix and mutation audit",
+      "result": "pass"
+    },
+    {
+      "role": "super_admin",
+      "check": "role deactivation revoked page/API/database privileges even with aal2",
+      "result": "pass"
+    },
+    {
+      "role": "ordinary-user",
+      "check": "account access retained; admin API and administrator MFA page denied",
+      "result": "pass"
+    }
+  ]
+}
