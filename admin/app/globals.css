@@ -109,9 +109,11 @@ a { color: inherit; text-decoration: none; }
 .country-label { min-width: 22px; font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--purple); }
 .country-code { font-weight: 700; padding-right: 12px; border-right: 1px solid var(--line); }
 .phone-field input { border: 0; outline: none; flex: 1; min-width: 0; font-size: 17px; background: transparent; color: var(--ink); }
-.sign-in-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 0 0 24px; border-radius: 12px; background: var(--soft); }
-.sign-in-method { min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 750; cursor: pointer; }
-.sign-in-method.active { color: var(--purple-dark); background: white; box-shadow: 0 1px 4px rgba(34,20,55,.12); }
+.sign-in-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 0 0 24px; border: 1px solid #e8e3ee; border-radius: 14px; background: #f1eef5; }
+.sign-in-method { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
+.sign-in-method:hover:not(.active) { color: var(--purple-dark); }
+.sign-in-method.active { color: var(--purple-dark); background: white; box-shadow: 0 1px 5px rgba(34,20,55,.12); }
+.sign-in-method:focus-visible, .login-account-toggle:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
 .code-field { width: 100%; height: 62px; border: 1.5px solid var(--line); border-radius: 14px; background: white; padding: 0 18px; font-size: 25px; letter-spacing: .32em; text-align: center; font-weight: 750; }
 .profile-setup-field { width: 100%; height: 56px; border: 1.5px solid var(--line); border-radius: 14px; background: white; padding: 0 16px; color: var(--ink); font-size: 16px; box-shadow: 0 2px 10px rgba(34,20,55,.03); }
 .profile-setup-field:focus { border-color: var(--purple); box-shadow: 0 0 0 4px rgba(113,48,231,.1); outline: none; }
@@ -126,8 +128,22 @@ a { color: inherit; text-decoration: none; }
 .form-message { min-height: 20px; margin: 15px 0 0; font-size: 13px; color: var(--red); line-height: 1.5; }
 .form-message.success { color: var(--green); }
 .login-help { padding-top: 20px; border-top: 1px solid var(--line); margin-top: 18px; text-align: center; color: #938d9b; font-size: 12px; }
+.login-account-toggle { display: block; margin: 16px auto 0; padding: 6px; border: 0; background: transparent; color: var(--purple-dark); font-size: 13px; font-weight: 700; text-align: center; cursor: pointer; }
+.login-account-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
 .back-link { border: 0; background: transparent; color: var(--muted); display: inline-flex; align-items: center; gap: 7px; padding: 0; margin: 0 0 28px; cursor: pointer; font-weight: 650; font-size: 13px; }
 .profile-change-number { display: block; margin: 2px auto 0; }
+.onboarding-card { padding: 24px 0; }
+.login-card label.onboarding-consent { margin: 22px 0 4px; }
+.onboarding-payment-card { margin: 0 0 14px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: white; box-shadow: 0 2px 10px rgba(34,20,55,.03); }
+.onboarding-payment-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; color: var(--purple); }
+.onboarding-payment-heading div { display: grid; gap: 5px; }
+.onboarding-payment-heading strong { color: var(--ink); font-size: 14px; }
+.onboarding-payment-heading span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.onboarding-secondary { width: 100%; min-height: 42px; margin-top: 16px; border: 1px dashed var(--purple-line); border-radius: 10px; background: var(--purple-pale); color: var(--purple-dark); font-size: 13px; font-weight: 700; cursor: pointer; }
+.onboarding-bank-fields { margin-top: 18px; }
+.onboarding-bank-fields label:not(:first-child) { margin-top: 16px; }
+.onboarding-text-button { margin-top: 15px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.onboarding-secondary:focus-visible, .onboarding-text-button:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
 
 .centered-page { min-height: 100vh; padding: 28px; display: grid; place-items: center; background: radial-gradient(circle at 50% 0, #eee5ff, var(--soft) 45%); }
 .status-card { background: white; width: min(500px, 100%); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 40px; }

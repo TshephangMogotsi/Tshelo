@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 }
 
 export default function AccountPreferencesPage() {
-  return <AccountPreferences />
+  return <AccountPreferences recoveryEnabled={process.env.TSHELO_RECOVERY_ENABLED === 'true'} />
 }

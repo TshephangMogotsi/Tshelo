@@ -133,7 +133,7 @@ export function toUserSummary(row: UserRow): UserSummary {
   return {
     id: row.id,
     name: row.name,
-    phone: row.phone,
+    phone: row.phone ?? '',
     country_code: row.country_code,
     trust_level: row.trust_level ?? 'new',
     trust_score: row.trust_score ?? 0,
