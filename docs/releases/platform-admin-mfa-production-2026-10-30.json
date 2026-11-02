@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-30",
+  "project": "albihofmlafjzbusancu",
+  "migration": "supabase/migrations/20261022120000_require_platform_admin_mfa.sql",
+  "migrationSha256": "af47872d5f5117947274fe55065cad0ffe9dff6f4648f153ec2d57fd1fcd1fad",
+  "state": {
+    "active_admins": 4,
+    "migration_recorded": true,
+    "mutation_gate_has_aal2": true,
+    "read_gate_has_aal2": true,
+    "verified_active_admins": 0
+  },
+  "productionAssertions": "passed",
+  "coverage": [
+    "missing, aal1 and invalid assurance denied",
+    "four privileged RPCs denied before mutation for every active administrator",
+    "aal2 role helper accepts active administrators",
+    "self-role enrollment lookup and own profile remain accessible at aal1",
+    "internal operation helper remains inaccessible to authenticated callers"
+  ],
+  "method": "Synthetic JWT claims under authenticated database role, in a rollback-only transaction; not hosted user sign-in or enrollment",
+  "actualAdministratorEnrollmentComplete": false
+}

@@ -1,5 +1,9 @@
 # Platform administrator MFA — 22 October 2026
 
+**Production update — 30 October:** Database MFA migration `20261022120000` is now
+applied. See [production onboarding and enforcement](platform-admin-onboarding-2026-10-30.md)
+for current status; the original release notes below describe the earlier stage.
+
 ## Scope and implementation
 
 Local implementation covers all active `platform_admins` roles: support,

@@ -41,7 +41,7 @@ function verificationMessage(error: unknown) {
 }
 
 export default function OTPScreen({ navigation, route }: Props) {
-  const { phone, mode, registration, mobileMoneyReturn } = route.params
+  const { phone, email, mode, registration, mobileMoneyReturn } = route.params
   const { isTablet } = useTabletLayout()
   const { refreshProfile } = useAuth()
   const requireOnline = useRequireOnline()
@@ -93,10 +93,9 @@ export default function OTPScreen({ navigation, route }: Props) {
 
     if (!requireOnline()) return
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone,
-        options: { shouldCreateUser: mode === 'register' },
-      })
+      const { error } = await supabase.auth.signInWithOtp(email
+        ? { email, options: { shouldCreateUser: false } }
+        : { phone, options: { shouldCreateUser: mode === 'register' } })
       if (error) { Alert.alert('Could not send code', verificationMessage(error)); return }
     } catch (error) {
       Alert.alert('Could not send code', verificationMessage(error))
@@ -122,7 +121,9 @@ export default function OTPScreen({ navigation, route }: Props) {
     let data: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>['data']
     let error: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>['error']
     try {
-      ({ data, error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' }))
+      ({ data, error } = await supabase.auth.verifyOtp(email
+        ? { email, token: otp, type: 'email' }
+        : { phone, token: otp, type: 'sms' }))
     } catch (verifyError) {
       setLoading(false)
       hapticError()
@@ -220,11 +221,11 @@ export default function OTPScreen({ navigation, route }: Props) {
 
           <View style={styles.header}>
             <Text style={styles.heading}>
-              {mode === 'mobile_money' ? 'Verify mobile money' : 'Verify your number'}
+              {mode === 'mobile_money' ? 'Verify mobile money' : email ? 'Verify your email' : 'Verify your number'}
             </Text>
             <Text style={[styles.subheading, { color: mutedCol }]}>
               Enter the 6-digit code sent to{'\n'}
-              <Text style={[styles.phoneHighlight, { color: textCol }]}>{maskedPhone}</Text>
+              <Text style={[styles.phoneHighlight, { color: textCol }]}>{email ?? maskedPhone}</Text>
             </Text>
           </View>
 
@@ -241,7 +242,7 @@ export default function OTPScreen({ navigation, route }: Props) {
                 keyboardType="number-pad"
                 maxLength={i === 0 ? OTP_LENGTH : 1}
                 textContentType="oneTimeCode"
-                autoComplete="sms-otp"
+                autoComplete={email ? 'one-time-code' : 'sms-otp'}
                 selectTextOnFocus
                 autoFocus={i === 0}
                 accessibilityLabel={`Verification digit ${i + 1} of ${OTP_LENGTH}`}

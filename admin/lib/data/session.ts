@@ -1,7 +1,7 @@
 import 'server-only'
 
 import type { ServerClient } from './client'
-import { invitationContinuation, onboardingPathFor } from '@/lib/post-login'
+import { onboardingPathFor } from '@/lib/post-login'
 
 export type SignedInDestination = '/mfa' | '/' | '/account/overview' | `/account${string}` | `/onboarding${string}` | null
 
@@ -28,10 +28,10 @@ export async function getSignedInDestination(client: ServerClient, requestedPath
       .maybeSingle(),
   ])
 
+  if (appUser && !admin && !appUser.profile_completed) {
+    return onboardingPathFor(requestedPath ?? '')
+  }
   if (appUser && requestedPath) {
-    if (invitationContinuation(requestedPath) && !appUser.profile_completed) {
-      return onboardingPathFor(requestedPath)
-    }
     return requestedPath
   }
   if (admin) {

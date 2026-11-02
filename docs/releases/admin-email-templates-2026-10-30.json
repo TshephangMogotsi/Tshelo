@@ -1,0 +1,21 @@
+{
+  "project": "albihofmlafjzbusancu",
+  "date": "2026-10-30",
+  "authorization": "User explicitly approved production-wide OTP email template update in session",
+  "templatesUpdated": [
+    "mailer_templates_confirmation_content",
+    "mailer_templates_magic_link_content"
+  ],
+  "templatesVerified": true,
+  "relatedSettingsPreserved": true,
+  "otpExpirySeconds": 3600,
+  "otpLength": 8,
+  "verificationRateLimit": 30,
+  "emailSendRateLimit": 30,
+  "emailResendIntervalSeconds": 60,
+  "emailAutoConfirmed": false,
+  "totpEnrollmentEnabled": true,
+  "totpVerificationEnabled": true,
+  "smtpHost": "smtp.resend.com",
+  "smtpSender": "no-reply@tshelo.com"
+}

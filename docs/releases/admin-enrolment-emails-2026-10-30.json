@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-30",
+  "provider": "Resend",
+  "results": [
+    {
+      "name": "Nono",
+      "email": "nbokete@data-sentinels.com",
+      "status": 200,
+      "accepted": true,
+      "messageId": "01a18b50-5b6f-788f-9fc6-866f3b70b080"
+    },
+    {
+      "name": "Syntiche",
+      "email": "dev@data-sentinels.com",
+      "status": 200,
+      "accepted": true,
+      "messageId": "01a18b50-5e9d-789a-9237-144846106ae6"
+    }
+  ],
+  "inboxReceiptVerified": false,
+  "deliveryChecks": [
+    {
+      "email": "nbokete@data-sentinels.com",
+      "lookupStatus": 401,
+      "error": "restricted_api_key"
+    },
+    {
+      "email": "dev@data-sentinels.com",
+      "lookupStatus": 401,
+      "error": "restricted_api_key"
+    }
+  ]
+}

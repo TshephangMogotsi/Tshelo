@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-30",
+  "provider": "Resend",
+  "results": [
+    {
+      "name": "Tshephang",
+      "email": "mogotsi_tshephang@yahoo.com",
+      "status": 200,
+      "accepted": true,
+      "messageId": "01a18b5a-6c5d-7b38-9c93-5938e7dcb6c9"
+    }
+  ],
+  "inboxReceiptVerified": false
+}

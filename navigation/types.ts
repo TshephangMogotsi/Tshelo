@@ -34,6 +34,7 @@ export type AuthStackParamList = {
   Register:      { countryCode?: string; countryName?: string; currency?: string; flag?: string; dialCode?: string } | undefined
   OTP: {
     phone: string
+    email?: string
     mode: 'login' | 'register' | 'mobile_money'
     registration?: RegistrationData
     mobileMoneyReturn?: {
