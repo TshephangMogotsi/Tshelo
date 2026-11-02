@@ -76,6 +76,12 @@ jobs:
         run: >-
           psql --host 127.0.0.1 --port 54322 --username postgres --dbname postgres
           --set ON_ERROR_STOP=1 --file supabase/tests/future_table_security.sql
+      - name: Verify legacy table least-privilege grants
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql --host 127.0.0.1 --port 54322 --username postgres --dbname postgres
+          --set ON_ERROR_STOP=1 --file supabase/tests/legacy_table_privileges.sql
       - name: Verify payment encryption and role boundaries
         env:
           PGPASSWORD: postgres

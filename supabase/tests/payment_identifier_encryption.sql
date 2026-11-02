@@ -9,6 +9,8 @@ BEGIN
   IF condition IS DISTINCT FROM true THEN RAISE EXCEPTION 'Payment encryption check failed: %', message; END IF;
 END;
 $$;
+GRANT EXECUTE ON FUNCTION pg_temp.assert_payment(boolean,text) TO authenticated, service_role;
+
 
 DO $$
 DECLARE signature text; role_name text;
