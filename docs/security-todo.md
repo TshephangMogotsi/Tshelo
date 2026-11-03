@@ -57,6 +57,7 @@ SMS/push and customer consent history remain unverified.
 - [ ] Authorized managed-role administrator/Supabase support: close the remaining supabase_admin future defaults and verify. [Handoff SQL](supabase-admin-defaults-handoff-2026-10-23.sql).
 - [x] Require explicit grants and RLS policies for new application tables.
 - [x] Add CI/deployment checks for missing RLS, structural grants and grants without policies.
+- [x] Tighten legacy table client grants and remove the legacy guard exemption. Independently verified in production on 3 November: 108 legacy tables checked, zero anonymous table grants, only three public country columns retained. [Closure and evidence](legacy-table-permissions-2026-11-02.md).
 - [x] Test a newly created table locally and in a rolled-back live transaction.
 
 ### Supabase leaked-password protection

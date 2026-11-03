@@ -1,0 +1,112 @@
+{
+  "finding": "Legacy tables grant blanket client permissions",
+  "status": "Closed: hosted permission state independently verified",
+  "project_ref": "albihofmlafjzbusancu",
+  "project_name": "Tshelo",
+  "verification": {
+    "database": "postgres",
+    "legacy_table_grants": "PASS",
+    "legacy_tables_checked": 108,
+    "verified_at": "2026-11-03 09:49:06.185623+00"
+  },
+  "catalog": {
+    "anonymous_table_grants": 0,
+    "missing_rls": 0,
+    "public_tables": 111
+  },
+  "deployed_migrations_and_guard": {
+    "anonymous_select_columns": [
+      "countries.code",
+      "countries.is_launch_country",
+      "countries.name"
+    ],
+    "guard_body_md5": "71f7a9ab6b685af1c5cc9eb34d34bf7d",
+    "migrations": [
+      {
+        "name": "explicit_vouch_read_grants",
+        "version": "20261102105000"
+      },
+      {
+        "name": "tighten_legacy_table_grants",
+        "version": "20261102110000"
+      }
+    ]
+  },
+  "local_guard_body_md5": "71f7a9ab6b685af1c5cc9eb34d34bf7d",
+  "local_and_hosted_guard_bodies_match": true,
+  "http_permission_checks": {
+    "verified_at": "2026-11-03T09:50:32.401Z",
+    "results": [
+      {
+        "check": "public waitlist country read",
+        "http_status": 200,
+        "pass": true,
+        "country_count": 12
+      },
+      {
+        "check": "anonymous users read denied",
+        "http_status": 401,
+        "pass": true,
+        "error_code": "42501"
+      },
+      {
+        "check": "anonymous funds read denied",
+        "http_status": 401,
+        "pass": true,
+        "error_code": "42501"
+      },
+      {
+        "check": "anonymous events read denied",
+        "http_status": 401,
+        "pass": true,
+        "error_code": "42501"
+      },
+      {
+        "check": "anonymous fund_members read denied",
+        "http_status": 401,
+        "pass": true,
+        "error_code": "42501"
+      },
+      {
+        "check": "anonymous contributions read denied",
+        "http_status": 401,
+        "pass": true,
+        "error_code": "42501"
+      },
+      {
+        "check": "anonymous expenses read denied",
+        "http_status": 401,
+        "pass": true,
+        "error_code": "42501"
+      }
+    ]
+  },
+  "authenticated_select_permission_check": {
+    "authenticated_read_permission_smoke": "PASS"
+  },
+  "snapshot_captured_at": "2026-11-03T09:48:51.863682+00:00",
+  "snapshot_timing": "After the migration was already applied; no pre-change snapshot is claimed.",
+  "local_validation": {
+    "application_migrations_replayed": 85,
+    "isolated_staged_candidate_migrations_replayed": 83,
+    "isolated_staged_candidate_node_tests_passed": 3,
+    "node_tests_passed": 3,
+    "sql_suites_passed": [
+      "legacy_table_privileges",
+      "future_table_security",
+      "fund_admin_permission_matrix",
+      "api_v1_boundaries",
+      "consent_audit",
+      "receipt_scan_audit",
+      "vouch_membership"
+    ],
+    "environment": "PGlite with minimal Supabase service catalog fixtures, not full hosted services"
+  },
+  "production_actions_this_followup": "Read-only verification only; migration was already recorded as applied.",
+  "limitations": [
+    "Authenticated SQL smoke uses SET LOCAL ROLE and LIMIT 0: permission and query-planning validation, not a real user login or write flow.",
+    "No pre-change production snapshot is available for this follow-up, so historical service-role/policy preservation is covered locally rather than by a hosted before/after comparison.",
+    "Real disposable-Supabase CI matrix was not executed in this environment (no Docker/Postgres runtime).",
+    "GET https://app.tshelo.com/waitlist returned HTTP 404; its direct country data request passed (HTTP 200, 12 countries). Full deployed waitlist UI remains a separate deployment check."
+  ]
+}

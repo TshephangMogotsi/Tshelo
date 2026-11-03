@@ -6,6 +6,8 @@ BEGIN
   IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'Vouch membership regression: %',message; END IF;
 END;
 $$;
+GRANT EXECUTE ON FUNCTION pg_temp.assert_vouch(boolean,text) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION pg_temp.verify_vouch_membership()
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE

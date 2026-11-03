@@ -6,6 +6,8 @@ BEGIN
   IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'Consent regression: %',message; END IF;
 END;
 $$;
+GRANT EXECUTE ON FUNCTION pg_temp.assert_consent(boolean,text) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION pg_temp.verify_consent_audit()
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE

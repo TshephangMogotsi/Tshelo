@@ -4,6 +4,8 @@ CREATE OR REPLACE FUNCTION pg_temp.assert_receipt(ok boolean, message text)
 RETURNS void LANGUAGE plpgsql AS $$ BEGIN
   IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'Receipt audit regression: %', message; END IF;
 END; $$;
+GRANT EXECUTE ON FUNCTION pg_temp.assert_receipt(boolean,text) TO authenticated, service_role;
+
 
 CREATE OR REPLACE FUNCTION pg_temp.verify_receipt_audit()
 RETURNS jsonb LANGUAGE plpgsql AS $$
