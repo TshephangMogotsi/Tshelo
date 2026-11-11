@@ -81,17 +81,14 @@ export async function POST(request: Request) {
   try {
     const { url, key } = getSupabaseAdminConfig()
     const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-    const { data: emailMatch, error: emailError } = await supabase
-      .from('users')
-      .select('id')
-      .is('deleted_at', null)
-      .eq('email', email)
-      .limit(1)
-      .maybeSingle()
+    const { data: emailMatch, error: emailError } = await supabase.rpc(
+      'resolve_verified_closure_account', { p_email: email },
+    )
     if (emailError) throw emailError
     if (emailMatch) {
       const token = randomBytes(32).toString('base64url')
       const { error: verificationError } = await supabase.from('account_closure_verifications').insert({
+        account_user_id: emailMatch,
         contact_email: email,
         account_phone: phone || null,
         notes: notes || null,

@@ -1,0 +1,152 @@
+diff --git a/admin/app/api/account-deletion-request/route.ts b/admin/app/api/account-deletion-request/route.ts
+index 64679a7..1229c2a 100644
+--- a/admin/app/api/account-deletion-request/route.ts
++++ b/admin/app/api/account-deletion-request/route.ts
+@@ -81,17 +81,14 @@ export async function POST(request: Request) {
+   try {
+     const { url, key } = getSupabaseAdminConfig()
+     const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+-    const { data: emailMatch, error: emailError } = await supabase
+-      .from('users')
+-      .select('id')
+-      .is('deleted_at', null)
+-      .eq('email', email)
+-      .limit(1)
+-      .maybeSingle()
++    const { data: emailMatch, error: emailError } = await supabase.rpc(
++      'resolve_verified_closure_account', { p_email: email },
++    )
+     if (emailError) throw emailError
+     if (emailMatch) {
+       const token = randomBytes(32).toString('base64url')
+       const { error: verificationError } = await supabase.from('account_closure_verifications').insert({
++        account_user_id: emailMatch,
+         contact_email: email,
+         account_phone: phone || null,
+         notes: notes || null,
+diff --git a/admin/components/account/account-profile.tsx b/admin/components/account/account-profile.tsx
+index cff0979..1f1c273 100644
+--- a/admin/components/account/account-profile.tsx
++++ b/admin/components/account/account-profile.tsx
+@@ -11,7 +11,6 @@ import { formatDate, titleCase } from '@/lib/format'
+ export function AccountProfile({ user }: { user: AppUser }) {
+   const router = useRouter()
+   const [name, setName] = useState(user.name)
+-  const [email, setEmail] = useState(user.email ?? '')
+   const [preferredCurrency, setPreferredCurrency] = useState(user.preferredCurrency ?? 'BWP')
+   const [notificationsEnabled, setNotificationsEnabled] = useState(user.notificationsEnabled)
+   const [saving, setSaving] = useState(false)
+@@ -21,7 +20,6 @@ export function AccountProfile({ user }: { user: AppUser }) {
+   async function save(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault()
+     const nextName = name.trim()
+-    const nextEmail = email.trim()
+ 
+     if (nextName.length < 2) {
+       setError('Enter your name using at least 2 characters.')
+@@ -36,12 +34,10 @@ export function AccountProfile({ user }: { user: AppUser }) {
+     try {
+       await createApiClient().users.updateMe({
+         name: nextName,
+-        email: nextEmail || null,
+         preferred_currency: preferredCurrency || 'BWP',
+         notifications_enabled: notificationsEnabled,
+       })
+       setName(nextName)
+-      setEmail(nextEmail)
+       setSaved(true)
+       router.refresh()
+     } catch (cause) {
+@@ -71,12 +67,14 @@ export function AccountProfile({ user }: { user: AppUser }) {
+           <input
+             name="email"
+             type="email"
+-            value={email}
+-            onChange={(event) => setEmail(event.target.value)}
++            value={user.email ?? ''}
++            readOnly
++            aria-describedby="profile-email-help"
+             autoComplete="email"
+             maxLength={255}
+-            placeholder="you@example.com"
++            placeholder="No email set"
+           />
++          <span id="profile-email-help">Email changes require verification through account recovery.</span>
+         </label>
+         <label>
+           <span>Preferred currency</span>
+@@ -112,7 +110,7 @@ export function AccountProfile({ user }: { user: AppUser }) {
+       {saved && <p className="member-profile-saved" role="status"><Check size={14} /> Profile saved.</p>}
+ 
+       <div className="member-form-actions">
+-        <span className="member-form-note">Phone and trust details are protected account information.</span>
++        <span className="member-form-note">Email, phone and trust details are protected account information.</span>
+         <button className="primary" type="submit" disabled={saving}>
+           <Save size={14} />
+           {saving ? 'Saving…' : 'Save profile'}
+diff --git a/admin/lib/api/openapi.ts b/admin/lib/api/openapi.ts
+index 89a6897..8763349 100644
+--- a/admin/lib/api/openapi.ts
++++ b/admin/lib/api/openapi.ts
+@@ -1053,8 +1053,9 @@ export const tsheloOpenApiDocument = {
+       UpdateCurrentUserRequest: {
+         type: 'object', minProperties: 1, additionalProperties: false,
+         properties: {
++          email: { type: ['string', 'null'], format: 'email', deprecated: true, description: 'Legacy compatibility only: must match the current profile email. Changes require verified Auth email change.' },
+           name: { type: 'string', minLength: 2, maxLength: 100 },
+-          email: { type: ['string', 'null'], format: 'email' }, avatar_url: { type: ['string', 'null'], format: 'uri' },
++          avatar_url: { type: ['string', 'null'], format: 'uri' },
+           country_code: { type: 'string' }, preferred_currency: { type: 'string', pattern: '^[A-Z]{3}$' }, notifications_enabled: { type: 'boolean' },
+           mobile_money_provider: { type: ['string', 'null'] }, bank_name: { type: ['string', 'null'] }, bank_branch_code: { type: ['string', 'null'] }, bank_account_number: { type: ['string', 'null'] },
+           profile_completed: { type: 'boolean' }, onboarding_completed: { type: 'boolean' },
+diff --git a/admin/lib/api/validation.ts b/admin/lib/api/validation.ts
+index 35be9b0..430706b 100644
+--- a/admin/lib/api/validation.ts
++++ b/admin/lib/api/validation.ts
+@@ -745,6 +745,8 @@ export function validateUpdateCurrentUserRequest(
+       errors.push(issue('name', 'invalid_string', 'Must contain between 2 and 100 characters.'))
+     }
+   }
++  // Older clients include the unchanged email on every profile save. The data
++  // service rejects changes and never forwards this field to a table UPDATE.
+   optionalString(value, 'email', errors, 255)
+   if (typeof value.email === 'string' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email)) {
+     errors.push(issue('email', 'invalid_email', 'Must be a valid email address or null.'))
+diff --git a/admin/lib/data/api-account.ts b/admin/lib/data/api-account.ts
+index 61cda9c..0e53431 100644
+--- a/admin/lib/data/api-account.ts
++++ b/admin/lib/data/api-account.ts
+@@ -117,11 +117,21 @@ export async function updateApiCurrentUser(
+   request: UpdateCurrentUserRequest,
+ ): Promise<ApiDataResult<User | null>> {
+   const patch: Record<string, string | boolean | NotificationPreferences | null> = {}
++  if (Object.prototype.hasOwnProperty.call(request, 'email')) {
++    const { data: profile, error } = await client.from('users').select('email')
++      .eq('id', actorUserId).is('deleted_at', null).maybeSingle()
++    if (error) return dataFailure({ kind: 'database', error })
++    const normalized = (email: unknown) => typeof email === 'string' ? email.trim().toLowerCase() || null : null
++    if (!profile || normalized(request.email) !== normalized(profile.email)) {
++      return dataFailure({ kind: 'validation', message: 'Email changes require verification through account recovery.' })
++    }
++  }
+   const paymentFields = new Set(['mobile_money_provider', 'mobile_money_number', 'mobile_money_name', 'bank_name', 'bank_account_number', 'bank_account_name', 'bank_branch_code'])
+   const consentFields = new Set(['terms_version', 'privacy_version', 'marketing_consent', 'marketing_email_enabled', 'marketing_sms_enabled', 'marketing_push_enabled', 'data_processing_consent'])
+   const paymentDetails: Record<string, unknown> = {}
+   const consents: Record<string, unknown> = {}
+   for (const [field, rawValue] of Object.entries(request)) {
++    if (field === 'email') continue
+     const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
+     // Acceptance timestamps are never accepted from the client. The database
+     // stamps and audits consent in record_own_consents.
+diff --git a/shared/contracts/users.ts b/shared/contracts/users.ts
+index b8392e1..33d1ecc 100644
+--- a/shared/contracts/users.ts
++++ b/shared/contracts/users.ts
+@@ -81,6 +81,7 @@ export type GetUserRequest = {
+ 
+ export type UpdateCurrentUserRequest = {
+   name?: string
++  /** @deprecated Accepted only when unchanged, for older clients. Use verified Auth email changes. */
+   email?: string | null
+   avatar_url?: string | null
+   country_code?: string

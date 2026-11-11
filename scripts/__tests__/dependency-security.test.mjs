@@ -20,13 +20,13 @@ const uuid = xcodeRequire('uuid')
 
 test('consumer paths resolve only the pinned patched decoder and UUID', () => {
   const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'))
-  for (const [name, version] of [['decode-uri-component', '0.5.0'], ['uuid', '11.1.1']]) {
+  for (const [name, version] of [['decode-uri-component', '0.5.1'], ['uuid', '11.1.1']]) {
     const copies = Object.entries(lock.packages).filter(([key]) => key.endsWith(`/node_modules/${name}`) || key === `node_modules/${name}`)
     assert.ok(copies.length > 0, `${name} missing from the lockfile`)
     for (const [key, pkg] of copies) assert.equal(pkg.version, version, key)
   }
   const decoderPackage = JSON.parse(readFileSync(path.join(path.dirname(queryRequire.resolve('decode-uri-component')), 'package.json'), 'utf8'))
-  assert.equal(decoderPackage.version, '0.5.0')
+  assert.equal(decoderPackage.version, '0.5.1')
   assert.equal(xcodeRequire('uuid/package.json').version, '11.1.1')
 })
 

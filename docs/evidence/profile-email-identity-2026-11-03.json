@@ -1,0 +1,157 @@
+{
+  "finding": "Profile email writable without verification; deletion account selected by profile email",
+  "project_ref": "albihofmlafjzbusancu",
+  "status": "Closed: compatible API promoted and final profile email UPDATE revocation independently verified on 6 November 2026",
+  "before": {
+    "anonymous_email_update": false,
+    "authenticated_email_update": true,
+    "email_constraints": [
+      "UNIQUE (phone)",
+      "UNIQUE (referral_code)"
+    ],
+    "latest_migration": "20261102110000",
+    "sync_trigger": [
+      "CREATE TRIGGER on_auth_phone_changed AFTER UPDATE OF phone ON auth.users FOR EACH ROW EXECUTE FUNCTION sync_verified_auth_phone()",
+      "CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()",
+      "CREATE TRIGGER reserve_auth_phone_change BEFORE UPDATE OF phone_change ON auth.users FOR EACH ROW EXECUTE FUNCTION reserve_pending_auth_phone_change()"
+    ]
+  },
+  "pre_rollout_aggregate_counts": {
+    "captured_at": "2026-11-03T10:16:43.335817+00:00",
+    "unexpired_unconsumed_tokens": 0,
+    "active_profiles_differing_from_confirmed_auth": 1
+  },
+  "independent_hosted_verification": {
+    "anonymous_email_update": false,
+    "authenticated_email_update": true,
+    "function_body_md5": {
+      "bind_verified_closure_account": "3601e6db8c88200dfed77da2215eae10",
+      "consume_verified_account_closure_request": "57ccedc4fa679a7fdfa80010c860790b",
+      "enforce_verified_profile_email": "27fdd1a12e637ce45544780cd06c5934",
+      "resolve_verified_closure_account": "759422c3ad5062442a7724a0e45ac62c",
+      "sync_verified_auth_email": "4d5c5ca67498abd1313965be48c696b7"
+    },
+    "profile_email_identity": "PHASE_ONE_PROTECTED",
+    "verified_at": "2026-11-03 10:21:40.040771+00"
+  },
+  "local_function_body_md5": {
+    "sync_verified_auth_email": "4d5c5ca67498abd1313965be48c696b7",
+    "enforce_verified_profile_email": "27fdd1a12e637ce45544780cd06c5934",
+    "resolve_verified_closure_account": "759422c3ad5062442a7724a0e45ac62c",
+    "bind_verified_closure_account": "3601e6db8c88200dfed77da2215eae10",
+    "consume_verified_account_closure_request": "57ccedc4fa679a7fdfa80010c860790b"
+  },
+  "all_hosted_function_bodies_match_source": true,
+  "local_validation": {
+    "database_replay": "Full application migrations with PGlite service catalog substitutes; identity suite runs both before and after final grant revocation",
+    "api_security_tests_passed": 319,
+    "api_security_suites_passed": 41,
+    "web_tests_passed": 72,
+    "web_suites_passed": 9,
+    "typechecks": [
+      "app",
+      "admin",
+      "API tests"
+    ],
+    "targeted_admin_lint": "zero errors; two existing warnings"
+  },
+  "production_actions": [
+    "Applied and recorded migration 20261103100000 atomically",
+    "Reconciled confirmed Auth/profile email differences (aggregate mismatch count fell from one to zero)",
+    "Did not apply 20261103101000; it must follow the compatible API release",
+    "Did not deploy website or native app",
+    "Promoted the isolated six-file API/web patch from the exact prior live source to tshelo-admin.vercel.app",
+    "Applied and recorded 20261103101000_revoke_profile_email_updates atomically on 6 November",
+    "Independently verified both client email UPDATE privileges are false and confirmed both migration records"
+  ],
+  "remaining": [
+    "Native read-only-email screen is prepared in source and follows the normal app distribution process. Server-side safeguards and legacy unchanged-email API compatibility do not depend on installing it."
+  ],
+  "limitations": [
+    "No live signup, real verification email or deletion ticket was created for testing; those behaviors were exercised with disposable synthetic fixtures",
+    "No full Docker/Supabase services replay was available locally",
+    "Authenticated full browser/email-provider journeys were not exercised against real production accounts. Permission and deletion identity behavior were tested with disposable synthetic fixtures and exact-release API tests; live smoke checks used no-match/unauthenticated requests.",
+    "The closed scope is the confirmed tshelo-admin.vercel.app deployment and linked Tshelo database. app.tshelo.com domain routing is separate."
+  ],
+  "phase_one_deployment_state": {
+    "active_profiles_differing_from_confirmed_auth": 0,
+    "final_revocation_recorded": false,
+    "migration_recorded": true
+  },
+  "final_deployment_state": {
+    "anonymous_email_update": false,
+    "authenticated_email_update": false,
+    "phase_one_recorded": true,
+    "phase_two_recorded": true
+  },
+  "final_hosted_verification": {
+    "anonymous_email_update": false,
+    "authenticated_email_update": false,
+    "function_body_md5": {
+      "bind_verified_closure_account": "3601e6db8c88200dfed77da2215eae10",
+      "consume_verified_account_closure_request": "57ccedc4fa679a7fdfa80010c860790b",
+      "enforce_verified_profile_email": "27fdd1a12e637ce45544780cd06c5934",
+      "resolve_verified_closure_account": "759422c3ad5062442a7724a0e45ac62c",
+      "sync_verified_auth_email": "4d5c5ca67498abd1313965be48c696b7"
+    },
+    "profile_email_identity": "PASS",
+    "verified_at": "2026-11-06 07:42:25.592679+00"
+  },
+  "website_release": {
+    "source_deployment": "dpl_BmztocNXrTT8aiTqzcPntW615btW",
+    "patch_sha256": "2f68c3b4695257e279f68fed7f05ac071152a68be369012a030d30db72cc71e9",
+    "source_files_verified": 321,
+    "changed_files": [
+      "admin/app/api/account-deletion-request/route.ts",
+      "admin/components/account/account-profile.tsx",
+      "admin/lib/api/openapi.ts",
+      "admin/lib/api/validation.ts",
+      "admin/lib/data/api-account.ts",
+      "shared/contracts/users.ts"
+    ],
+    "project": "tshelo-admin",
+    "team": "diginav",
+    "id": "dpl_Fdgib9nPJGNhQB78uiSedvFtR93t",
+    "deployment_url": "https://tshelo-admin-mhwd9hrlu-diginav.vercel.app",
+    "live_url": "https://tshelo-admin.vercel.app",
+    "status": "READY and promoted; live alias independently inspected",
+    "exact_candidate_tests_passed": 11,
+    "exact_candidate_typecheck": "passed",
+    "remote_production_build": "passed",
+    "dependencies": "Preserved from live source; remote install reported 16 moderate and 1 high pre-existing advisories. This finding does not certify dependency remediation."
+  },
+  "final_live_smoke_checks": {
+    "deployment": "https://tshelo-admin.vercel.app",
+    "checks": [
+      {
+        "check": "deployed profile email compatibility schema",
+        "status": 200,
+        "pass": true
+      },
+      {
+        "check": "profile endpoint denies unauthenticated reads",
+        "status": 401,
+        "pass": true
+      },
+      {
+        "check": "profile endpoint denies unauthenticated email writes",
+        "status": 401,
+        "pass": true
+      },
+      {
+        "check": "deletion initiation resolves nonmatching identity with a generic response and no email",
+        "status": 200,
+        "pass": true
+      },
+      {
+        "check": "public deletion page renders",
+        "status": 200,
+        "pass": true
+      }
+    ]
+  },
+  "production_direct_write_probe": {
+    "direct_profile_email_write_denial": "PASS"
+  },
+  "production_direct_write_probe_scope": "Authenticated and anonymous UPDATE attempts with WHERE false were rejected with insufficient_privilege; no application records were created or changed."
+}

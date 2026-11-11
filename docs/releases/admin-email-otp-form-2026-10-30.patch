@@ -1,0 +1,46 @@
+--- a/admin/components/login-form.tsx
++++ b/admin/components/login-form.tsx
+@@ -30,6 +30,7 @@
+   const normalizedEmail = email.trim().toLowerCase()
+   const emailIsValid = /^\S+@\S+\.\S+$/.test(normalizedEmail)
+   const invitation = invitationContinuation(nextPath)
++  const codeIsValid = method === 'email' ? /^\d{6,10}$/.test(code) : /^\d{6}$/.test(code)
+ 
+   function changeMethod(nextMethod: SignInMethod) {
+     setMethod(nextMethod)
+@@ -84,7 +85,7 @@
+ 
+   async function verifyCode(event: FormEvent) {
+     event.preventDefault()
+-    if (code.length !== 6) return
++    if (!codeIsValid) return
+ 
+     setLoading(true)
+     setMessage('')
+@@ -170,7 +171,7 @@
+                 : method === 'phone'
+                   ? 'Use the mobile number linked to your Tshelo account.'
+                   : 'Use the verified email linked to your Tshelo account.'
+-              : `We sent a six-digit code to ${method === 'phone' ? fullPhone : normalizedEmail}.`}
++              : `Enter the code sent to ${method === 'phone' ? fullPhone : normalizedEmail}.`}
+           </p>
+ 
+           {step === 'details' ? (
+@@ -228,14 +229,14 @@
+                 className="code-field"
+                 inputMode="numeric"
+                 autoComplete="one-time-code"
+-                maxLength={6}
++                maxLength={method === 'email' ? 10 : 6}
+                 value={code}
+                 onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+-                placeholder="000000"
++                placeholder={method === 'email' ? 'Email code' : '000000'}
+                 aria-describedby="login-message"
+                 autoFocus
+               />
+-              <button className="primary-button" disabled={code.length !== 6 || loading}>
++              <button className="primary-button" disabled={!codeIsValid || loading}>
+                 {loading ? 'Checking…' : invitation ? 'Continue to invitation' : 'Continue to dashboard'}
+               </button>
+             </form>

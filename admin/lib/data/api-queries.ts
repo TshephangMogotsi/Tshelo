@@ -502,7 +502,7 @@ export async function listApiSupportTickets(
   const ascending = (request.sort_direction ?? 'desc') === 'asc'
   let query = client
     .from('support_tickets')
-    .select('id, ticket_number, category, subject, priority, status, assigned_to, created_at')
+    .select('id, ticket_number, category, subject, description, resolution_note, priority, status, assigned_to, created_at')
 
   if (request.q?.trim()) {
     const q = request.q.trim()

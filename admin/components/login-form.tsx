@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import Image from 'next/image'
-import { ArrowLeft, LockKeyhole, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, LockKeyhole, Mail, ShieldCheck, Smartphone } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { createApiClient } from '@/lib/api-client'
 import {
@@ -11,55 +11,88 @@ import {
   safePostLoginPath,
 } from '@/lib/post-login'
 
-type Step = 'phone' | 'code'
+type Step = 'details' | 'code'
+type SignInMethod = 'phone' | 'email'
 
 export function LoginForm({ nextPath }: { nextPath?: string | null }) {
-  const [step, setStep] = useState<Step>('phone')
+  const [step, setStep] = useState<Step>('details')
+  const [method, setMethod] = useState<SignInMethod>('phone')
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [register, setRegister] = useState(false)
 
-  const digits = phone.replace(/\D/g, '').replace(/^267/, '').slice(0, 8)
-  const fullPhone = `+267${digits}`
+  const digits = phone.replace(/\D/g, '')
+  const fullPhone = phone.startsWith('+') ? `+${digits}` : `+267${digits.replace(/^267/, '')}`
+  const validPhone = /^\+[1-9][0-9]{6,14}$/.test(fullPhone)
+  const normalizedEmail = email.trim().toLowerCase()
+  const emailIsValid = /^\S+@\S+\.\S+$/.test(normalizedEmail)
   const invitation = invitationContinuation(nextPath)
+  const codeIsValid = method === 'email' ? /^\d{6,10}$/.test(code) : /^\d{6}$/.test(code)
+
+  function changeMethod(nextMethod: SignInMethod) {
+    setMethod(nextMethod)
+    setCode('')
+    setMessage('')
+  }
 
   async function sendCode(event: FormEvent) {
     event.preventDefault()
-    if (digits.length !== 8) return
+    if (method === 'phone' && !validPhone) return
+    if (method === 'email' && !emailIsValid) return
 
     setLoading(true)
     setMessage('')
+    if (register) {
+      try {
+        const response = await fetch('/api/beta-registration', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail }),
+        })
+        if (!response.ok) throw new Error('unavailable')
+      } catch {
+        setLoading(false)
+        setMessage('Registration is unavailable. Contact the Tshelo team.')
+        return
+      }
+    }
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: fullPhone,
-      options: { shouldCreateUser: Boolean(invitation) },
-    })
+    const { error } = method === 'phone'
+      ? await supabase.auth.signInWithOtp({
+          phone: fullPhone,
+          options: { shouldCreateUser: Boolean(invitation) },
+        })
+      : await supabase.auth.signInWithOtp({
+          email: normalizedEmail,
+          options: { shouldCreateUser: false },
+        })
     setLoading(false)
 
     if (error) {
-      setMessage(invitation
+      setMessage(method === 'email'
+        ? 'We could not send a code. Check the email address or use your phone number.'
+        : invitation
         ? 'We could not send a code. Check the number and try again.'
         : 'We could not send a code. Check the number or contact the system owner.')
       return
     }
 
     setStep('code')
-    setMessage(`Code sent to ${fullPhone}`)
+    setMessage(`Code sent to ${method === 'phone' ? fullPhone : normalizedEmail}`)
   }
 
   async function verifyCode(event: FormEvent) {
     event.preventDefault()
-    if (code.length !== 6) return
+    if (!codeIsValid) return
 
     setLoading(true)
     setMessage('')
     const supabase = createClient()
-    const { error } = await supabase.auth.verifyOtp({
-      phone: fullPhone,
-      token: code,
-      type: 'sms',
-    })
+    const { error } = method === 'phone'
+      ? await supabase.auth.verifyOtp({ phone: fullPhone, token: code, type: 'sms' })
+      : await supabase.auth.verifyOtp({ email: normalizedEmail, token: code, type: 'email' })
 
     if (error) {
       setLoading(false)
@@ -90,8 +123,8 @@ export function LoginForm({ nextPath }: { nextPath?: string | null }) {
     }
 
     const continuation = safePostLoginPath(nextPath)
-    if (invitation && !appUser.profile_completed) {
-      window.location.replace(onboardingPathFor(invitation.path))
+    if (!admin && !appUser.profile_completed) {
+      window.location.replace(onboardingPathFor(invitation?.path ?? ''))
       return
     }
     window.location.replace(appUser && continuation ? continuation : admin ? '/mfa' : '/account/overview')
@@ -113,46 +146,78 @@ export function LoginForm({ nextPath }: { nextPath?: string | null }) {
         </div>
         <div className="security-note">
           <ShieldCheck size={19} />
-          <span>Protected by secure phone verification</span>
+          <span>Protected by secure verification</span>
         </div>
       </section>
 
       <section className="login-form-panel">
         <div className="login-card">
           {step === 'code' && (
-            <button className="back-link" type="button" onClick={() => { setStep('phone'); setCode(''); setMessage('') }}>
-              <ArrowLeft size={16} /> Change number
+            <button className="back-link" type="button" onClick={() => { setStep('details'); setCode(''); setMessage('') }}>
+              <ArrowLeft size={16} /> Change sign-in method
             </button>
           )}
           <div className="login-icon"><LockKeyhole size={22} /></div>
           <p className="eyebrow">Secure sign in</p>
-          <h2>{step === 'phone' ? (invitation ? 'Open your invitation' : 'Welcome back') : 'Enter your code'}</h2>
+          <h2>{step === 'details' ? (register ? 'Create your account' : invitation ? 'Open your invitation' : 'Welcome back') : 'Enter your code'}</h2>
           <p className="form-intro">
-            {step === 'phone'
-              ? invitation
-                ? `Enter your Botswana mobile number to continue to this ${invitation.kind} invitation. We will create your Tshelo account if you are new.`
-                : 'Use the Botswana number linked to your Tshelo account.'
-              : `We sent a six-digit code to ${fullPhone}.`}
+            {step === 'details'
+              ? register
+                ? 'Enter the email address approved for the Tshelo beta.'
+                : invitation
+                ? method === 'phone'
+                  ? `Enter your Botswana mobile number to continue to this ${invitation.kind} invitation. We will create your Tshelo account if you are new.`
+                  : 'Use the verified email linked to your existing Tshelo account.'
+                : method === 'phone'
+                  ? 'Use the mobile number linked to your Tshelo account.'
+                  : 'Use the verified email linked to your Tshelo account.'
+              : `Enter the code sent to ${method === 'phone' ? fullPhone : normalizedEmail}.`}
           </p>
 
-          {step === 'phone' ? (
+          {step === 'details' ? (
             <form onSubmit={sendCode}>
-              <label htmlFor="phone">Phone number</label>
-              <div className="phone-field">
-                <span className="country-label">BW</span>
-                <span className="country-code">+267</span>
-                <input
-                  id="phone"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  value={digits}
-                  onChange={(event) => setPhone(event.target.value)}
-                  placeholder="71 000 000"
-                  aria-describedby="login-message"
-                  autoFocus
-                />
-              </div>
-              <button className="primary-button" disabled={digits.length !== 8 || loading}>
+              {!register && <div className="sign-in-methods" role="group" aria-label="Sign-in method">
+                <button className={method === 'phone' ? 'sign-in-method active' : 'sign-in-method'} type="button" aria-pressed={method === 'phone'} onClick={() => changeMethod('phone')}>
+                  <Smartphone size={17} aria-hidden="true" /> Mobile number
+                </button>
+                <button className={method === 'email' ? 'sign-in-method active' : 'sign-in-method'} type="button" aria-pressed={method === 'email'} onClick={() => changeMethod('email')}>
+                  <Mail size={17} aria-hidden="true" /> Email address
+                </button>
+              </div>}
+              {method === 'phone' ? (
+                <>
+                  <label htmlFor="phone">Phone number</label>
+                  <div className="phone-field">
+                    <input
+                      id="phone"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      placeholder="+267 71 000 000"
+                      aria-describedby="login-message"
+                      autoFocus
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label htmlFor="email">Email address</label>
+                  <input
+                    id="email"
+                    className="profile-setup-field"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    aria-describedby="login-message"
+                    autoFocus
+                  />
+                </>
+              )}
+              <button className="primary-button" disabled={(method === 'phone' ? !validPhone : !emailIsValid) || loading}>
                 {loading ? 'Sending…' : 'Send secure code'}
               </button>
             </form>
@@ -164,14 +229,14 @@ export function LoginForm({ nextPath }: { nextPath?: string | null }) {
                 className="code-field"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={method === 'email' ? 10 : 6}
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
+                placeholder={method === 'email' ? 'Email code' : '000000'}
                 aria-describedby="login-message"
                 autoFocus
               />
-              <button className="primary-button" disabled={code.length !== 6 || loading}>
+              <button className="primary-button" disabled={!codeIsValid || loading}>
                 {loading ? 'Checking…' : invitation ? 'Continue to invitation' : 'Continue to dashboard'}
               </button>
             </form>
@@ -181,6 +246,9 @@ export function LoginForm({ nextPath }: { nextPath?: string | null }) {
             {message}
           </p>
           <p className="login-help">App users open My Tshelo. Authorised staff continue to the admin dashboard.</p>
+          {!invitation && step === 'details' && <button className="login-account-toggle" type="button" onClick={() => { setRegister(!register); setMethod(register ? 'phone' : 'email'); setMessage('') }}>
+            {register ? 'Already have an account? Sign in' : 'New to Tshelo? Create an account'}
+          </button>}
         </div>
       </section>
     </main>

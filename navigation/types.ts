@@ -34,6 +34,7 @@ export type AuthStackParamList = {
   Register:      { countryCode?: string; countryName?: string; currency?: string; flag?: string; dialCode?: string } | undefined
   OTP: {
     phone: string
+    email?: string
     mode: 'login' | 'register' | 'mobile_money'
     registration?: RegistrationData
     mobileMoneyReturn?: {
@@ -110,9 +111,11 @@ export type MainStackParamList = {
   }
   TokenPurchase:       undefined
   Security:            undefined
+  ChangePhone:         undefined
   Support:             undefined
   AboutLegal:          undefined
   Notifications:       undefined
+  NotificationSettings: undefined
   MemberDetails:       {
     fundId: string
     fundTitle: string

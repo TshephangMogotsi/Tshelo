@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native'
-import { Linking } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFonts } from 'expo-font'
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
@@ -22,7 +22,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import AuthNavigator from './navigation/AuthNavigator'
 import MainNavigator from './navigation/MainNavigator'
 import OnboardingScreen from './screens/onboarding/OnboardingScreen'
-import { registerForPushNotificationsAsync } from './lib/pushNotifications'
+import { registerForPushNotificationsAsync, unregisterPushToken } from './lib/pushNotifications'
 import { startSmsWatcher } from './lib/smsWatcher'
 import { api } from './lib/api'
 import { runApiRead } from './lib/apiScreen'
@@ -53,8 +53,11 @@ async function navigateFromNotificationData(data: Record<string, any> | undefine
     navigationRef.navigate('Rewards')
     return
   }
-  if (data?.kind === 'event_announcement' && typeof data.eventId === 'string') {
-    navigationRef.navigate('EventDetail', { eventId: data.eventId, tab: 'announcements' })
+  if ((data?.kind === 'event_announcement' || data?.kind === 'event_reminder') && typeof data.eventId === 'string') {
+    navigationRef.navigate('EventDetail', data.kind === 'event_announcement'
+      ? { eventId: data.eventId, tab: 'announcements' }
+      : { eventId: data.eventId }
+    )
     return
   }
   const detected = data?.detectedSms
@@ -85,7 +88,7 @@ async function navigateFromNotificationData(data: Record<string, any> | undefine
 }
 
 function RootNavigator({ initialAuthRoute, navigationReady }: { initialAuthRoute: 'Welcome' | 'CountrySelect' | 'Login'; navigationReady: boolean }) {
-  const { isAuthenticated, profileCompleted, userId } = useAuth()
+  const { isAuthenticated, profileCompleted, userId, notificationsEnabled } = useAuth()
   const [pendingInvitation, setPendingInvitation] = useState<Invitation | null>(null)
 
   useEffect(() => {
@@ -125,10 +128,13 @@ function RootNavigator({ initialAuthRoute, navigationReady }: { initialAuthRoute
   }, [isAuthenticated, navigationReady, pendingInvitation, profileCompleted])
 
   useEffect(() => {
-    if (isAuthenticated && profileCompleted && userId) {
-      registerForPushNotificationsAsync(userId)
+    if (!isAuthenticated || !profileCompleted || !userId) return
+    if (notificationsEnabled) {
+      void registerForPushNotificationsAsync(userId)
+    } else {
+      void unregisterPushToken()
     }
-  }, [isAuthenticated, profileCompleted, userId])
+  }, [isAuthenticated, notificationsEnabled, profileCompleted, userId])
 
   useEffect(() => {
     if (!isAuthenticated || !profileCompleted || !userId) return
@@ -139,6 +145,8 @@ function RootNavigator({ initialAuthRoute, navigationReady }: { initialAuthRoute
   }, [isAuthenticated, profileCompleted, userId])
 
   useEffect(() => {
+    if (Platform.OS === 'web') return
+
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (response) void navigateFromNotificationData(response.notification.request.content.data as any)
     })

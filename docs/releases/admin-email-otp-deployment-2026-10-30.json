@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-30",
+  "deploymentId": "dpl_BmztocNXrTT8aiTqzcPntW615btW",
+  "productionUrl": "https://tshelo-admin.vercel.app",
+  "sourceDeploymentId": "dpl_9BeZGiGaWt3M3GgFjZ62tMmqBLhD",
+  "changedSourceFiles": [
+    "admin/components/login-form.tsx"
+  ],
+  "sourcePatch": "admin-email-otp-form-2026-10-30.patch",
+  "loginStatus": 200,
+  "emailCodeBundleVerified": true,
+  "anonymousMfaStatus": 307,
+  "anonymousMfaRedirect": "/login",
+  "anonymousAdminAuditStatus": 401,
+  "betaRegistrationStatus": 403,
+  "tests": [
+    "email method selection DOM",
+    "eight-digit email OTP submission DOM",
+    "admin typecheck",
+    "hosted production build"
+  ],
+  "authenticatedEmailSignInVerified": false,
+  "productionDatabaseMfaMigrationApplied": false
+}

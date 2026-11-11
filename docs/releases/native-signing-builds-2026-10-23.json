@@ -1,0 +1,32 @@
+{
+  "builds": [
+    {
+      "id": "e6d80f7a-3924-41eb-a449-a1615fc31d83",
+      "platform": "IOS",
+      "status": "FINISHED",
+      "app_version": "1.0.1",
+      "build_version": "10",
+      "completed_at": "2026-10-23T13:36:55.067Z",
+      "commit": "504467cc476770d529eb57191e938939c58beafa",
+      "dashboard_url": "https://expo.dev/accounts/digital-natives/projects/tshelo/builds/e6d80f7a-3924-41eb-a449-a1615fc31d83",
+      "artifact_present": true
+    },
+    {
+      "id": "68716f37-f58b-45ab-b340-3ca7286098c3",
+      "platform": "ANDROID",
+      "status": "FINISHED",
+      "app_version": "1.0.1",
+      "build_version": "13",
+      "completed_at": "2026-10-23T13:47:46.729Z",
+      "commit": "504467cc476770d529eb57191e938939c58beafa",
+      "dashboard_url": "https://expo.dev/accounts/digital-natives/projects/tshelo/builds/68716f37-f58b-45ab-b340-3ca7286098c3",
+      "artifact_present": true
+    }
+  ],
+  "result": "PASS",
+  "limits": [
+    "Build and signing validated; device runtime not tested",
+    "Launched using local EAS authentication; GitHub EXPO_TOKEN authentication not yet validated",
+    "No store submission or OTA publication performed"
+  ]
+}

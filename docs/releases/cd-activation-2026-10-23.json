@@ -1,0 +1,17 @@
+{
+  "main_commit": "ce840092a401b3b8932f21e46ee000c07ce279fe",
+  "source_correction_pr": 4,
+  "main_ci_run": 39970214006,
+  "releases_enabled": true,
+  "web_run": 39970691828,
+  "web_status": "success",
+  "android_run": 39970697522,
+  "android_build": "5e7d075b-3ab1-4ee1-89f9-c75d9550cc52",
+  "ios_run": 39970703090,
+  "ios_build": "a58374a5-1aec-4cb3-8a8b-55d62a01d337",
+  "native_status": "success",
+  "secret_values_recorded": false,
+  "store_submission": false,
+  "android_status": "success",
+  "ios_status": "success"
+}

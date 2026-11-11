@@ -2,7 +2,9 @@
 
 This is the before-fix snapshot. The three consent defects below were subsequently
 fixed by `20261015220000` and regression-tested live on the same date; see
-[consent fixes](consent-fixes-2026-10-15.md). The membership exceptions remain open.
+[consent fixes](consent-fixes-2026-10-15.md). The personal-vouch exception was then
+fixed and tested live by `20261015230000`; see [vouch fix](vouch-read-fix-2026-10-15.md).
+Pending-invite fund-row visibility remains open.
 
 Tested the live Tshelo database (`albihofmlafjzbusancu`) through the authenticated
 database role with synthetic user JWT claims. No existing user's session or
@@ -34,7 +36,7 @@ The actual `leave_fund` RPC was also exercised: the membership row remained with
 status `left`, the helper returned false immediately, and shared announcements
 became inaccessible.
 
-### Exceptions still present
+### Exceptions observed before follow-up fixes
 
 1. A pending invitee can SELECT the fund row through existing permissive policies
    (`funds_select_member` and `Members and owners can read their funds`). This
@@ -46,6 +48,8 @@ became inaccessible.
    literal request for joined-only vouch reads, even though unrelated vouches
    are hidden. Tighten the policy or obtain an explicit product decision for
    continued personal-history access.
+   **Resolved:** the subsequent joined-only policy and live checks are documented
+   in [the vouch fix](vouch-read-fix-2026-10-15.md).
 3. Own membership-row visibility remains available to pending/left users; this
    supports their membership status/history and does not itself grant fund data.
 

@@ -1,5 +1,9 @@
 # Receipt deployment and waitlist cleanup — 15 October 2026
 
+16 October follow-up: cleanup also succeeded on 16 October; scheduled failure
+monitoring is now deployed and verified. [Monitoring evidence](waitlist-cleanup-monitoring.md).
+Receipt/API status is superseded by the [live QA report](live-qa-verification-2026-10-16.md).
+
 Read-only inspection. No deployment, build, OTA release or cleanup invocation
 was triggered.
 

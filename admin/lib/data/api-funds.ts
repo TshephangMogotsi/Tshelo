@@ -344,7 +344,7 @@ export async function getApiFundWorkspace(client: SupabaseClient, actorUserId: s
   if (fundResult.error || !fundResult.data) return fundResult as ApiDataResult<FundWorkspace | null>
   const [contributions, expenses, members, pledges, contributors, sponsorships, permissions] = await Promise.all([
     client.from('contributions').select('id, contributor_id, user_id, contributor_name, amount, pledged_amount, payment_method, reference_number, detected_via, status, is_refunded, confirmed_at, created_at, notes').eq('fund_id', fundId).order('created_at', { ascending: false }),
-    client.from('expenses').select('id, vendor_name, description, receipt_url, category, custom_category, amount, created_at, has_open_query, is_sponsored, sponsored_by_user_id, sponsored_by_name').eq('fund_id', fundId).is('deleted_at', null).order('created_at', { ascending: false }),
+    client.from('expenses').select('id, added_by, vendor_name, description, receipt_url, category, custom_category, amount, created_at, has_open_query, is_sponsored, sponsored_by_user_id, sponsored_by_name').eq('fund_id', fundId).is('deleted_at', null).order('created_at', { ascending: false }),
     loadMemberDirectory(client, fundId),
     client.from('contributor_pledge_balances').select('pledge_id, allocated_amount, outstanding_amount, pledge_state').eq('fund_id', fundId),
     client.from('fund_contributors').select('id, contributor_type').eq('fund_id', fundId),
@@ -356,6 +356,11 @@ export async function getApiFundWorkspace(client: SupabaseClient, actorUserId: s
   }
   const pledgeById = new Map((pledges.data ?? []).map(row => [row.pledge_id as string, row]))
   const contributorTypeById = new Map((contributors.data ?? []).map(row => [row.id as string, row.contributor_type]))
+  const memberNameByUserId = new Map(
+    (members.data ?? [])
+      .filter(member => member.user_id)
+      .map(member => [member.user_id as string, member.display_name] as const)
+  )
   const allowed = new Set<string>(FUND_PERMISSION_KEYS)
   return dataSuccess({
     fund: fundResult.data,
@@ -377,6 +382,7 @@ export async function getApiFundWorkspace(client: SupabaseClient, actorUserId: s
     }),
     expenses: (expenses.data ?? []).map(row => ({
       id: row.id as string, vendor_name: row.vendor_name as string | null, description: row.description as string,
+      recorded_by_name: memberNameByUserId.get(row.added_by as string) ?? null,
       receipt_path: row.receipt_url as string | null,
       category: row.category as string | null, custom_category: row.custom_category as string | null, amount: money(row.amount), created_at: row.created_at as string,
       notes: null, has_open_query: Boolean(row.has_open_query), is_sponsored: Boolean(row.is_sponsored),

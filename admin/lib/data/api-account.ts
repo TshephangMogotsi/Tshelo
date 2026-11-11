@@ -117,11 +117,21 @@ export async function updateApiCurrentUser(
   request: UpdateCurrentUserRequest,
 ): Promise<ApiDataResult<User | null>> {
   const patch: Record<string, string | boolean | NotificationPreferences | null> = {}
+  if (Object.prototype.hasOwnProperty.call(request, 'email')) {
+    const { data: profile, error } = await client.from('users').select('email')
+      .eq('id', actorUserId).is('deleted_at', null).maybeSingle()
+    if (error) return dataFailure({ kind: 'database', error })
+    const normalized = (email: unknown) => typeof email === 'string' ? email.trim().toLowerCase() || null : null
+    if (!profile || normalized(request.email) !== normalized(profile.email)) {
+      return dataFailure({ kind: 'validation', message: 'Email changes require verification through account recovery.' })
+    }
+  }
   const paymentFields = new Set(['mobile_money_provider', 'mobile_money_number', 'mobile_money_name', 'bank_name', 'bank_account_number', 'bank_account_name', 'bank_branch_code'])
   const consentFields = new Set(['terms_version', 'privacy_version', 'marketing_consent', 'marketing_email_enabled', 'marketing_sms_enabled', 'marketing_push_enabled', 'data_processing_consent'])
   const paymentDetails: Record<string, unknown> = {}
   const consents: Record<string, unknown> = {}
   for (const [field, rawValue] of Object.entries(request)) {
+    if (field === 'email') continue
     const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
     // Acceptance timestamps are never accepted from the client. The database
     // stamps and audits consent in record_own_consents.

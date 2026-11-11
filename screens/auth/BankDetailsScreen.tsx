@@ -10,6 +10,7 @@ import { fonts } from '../../theme/typography'
 import { useTheme } from '../../context/ThemeContext'
 import ProviderLogo from '../../components/ProviderLogo'
 import { PROVIDER_LABELS } from '../../lib/providers'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'BankDetails'>
@@ -39,6 +40,7 @@ function maskAccount(accountNumber: string) {
 
 export default function BankDetailsScreen({ navigation, route }: Props) {
   const { isDark } = useTheme()
+  const { isTablet } = useTabletLayout()
   const bg        = isDark ? '#1A1C24' : '#F4F2EB'
   const inputBg   = isDark ? '#2D2E41' : '#FFFFFF'
   const textCol   = isDark ? '#F2F2F7' : '#1A1A2E'
@@ -156,7 +158,7 @@ export default function BankDetailsScreen({ navigation, route }: Props) {
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -387,6 +389,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 40,
     paddingBottom: 48,
+  },
+  scrollTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 56,
   },
 
   heading: {

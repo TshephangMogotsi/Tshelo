@@ -81,6 +81,7 @@ export type GetUserRequest = {
 
 export type UpdateCurrentUserRequest = {
   name?: string
+  /** @deprecated Accepted only when unchanged, for older clients. Use verified Auth email changes. */
   email?: string | null
   avatar_url?: string | null
   country_code?: string

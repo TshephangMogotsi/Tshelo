@@ -126,3 +126,17 @@ Live backup metadata lists eight completed physical backups dated 8–15 October
 2026; PITR is disabled. Older recovery points therefore still exist and must be
 handled as potentially containing plaintext. Backup contents were not downloaded
 or restored, and no backup was deleted or modified.
+
+## Follow-up — 16 October 2026
+
+Approved synthetic live API QA passed encrypted payment changes, verification
+reset, identifier-free owner notices and profile response omission on the
+promoted web build. [Live QA](live-qa-verification-2026-10-16.md).
+
+Accessible retained telemetry was checked: 1,640 Supabase events, 17 Vercel
+request records and 200 database history/notification records. No current
+payment identifiers matched. Number-looking SQL log literals were traced to
+synthetic regression fixtures. Vercel returned no application log messages;
+Supabase log-drain configuration returned 403. The earlier historical/provider
+review remains partially open outside these accessible surfaces. No backup or
+raw telemetry was exported/deleted. [Detailed scope and evidence](payment-telemetry-review-2026-10-16.md).

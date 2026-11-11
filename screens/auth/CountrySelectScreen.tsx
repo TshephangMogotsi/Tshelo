@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, Dimensions } from 'react-native'
+  View, Text, StyleSheet, TouchableOpacity, StatusBar, ScrollView, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -10,16 +10,18 @@ import type { AppColors } from '../../theme/themes'
 import { fonts } from '../../theme/typography'
 import CountryPickerModal from '../../components/CountryPickerModal'
 import { FEATURED_SIGNUP_COUNTRIES, findSignupCountry } from '../../lib/countries'
+import { TABLET_SMALLEST_WIDTH } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'CountrySelect'>
 }
 
-const CARD_SIZE = (Dimensions.get('window').width - 48 - 12) / 2
-
 export default function CountrySelectScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme()
-  const styles = makeStyles(colors)
+  const { width, height } = useWindowDimensions()
+  const isTablet = Math.min(width, height) >= TABLET_SMALLEST_WIDTH
+  const contentWidth = isTablet ? Math.min(width - 80, 560) : width - 48
+  const styles = makeStyles(colors, (contentWidth - 12) / 2)
 
   const [selected, setSelected] = useState<string>('BW')
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -32,7 +34,7 @@ export default function CountrySelectScreen({ navigation }: Props) {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -131,7 +133,7 @@ export default function CountrySelectScreen({ navigation }: Props) {
   )
 }
 
-function makeStyles(colors: AppColors) {
+function makeStyles(colors: AppColors, cardSize: number) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
     scroll: {
@@ -139,6 +141,13 @@ function makeStyles(colors: AppColors) {
       paddingHorizontal: 24,
       paddingTop: 40,
       paddingBottom: 40,
+    },
+    scrollTablet: {
+      width: '100%',
+      maxWidth: 560,
+      alignSelf: 'center',
+      paddingHorizontal: 0,
+      paddingTop: 56,
     },
 
     heading: {
@@ -169,8 +178,8 @@ function makeStyles(colors: AppColors) {
       marginBottom: 12,
     },
     card: {
-      width: CARD_SIZE,
-      height: CARD_SIZE,
+      width: cardSize,
+      height: cardSize,
       backgroundColor: colors.surface,
       borderRadius: 16,
       borderWidth: 1.5,

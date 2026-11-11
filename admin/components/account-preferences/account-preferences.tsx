@@ -29,6 +29,7 @@ import {
   type AccountThemePreference,
 } from '@/components/account-theme'
 import { formatDate } from '@/lib/format'
+import { RecoveryContacts } from '@/components/account-preferences/recovery-contacts'
 
 type CommunicationDraft = {
   notificationsEnabled: boolean
@@ -99,7 +100,7 @@ function PreferenceSwitch({
   )
 }
 
-export function AccountPreferences() {
+export function AccountPreferences({ recoveryEnabled = false }: { recoveryEnabled?: boolean }) {
   const theme = useAccountThemePreference()
   const [user, setUser] = useState<User | null>(null)
   const [draft, setDraft] = useState<CommunicationDraft | null>(null)
@@ -142,7 +143,6 @@ export function AccountPreferences() {
   async function saveCommunications() {
     if (!user || !draft) return
     const marketingConsent = draft.marketingEmailEnabled || draft.marketingSmsEnabled
-    const startedMarketingConsent = marketingConsent && !user.marketing_consent
     setSaving(true)
     setError('')
     setNotice('')
@@ -153,7 +153,6 @@ export function AccountPreferences() {
         marketing_consent: marketingConsent,
         marketing_email_enabled: draft.marketingEmailEnabled,
         marketing_sms_enabled: draft.marketingSmsEnabled,
-        ...(startedMarketingConsent ? { marketing_consent_at: new Date().toISOString() } : {}),
       })
       setUser(updated)
       setDraft(draftFromUser(updated))
@@ -246,6 +245,7 @@ export function AccountPreferences() {
                 <article><span><UserRound size={18} /></span><div><strong>Personal details</strong><p>Update your name, email address, and preferred currency from Account details.</p></div><Link href={'/account#profile' as Route}>Manage</Link></article>
                 <article><span><LockKeyhole size={18} /></span><div><strong>Account closure</strong><p>To close an account or discuss your data, contact Tshelo support so we can protect fund records and meet legal obligations.</p></div><a href="mailto:support@tshelo.co.bw">Contact support</a></article>
               </div>
+              {recoveryEnabled && <RecoveryContacts />}
               <div className="member-preference-signout">
                 <div><strong>Sign out of this browser</strong><p>End this web session when you are using a shared computer.</p></div>
                 <form action="/logout" method="post"><button type="submit"><LogOut size={14} /> Sign out</button></form>

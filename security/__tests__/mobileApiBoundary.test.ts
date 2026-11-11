@@ -13,6 +13,9 @@ const LEGACY_DIRECT_SUPABASE_DATA_FILES = [
 const DIRECT_SUPABASE_DATA = /\bsupabase\s*\.\s*(?:from|rpc|functions|storage)\b/
 const SUPABASE_IMPORT = /from\s+['"][^'"]*supabase['"]/
 const MOBILE_API_IMPORT = /from\s+['"][^'"]*lib\/api['"]/
+// Phone changes use GoTrue's authenticated OTP flow, not database writes.
+// Keep this explicit auth boundary under the same no-data-access assertions.
+const AUTH_ONLY_HELPERS = ['lib/changePhone.ts']
 
 function read(relativePath: string) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8')
@@ -67,6 +70,7 @@ describe('mobile API migration boundaries', () => {
       'screens/auth/ProfileSetupScreen.tsx',
       'screens/auth/RegisterScreen.tsx',
       'screens/auth/RegistrationSuccessScreen.tsx',
+      ...AUTH_ONLY_HELPERS,
     ])
     const legacyImports = new Set([
       ...LEGACY_DIRECT_SUPABASE_DATA_FILES,
@@ -96,14 +100,19 @@ describe('mobile API migration boundaries', () => {
     }
   })
 
-  it('limits permanent auth-screen Supabase access to auth operations', () => {
+  it('limits permanent auth-screen and phone-helper Supabase access to auth operations', () => {
     const legacy = new Set(LEGACY_DIRECT_SUPABASE_DATA_FILES)
     const authScreens = sourceFiles('screens/auth').filter((file) => SUPABASE_IMPORT.test(read(file)))
 
-    for (const file of authScreens.filter((candidate) => !legacy.has(candidate))) {
+    for (const file of [...authScreens.filter((candidate) => !legacy.has(candidate)), ...AUTH_ONLY_HELPERS]) {
       const source = read(file)
       expect(source).toMatch(/\bsupabase\s*\.\s*auth\b/)
       expect(source).not.toMatch(DIRECT_SUPABASE_DATA)
+      if (AUTH_ONLY_HELPERS.includes(file)) {
+        const accessedMembers = source.match(/\bsupabase\s*\.\s*[A-Za-z_]\w*/g) ?? []
+        expect(accessedMembers.length).toBeGreaterThan(0)
+        expect([...new Set(accessedMembers.map(member => member.replace(/\s/g, '')))]).toEqual(['supabase.auth'])
+      }
     }
   })
 

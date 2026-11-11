@@ -745,6 +745,8 @@ export function validateUpdateCurrentUserRequest(
       errors.push(issue('name', 'invalid_string', 'Must contain between 2 and 100 characters.'))
     }
   }
+  // Older clients include the unchanged email on every profile save. The data
+  // service rejects changes and never forwards this field to a table UPDATE.
   optionalString(value, 'email', errors, 255)
   if (typeof value.email === 'string' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email)) {
     errors.push(issue('email', 'invalid_email', 'Must be a valid email address or null.'))

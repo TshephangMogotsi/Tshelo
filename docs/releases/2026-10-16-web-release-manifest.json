@@ -1,0 +1,32 @@
+{
+  "directory": "/private/tmp/tshelo-web-release-1lvsnwqz",
+  "base_commit": "40423f432af5be99a03575243b3e5353acf6a169",
+  "overlaid_files": [
+    {
+      "path": "admin/components/account-funds/fund-finances.tsx",
+      "sha256": "755201c41045ab7831e0972c89932bb1c69e267a92dee3aa1e1c5de4038652a8"
+    },
+    {
+      "path": "admin/components/invitation-onboarding-form.tsx",
+      "sha256": "6d60ba1ef09a47d104b6446bf1d21b6a299e941bee6c6e9ced35a78b2be0bc81"
+    },
+    {
+      "path": "admin/lib/data/api-records.ts",
+      "sha256": "8c087e8bf686fb3475c10a87e14cc9a101d6124bd574b5a21a54087238d94d61"
+    },
+    {
+      "path": "admin/lib/data/api-queries.ts",
+      "sha256": "e06e591d9851b66b12e60b61f82dc3fbab00deed168100c91ad70cdae5711b10"
+    },
+    {
+      "path": "admin/package.json",
+      "sha256": "0a401351c37b8b7ea7905f9e295c27d19a982554cc613c36f7666afc87edbd5f"
+    },
+    {
+      "path": "admin/package-lock.json",
+      "sha256": "a60f66ff3c43e1ef7f0dabe425928775ec8b829bdc99f0866db65324d72e2728"
+    }
+  ],
+  "completion_route_present": true,
+  "environment_files_copied": false
+}

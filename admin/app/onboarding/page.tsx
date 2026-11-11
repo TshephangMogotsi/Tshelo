@@ -34,7 +34,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
   const { data: appUser } = await supabase
     .from('users')
-    .select('phone, profile_completed, is_banned')
+    .select('phone, name, country_code, profile_completed, is_banned')
     .eq('id', user.id)
     .is('deleted_at', null)
     .maybeSingle()
@@ -45,7 +45,10 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   return (
     <InvitationOnboardingForm
       nextPath={nextPath}
-      phone={user.phone ?? appUser.phone ?? ''}
+      phone={user.phone_confirmed_at ? user.phone ?? appUser.phone ?? '' : ''}
+      email={user.email}
+      initialName={appUser.name}
+      initialCountry={appUser.country_code}
       termsUrl={configuredHttpsUrl(process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL)}
       privacyUrl={configuredHttpsUrl(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)}
     />

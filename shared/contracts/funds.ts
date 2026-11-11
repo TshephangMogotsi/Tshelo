@@ -257,6 +257,7 @@ export type FundWorkspaceExpense = {
   id: Uuid
   vendor_name: string | null
   description: string
+  recorded_by_name: string | null
   receipt_path: string | null
   category: string | null
   custom_category: string | null

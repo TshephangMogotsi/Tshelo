@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { api } from '../../lib/api'
 import { toApiUiError } from '../../lib/apiScreen'
 import { useAuth } from '../../context/AuthContext'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'RegistrationSuccess'>
@@ -25,6 +26,7 @@ const FEATURES = [
 
 export default function RegistrationSuccessScreen({ navigation }: Props) {
   const { refreshProfile } = useAuth()
+  const { isTablet } = useTabletLayout()
   const [loading, setLoading] = useState(false)
   const pulse = useRef(new Animated.Value(0)).current
 
@@ -92,7 +94,7 @@ export default function RegistrationSuccessScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-      <View style={styles.container}>
+      <View style={[styles.container, isTablet && styles.containerTablet]}>
         <View style={styles.celebrationWrap}>
           <Animated.View
             testID="success-pulse"
@@ -150,6 +152,13 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 48,
     alignItems: 'center',
+  },
+  containerTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 56,
   },
   celebrationWrap: {
     width: 140,

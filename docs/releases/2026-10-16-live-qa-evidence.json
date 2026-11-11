@@ -1,0 +1,144 @@
+{
+  "deployment": "https://tshelo-admin-9aof51s3l-diginav.vercel.app",
+  "qa_user_id": "0397b4ab-d593-45c1-b633-a1c1d4b2b095",
+  "qa_fund_id": "c7d162eb-8458-4464-a61e-3147183a1ba3",
+  "synthetic_only": true,
+  "checks": {
+    "normal_authenticated_role": true,
+    "authenticated_profile_read": true,
+    "protected_field_rejected": true,
+    "processing_acceptance_logged": true,
+    "channel_only_change_logged": true,
+    "marketing_withdrawal_disables_all_channels": true,
+    "payment_encrypted_reset_and_owner_notice": true,
+    "direct_protected_write_denied": true,
+    "provider_scan_review_save_audit": true
+  },
+  "requests": [
+    {
+      "path": "/api/v1/users/me",
+      "method": "GET",
+      "status": 200,
+      "request_id": "3e73154f-9fa9-4616-93b1-42d1bba6a59a"
+    },
+    {
+      "path": "/api/v1/users/me",
+      "method": "PATCH",
+      "status": 422,
+      "request_id": "ae6677ad-1385-4ed1-a848-e9b27c3e90e2",
+      "code": "VALIDATION_FAILED"
+    },
+    {
+      "path": "/api/v1/users/me",
+      "method": "PATCH",
+      "status": 200,
+      "request_id": "1d6f31af-9440-4598-87be-0dabd3eb6f90"
+    },
+    {
+      "path": "/api/v1/users/me",
+      "method": "PATCH",
+      "status": 200,
+      "request_id": "36d45b1c-ef86-4d4a-8aaa-79bd3c67d0bc"
+    },
+    {
+      "path": "/api/v1/users/me",
+      "method": "PATCH",
+      "status": 200,
+      "request_id": "77dba486-2ed9-4fd0-b61e-a3db668c33f9"
+    },
+    {
+      "path": "/api/v1/users/me",
+      "method": "PATCH",
+      "status": 200,
+      "request_id": "1bc692d7-6b59-4b53-9ac7-e1a69b82b9d2"
+    },
+    {
+      "path": "/api/v1/receipts/upload-session",
+      "method": "POST",
+      "status": 201,
+      "request_id": "177913da-82ef-445c-b7b5-6a41b4c027d9"
+    },
+    {
+      "path": "/api/v1/receipts/parse",
+      "method": "POST",
+      "status": 200,
+      "request_id": "5829f1fa-1746-47c7-8c6e-838746e33bb7"
+    },
+    {
+      "path": "/api/v1/receipts/scan-completion",
+      "method": "POST",
+      "status": 200,
+      "request_id": "a23750eb-3efe-4030-8e8d-4ffe369ca377"
+    },
+    {
+      "path": "/api/v1/expenses",
+      "method": "POST",
+      "status": 201,
+      "request_id": "7ec33e57-2558-478a-8bcd-57d861a8422e"
+    }
+  ],
+  "audit_id": "5c9b15d4-85d8-4ec6-a852-c70a17383309",
+  "expense_id": "9dd07bf2-9ebb-4a71-84fa-2ec1170dea9f",
+  "receipt_model": "claude-haiku-4-5",
+  "receipt_model_version": "claude-haiku-4-5-20251001",
+  "result": "PASS",
+  "cleanup": {
+    "auth_identity_banned": true,
+    "refresh_sessions_revoked": true,
+    "qa_profile_banned": true,
+    "qa_fund_completed": true
+  },
+  "verified_date": "2026-10-16",
+  "scope": "Explicitly approved synthetic live API QA; no device/SMS/customer consent verification",
+  "cleanup_verification": {
+    "auth_identity_banned": true,
+    "sessions_remaining": 0,
+    "refresh_tokens_remaining": 0,
+    "qa_profile_banned": true,
+    "qa_fund_status": "completed",
+    "qa_plaintext_columns_null": true,
+    "labeled_qa_consent_records": 9,
+    "receipt_completed": true,
+    "receipt_result_saved": true,
+    "receipt_edits_saved": true,
+    "note": "The explicit sign-out call after banning returned an error. A separate database inspection confirmed the ban had already removed all sessions and refresh tokens; cleanup is verified by that inspection."
+  },
+  "consent_decisions": [
+    {
+      "consent_type": "terms",
+      "action": "accepted"
+    },
+    {
+      "consent_type": "privacy",
+      "action": "accepted"
+    },
+    {
+      "consent_type": "data_processing",
+      "action": "granted"
+    },
+    {
+      "consent_type": "marketing",
+      "action": "granted"
+    },
+    {
+      "consent_type": "marketing_email",
+      "action": "granted"
+    },
+    {
+      "consent_type": "marketing_sms",
+      "action": "granted"
+    },
+    {
+      "consent_type": "marketing",
+      "action": "withdrawn"
+    },
+    {
+      "consent_type": "marketing_email",
+      "action": "withdrawn"
+    },
+    {
+      "consent_type": "marketing_sms",
+      "action": "withdrawn"
+    }
+  ]
+}

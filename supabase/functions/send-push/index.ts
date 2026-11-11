@@ -22,6 +22,44 @@ type NotificationRow = {
   data: Record<string, unknown> | null
 }
 
+type NotificationPreferenceKey =
+  | 'fund_invites'
+  | 'contributions'
+  | 'expenses'
+  | 'deadlines'
+  | 'event_reminders'
+
+function preferenceKeyFor(notification: NotificationRow): NotificationPreferenceKey | null {
+  if (notification.data?.kind === 'event_fund_organiser_invite') return 'fund_invites'
+
+  switch (notification.type) {
+    case 'join_request':
+    case 'join_approved':
+    case 'join_declined':
+    case 'member_joined':
+    case 'member_removed':
+    case 'fund_joined':
+      return 'fund_invites'
+    case 'contribution_added':
+    case 'contribution_received':
+    case 'contribution_confirmed':
+      return 'contributions'
+    case 'expense_added':
+      return 'expenses'
+    case 'deadline_reminder':
+    case 'pledge_reminder':
+    case 'fund_closing_11':
+    case 'fund_closing_7':
+    case 'fund_closing_3':
+      return 'deadlines'
+    case 'event_reminder':
+    case 'event_announcement':
+      return 'event_reminders'
+    default:
+      return null
+  }
+}
+
 type WebhookPayload = {
   type: 'INSERT'
   table: string
@@ -69,6 +107,29 @@ Deno.serve(async (req) => {
   // SMS-detected money-in) only feed the in-app list — don't push twice.
   if (notification.data?.suppress_push === true) {
     return new Response('Push suppressed', { status: 200 })
+  }
+
+  // The inbox retains every valid notification. These preferences only decide
+  // whether a routine update interrupts the member on this device. Security
+  // and account-protection messages intentionally have no preference key.
+  const { data: recipient, error: recipientError } = await supabase
+    .from('users')
+    .select('notifications_enabled, notification_preferences')
+    .eq('id', notification.user_id)
+    .maybeSingle()
+
+  if (recipientError) {
+    console.error('recipient preference query failed', recipientError)
+    return new Response('Recipient preference lookup failed', { status: 500 })
+  }
+  if (!recipient || recipient.notifications_enabled === false) {
+    return new Response('Push disabled', { status: 200 })
+  }
+
+  const preferenceKey = preferenceKeyFor(notification)
+  const preferences = recipient.notification_preferences as Record<string, unknown> | null
+  if (preferenceKey && preferences?.[preferenceKey] === false) {
+    return new Response('Push category disabled', { status: 200 })
   }
 
   const { data: tokenRows, error: tokenError } = await supabase

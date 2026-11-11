@@ -14,6 +14,7 @@ import ProviderLogo from '../../components/ProviderLogo'
 import { api } from '../../lib/api'
 import { toApiUiError } from '../../lib/apiScreen'
 import { PROVIDER_LABELS, detectProvider, detectProviderOrUnknown } from '../../lib/providers'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ReceiveMoney'>
@@ -46,6 +47,7 @@ function makeBankAccounts(params: Props['route']['params']): BankAccount[] {
 
 export default function ReceiveMoneyScreen({ navigation, route }: Props) {
   const { isDark } = useTheme()
+  const { isTablet } = useTabletLayout()
   const requireOnline = useRequireOnline()
   const [confirmed, setConfirmed] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -95,7 +97,7 @@ export default function ReceiveMoneyScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]} showsVerticalScrollIndicator={false}>
         <Text style={[styles.heading, { color: textCol }]}>How you'll receive money</Text>
         <Text style={[styles.subheading, { color: mutedCol }]}>Contributors can send to:</Text>
 
@@ -187,6 +189,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 40,
     paddingBottom: 48,
+  },
+  scrollTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 56,
   },
   heading: {
     fontSize: 28,

@@ -1,0 +1,345 @@
+{
+  "project_ref": "albihofmlafjzbusancu",
+  "checked_at": "2026-10-16T08:03:11.011834+00:00",
+  "comparison_profiles": 7,
+  "short_identifiers_skipped": 0,
+  "raw_logs_or_identifiers_saved": false,
+  "supabase_windows": [
+    {
+      "start": "2026-10-08T00:00:00+00:00",
+      "end": "2026-10-09T00:00:00+00:00",
+      "events": 355,
+      "by_source": {
+        "postgres_logs": 114,
+        "supavisor_logs": 130,
+        "postgrest_logs": 41,
+        "edge_logs": 32,
+        "storage_logs": 13,
+        "auth_logs": 5,
+        "realtime_logs": 4,
+        "pgbouncer_logs": 16
+      },
+      "field_name_mentions_by_source": {},
+      "limit_reached": false,
+      "first_event_at": "2026-10-08T00:53:26.004000",
+      "last_event_at": "2026-10-08T23:41:50.786592"
+    },
+    {
+      "start": "2026-10-09T00:00:00+00:00",
+      "end": "2026-10-10T00:00:00+00:00",
+      "events": 169,
+      "by_source": {
+        "postgres_logs": 79,
+        "edge_logs": 14,
+        "realtime_logs": 1,
+        "pgbouncer_logs": 8,
+        "storage_logs": 3,
+        "postgrest_logs": 18,
+        "supavisor_logs": 46
+      },
+      "field_name_mentions_by_source": {
+        "postgres_logs": 2
+      },
+      "limit_reached": false,
+      "first_event_at": "2026-10-09T00:59:05.740000",
+      "last_event_at": "2026-10-09T17:58:19.831606"
+    },
+    {
+      "start": "2026-10-10T00:00:00+00:00",
+      "end": "2026-10-11T00:00:00+00:00",
+      "events": 5,
+      "by_source": {
+        "postgres_logs": 5
+      },
+      "field_name_mentions_by_source": {},
+      "limit_reached": false,
+      "first_event_at": "2026-10-10T08:13:58.183000",
+      "last_event_at": "2026-10-10T08:18:58.817000"
+    },
+    {
+      "start": "2026-10-11T00:00:00+00:00",
+      "end": "2026-10-12T00:00:00+00:00",
+      "events": 7,
+      "by_source": {
+        "postgres_logs": 7
+      },
+      "field_name_mentions_by_source": {},
+      "limit_reached": false,
+      "first_event_at": "2026-10-11T06:53:03.881000",
+      "last_event_at": "2026-10-11T13:53:10.443000"
+    },
+    {
+      "start": "2026-10-12T00:00:00+00:00",
+      "end": "2026-10-13T00:00:00+00:00",
+      "events": 363,
+      "by_source": {
+        "postgres_logs": 116,
+        "supavisor_logs": 184,
+        "postgrest_logs": 63
+      },
+      "field_name_mentions_by_source": {},
+      "limit_reached": false,
+      "first_event_at": "2026-10-12T06:57:41.097000",
+      "last_event_at": "2026-10-12T17:02:51.792000"
+    },
+    {
+      "start": "2026-10-13T00:00:00+00:00",
+      "end": "2026-10-14T00:00:00+00:00",
+      "events": 150,
+      "by_source": {
+        "postgres_logs": 51,
+        "edge_logs": 14,
+        "postgrest_logs": 18,
+        "supavisor_logs": 67
+      },
+      "field_name_mentions_by_source": {
+        "postgres_logs": 8
+      },
+      "limit_reached": false,
+      "first_event_at": "2026-10-13T02:15:00.167000",
+      "last_event_at": "2026-10-13T13:16:23.950148"
+    },
+    {
+      "start": "2026-10-14T00:00:00+00:00",
+      "end": "2026-10-15T00:00:00+00:00",
+      "events": 19,
+      "by_source": {
+        "postgres_logs": 13,
+        "edge_logs": 5,
+        "postgrest_logs": 1
+      },
+      "field_name_mentions_by_source": {},
+      "limit_reached": false,
+      "first_event_at": "2026-10-14T00:51:15.812000",
+      "last_event_at": "2026-10-14T23:27:20.773394"
+    },
+    {
+      "start": "2026-10-15T00:00:00+00:00",
+      "end": "2026-10-16T00:00:00+00:00",
+      "events": 328,
+      "by_source": {
+        "postgres_logs": 63,
+        "edge_logs": 21,
+        "postgrest_logs": 30,
+        "storage_logs": 3,
+        "auth_logs": 8,
+        "supavisor_logs": 203
+      },
+      "field_name_mentions_by_source": {
+        "postgres_logs": 2
+      },
+      "limit_reached": false,
+      "first_event_at": "2026-10-15T00:54:39.110000",
+      "last_event_at": "2026-10-15T21:28:07.375747"
+    },
+    {
+      "start": "2026-10-16T00:00:00+00:00",
+      "end": "2026-10-16T08:03:11.011834+00:00",
+      "events": 244,
+      "by_source": {
+        "postgres_logs": 29,
+        "supavisor_logs": 110,
+        "edge_logs": 63,
+        "postgrest_logs": 7,
+        "auth_audit_logs": 3,
+        "auth_logs": 7,
+        "function_logs": 6,
+        "function_edge_logs": 1,
+        "pgbouncer_logs": 11,
+        "storage_logs": 7
+      },
+      "field_name_mentions_by_source": {
+        "postgres_logs": 1,
+        "edge_logs": 1
+      },
+      "limit_reached": false,
+      "first_event_at": "2026-10-16T00:55:38.484000",
+      "last_event_at": "2026-10-16T08:03:09.640163"
+    }
+  ],
+  "vercel": {
+    "cli_exit": 0,
+    "events": 17,
+    "limit_reached": false,
+    "field_name_mentions": 0,
+    "record_field_names": [
+      "branch",
+      "cache",
+      "cacheReason",
+      "deploymentId",
+      "domain",
+      "environment",
+      "id",
+      "level",
+      "logs",
+      "message",
+      "pprState",
+      "projectId",
+      "requestMethod",
+      "requestPath",
+      "responseStatusCode",
+      "source",
+      "timestamp",
+      "traceId"
+    ],
+    "nested_log_entries": 0,
+    "oldest_record_timestamp": 1792135347476,
+    "latest_record_timestamp": 1792136191351,
+    "oldest_record_timestamp_utc": "2026-10-16T07:22:27.476000+00:00",
+    "latest_record_timestamp_utc": "2026-10-16T07:36:31.351000+00:00"
+  },
+  "matches": [],
+  "supabase_log_drains": {
+    "status": 403
+  },
+  "vercel_log_drains": {
+    "/v1/drains?teamId=team_rqjqHjlJ5bChakCGcVyHqdOO": {
+      "count": 0,
+      "response_keys": [
+        "drains"
+      ]
+    },
+    "/v1/integrations/log-drains?teamId=team_rqjqHjlJ5bChakCGcVyHqdOO": {
+      "count": 0,
+      "response_keys": null
+    }
+  },
+  "field_name_mention_context": [
+    {
+      "id": "73540407-5e9c-4532-98bd-4abef529f026",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-09T10:32:46.402000",
+      "schema_sql": false,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "db54958f-726e-4e3d-9ed5-19d80b6e0790",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-09T10:32:47.035000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "7a258c35-2b0a-4a21-bc95-15aef5f5f8d0",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:04.615000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "132d2e60-d25f-437f-a715-80a5042a49c3",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:05.423000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "c206dab9-e33f-4c48-a576-2a8c87adfa68",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:08.026000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "80cb6b89-38a4-4c0d-9a21-040cb360ec62",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:08.289000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "88e4b20e-83a6-4578-bb2d-e1a7ce4c9fa7",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:09.397000",
+      "schema_sql": false,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "fb210aa4-01ad-488b-a277-688b19d80ab3",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:09.951000",
+      "schema_sql": false,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "ebe5fd82-218d-4101-a889-44374ed805a5",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:10.293000",
+      "schema_sql": false,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "2eb69e0d-c8a1-450f-8a20-90447b8a903f",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-13T11:41:10.514000",
+      "schema_sql": false,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": false
+    },
+    {
+      "id": "375938fe-1c6a-4dc9-a90a-873298c74f1a",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-15T20:38:14.444000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": true,
+      "literal_candidate_count": 3,
+      "matching_fixture_files": [
+        "supabase/tests/payment_identifier_encryption.sql"
+      ],
+      "synthetic_context_marker": true,
+      "all_candidates_match_synthetic_test_artifacts": true
+    },
+    {
+      "id": "59e8ebf1-1dab-4ff2-a95d-9eabe5c00e7e",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-15T21:00:13.219000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": true,
+      "literal_candidate_count": 3,
+      "matching_fixture_files": [
+        "security/fixtures/transactional-protected-profile-rls.sql"
+      ],
+      "synthetic_context_marker": true,
+      "all_candidates_match_synthetic_test_artifacts": true
+    },
+    {
+      "id": "7af27100-dd31-40f1-807c-bd413cbbd07d",
+      "source": "postgres_logs",
+      "timestamp": "2026-10-16T02:46:27.328000",
+      "schema_sql": true,
+      "select_projection": false,
+      "quoted_identifier_value_candidate": true,
+      "literal_candidate_count": 3,
+      "matching_fixture_files": [
+        "supabase/tests/payment_identifier_encryption.sql"
+      ],
+      "synthetic_context_marker": true,
+      "all_candidates_match_synthetic_test_artifacts": true
+    },
+    {
+      "id": "a13ff118-09f7-476f-9a77-e666a8fad6a6",
+      "source": "edge_logs",
+      "timestamp": "2026-10-16T07:35:57.425000",
+      "schema_sql": false,
+      "select_projection": true,
+      "quoted_identifier_value_candidate": false
+    }
+  ],
+  "limits": [
+    "Current identifiers only; changed historical values not available for comparison.",
+    "Vercel returned 17 request records with zero nested application messages, covering only 07:22\u201307:36 UTC on 16 October.",
+    "Supabase log-drain configuration denied with 403.",
+    "Inaccessible app.tshelo.com deployment and independent provider/device logs not covered."
+  ]
+}

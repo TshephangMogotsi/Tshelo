@@ -76,7 +76,9 @@ it('keeps registration incomplete after OTP and opens bank details', async () =>
     },
   }
   await act(async () => { tree = create(React.createElement(OTPScreen, { navigation, route })) })
-  const inputs = tree.root.findAllByType(TextInput).filter(input => input.props.maxLength === 1)
+  const inputs = tree.root.findAllByType(TextInput).filter(input => (
+    String(input.props.accessibilityLabel ?? '').startsWith('Verification digit')
+  ))
   for (const input of inputs) await act(async () => input.props.onChangeText('1'))
   await act(async () => button('Verify').props.onPress())
 

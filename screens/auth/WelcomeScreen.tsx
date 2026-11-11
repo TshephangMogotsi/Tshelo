@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AuthStackParamList } from '../../navigation/types'
 import { fonts } from '../../theme/typography'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 const GRADIENT_START = '#7657F0'
 const GRADIENT_END   = '#8874E1'
@@ -22,47 +23,51 @@ type Props = {
 }
 
 export default function WelcomeScreen({ navigation }: Props) {
+  const { isTablet } = useTabletLayout()
+
   return (
     <LinearGradient colors={[GRADIENT_START, GRADIENT_END]} style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={[styles.content, isTablet && styles.contentTablet]}>
 
-        {/* Logo */}
-        <View style={styles.logoArea}>
-          <View style={styles.logoRing}>
-            <Image
-              source={require('../../assets/tshelo-icon.png')}
-              style={styles.logo}
-              resizeMode="cover"
-            />
+          {/* Logo */}
+          <View style={styles.logoArea}>
+            <View style={styles.logoRing}>
+              <Image
+                source={require('../../assets/tshelo-icon.png')}
+                style={styles.logo}
+                resizeMode="cover"
+              />
+            </View>
           </View>
+
+          {/* Bottom content */}
+          <View style={[styles.bottom, isTablet && styles.bottomTablet]}>
+            <Text style={[styles.heading, isTablet && styles.textCentered]}>Community Savings{'\n'}Made Simple</Text>
+            <Text style={[styles.body, isTablet && styles.bodyTablet]}>
+              Track contributions for funerals, weddings, graduations and more,
+              transparently and securely
+            </Text>
+
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.loginText}>LOGIN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={() => navigation.navigate('CountrySelect')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.registerText}>Create an Account</Text>
+            </TouchableOpacity>
+          </View>
+
         </View>
-
-        {/* Bottom content */}
-        <View style={styles.bottom}>
-          <Text style={styles.heading}>Community Savings{'\n'}Made Simple</Text>
-          <Text style={styles.body}>
-            Track contributions for funerals, weddings, graduations and more,
-            transparently and securely
-          </Text>
-
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.loginText}>LOGIN</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={() => navigation.navigate('CountrySelect')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.registerText}>Create an Account</Text>
-          </TouchableOpacity>
-        </View>
-
       </SafeAreaView>
     </LinearGradient>
   )
@@ -74,6 +79,15 @@ const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
+  },
+  content: {
+    flex: 1,
+    width: '100%',
+  },
+  contentTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
 
   logoArea: {
@@ -104,6 +118,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingBottom: 32,
   },
+  bottomTablet: {
+    paddingHorizontal: 0,
+  },
   heading: {
     fontSize: 34,
     fontFamily: fonts.display.bold,
@@ -117,6 +134,15 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     lineHeight: 26,
     marginBottom: 51,
+  },
+  textCentered: {
+    textAlign: 'center',
+  },
+  bodyTablet: {
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
+    textAlign: 'center',
   },
 
   loginButton: {

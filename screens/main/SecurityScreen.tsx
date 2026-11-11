@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -229,6 +230,12 @@ export default function SecurityScreen({ navigation }: Props) {
               <Text style={styles.detailLabel}>Verified login number</Text>
               <Text style={styles.phoneValue} selectable>{details.phone ? formatPhone(details.phone) : 'Unavailable'}</Text>
             </View>
+            <TouchableOpacity accessibilityRole="button" style={styles.retryButton} onPress={() => navigation.navigate('ChangePhone')}>
+              <Text style={styles.retryButtonText}>Change phone number</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={styles.retryButton} onPress={() => { void Linking.openURL('https://tshelo-admin.vercel.app/account/preferences').catch(() => Alert.alert('Could not open website', 'Visit tshelo-admin.vercel.app to manage your sign-in details.')) }}>
+              <Text style={styles.retryButtonText}>Manage sign-in recovery on the website</Text>
+            </TouchableOpacity>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Verified on</Text>
               <Text style={styles.detailValue}>{formatDateTime(details.phoneConfirmedAt)}</Text>

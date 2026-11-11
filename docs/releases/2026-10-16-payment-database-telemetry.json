@@ -1,0 +1,77 @@
+{
+  "project_ref": "albihofmlafjzbusancu",
+  "checked_date": "2026-10-16",
+  "method": "Exact current payment identifiers compared inside PostgreSQL against complete row JSON; named non-null number-field string scan. Only aggregates returned.",
+  "tables": [
+    {
+      "surface": "audit_log",
+      "rows_checked": 113,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "platform_admin_audit_log",
+      "rows_checked": 1,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "api_usage_logs",
+      "rows_checked": 0,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "sms_logs",
+      "rows_checked": 0,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "notifications",
+      "rows_checked": 85,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "receipt_scan_audit_log",
+      "rows_checked": 1,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "mobile_money_verifications",
+      "rows_checked": 0,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "payments",
+      "rows_checked": 0,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "login_notifications",
+      "rows_checked": 0,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    },
+    {
+      "surface": "account_closure_verifications",
+      "rows_checked": 0,
+      "bank_value_matches": 0,
+      "mobile_value_matches": 0,
+      "named_identifier_string_values": 0
+    }
+  ]
+}

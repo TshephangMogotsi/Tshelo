@@ -18,6 +18,7 @@ import {
   nationalPhoneDigits,
   phoneInputConfig,
 } from '../../lib/phoneNumbers'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>
@@ -25,6 +26,7 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const { isDark } = useTheme()
+  const { isTablet } = useTabletLayout()
   const requireOnline = useRequireOnline()
   const bg       = isDark ? '#1A1C24' : '#F4F2EB'
   const inputBg  = isDark ? '#2D2E41' : '#FFFFFF'
@@ -33,6 +35,8 @@ export default function LoginScreen({ navigation }: Props) {
   const borderCol = isDark ? '#3A3A5C' : colors.border
 
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [method, setMethod] = useState<'phone' | 'email'>('phone')
   const [focused, setFocused] = useState(false)
   const [loading, setLoading] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -40,23 +44,25 @@ export default function LoginScreen({ navigation }: Props) {
 
   const cleanedPhone = nationalPhoneDigits(phone)
   const phoneConfig = phoneInputConfig(selectedCountry.code, selectedCountry.dialCode)
-  const isValid = isValidNationalPhone(cleanedPhone, phoneConfig)
+  const normalizedEmail = email.trim().toLowerCase()
+  const isValid = method === 'phone' ? isValidNationalPhone(cleanedPhone, phoneConfig) : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
 
   async function handleSendOTP() {
     if (!isValid) return
     if (!requireOnline()) return
     const fullPhone = internationalPhone(selectedCountry.dialCode, cleanedPhone)
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: fullPhone,
-      options: { shouldCreateUser: false },
-    })
-    setLoading(false)
-    if (error) {
-      Alert.alert('Code not sent', 'Check the number or create a Tshelo account first, then try again.')
-      return
+    try {
+      const { error } = await supabase.auth.signInWithOtp(method === 'phone'
+        ? { phone: fullPhone, options: { shouldCreateUser: false } }
+        : { email: normalizedEmail, options: { shouldCreateUser: false } })
+      if (error) throw error
+      navigation.navigate('OTP', { phone: method === 'phone' ? fullPhone : '', ...(method === 'email' ? { email: normalizedEmail } : {}), mode: 'login' })
+    } catch {
+      Alert.alert('Code not sent', 'Check your sign-in details and try again.')
+    } finally {
+      setLoading(false)
     }
-    navigation.navigate('OTP', { phone: fullPhone, mode: 'login' })
   }
 
   return (
@@ -68,7 +74,7 @@ export default function LoginScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -79,11 +85,16 @@ export default function LoginScreen({ navigation }: Props) {
           <View style={styles.header}>
             <Text style={styles.heading}>Welcome back</Text>
             <Text style={[styles.subheading, { color: mutedCol }]}>
-              Enter your phone number to continue
+              Sign in with your verified mobile number or email address.
             </Text>
           </View>
 
           <View style={styles.form}>
+            <View style={styles.methodTabs} accessibilityRole="tablist">
+              <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: method === 'phone' }} onPress={() => setMethod('phone')} style={[styles.methodTab, method === 'phone' && styles.methodTabSelected]}><Text style={[styles.methodText, method === 'phone' && styles.methodTextSelected]}>Mobile number</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: method === 'email' }} onPress={() => setMethod('email')} style={[styles.methodTab, method === 'email' && styles.methodTabSelected]}><Text style={[styles.methodText, method === 'email' && styles.methodTextSelected]}>Email address</Text></TouchableOpacity>
+            </View>
+            {method === 'phone' ? <>
             <Text style={[styles.label, { color: textCol }]}>Phone Number</Text>
             <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: focused ? colors.primary : borderCol }]}>
               <TouchableOpacity
@@ -114,6 +125,13 @@ export default function LoginScreen({ navigation }: Props) {
             <Text style={[styles.hint, { color: mutedCol }]}>
               Enter the number without {selectedCountry.dialCode}. We’ll send a one-time code to verify it’s you.
             </Text>
+            </> : <>
+              <Text style={[styles.label, { color: textCol }]}>Email address</Text>
+              <View style={[styles.phoneRow, { backgroundColor: inputBg, borderColor: focused ? colors.primary : borderCol }]}>
+                <TextInput style={[styles.phoneInput, { color: textCol }]} placeholder="you@example.com" placeholderTextColor={mutedCol} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" value={email} onChangeText={setEmail} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} returnKeyType="done" onSubmitEditing={handleSendOTP} />
+              </View>
+              <Text style={[styles.hint, { color: mutedCol }]}>We’ll send a one-time code to your verified email address.</Text>
+            </>}
           </View>
 
           <TouchableOpacity
@@ -170,6 +188,13 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 48,
   },
+  scrollTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 40,
+  },
   backButton: {
     width: 40,
     height: 40,
@@ -192,6 +217,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   form: { marginBottom: 28 },
+  methodTabs: { flexDirection: 'row', backgroundColor: '#EAE6F3', padding: 4, borderRadius: 14, marginBottom: 24 },
+  methodTab: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  methodTabSelected: { backgroundColor: '#FFFFFF' },
+  methodText: { fontSize: 13, color: '#615B70', fontWeight: '600' },
+  methodTextSelected: { color: colors.primary },
   label: {
     fontSize: 12,
     fontWeight: '600',

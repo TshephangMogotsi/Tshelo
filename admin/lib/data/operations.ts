@@ -91,7 +91,7 @@ export async function getOperationsFunds(client: ServerClient, query: string): P
 export async function getSupportTickets(client: ServerClient, query: string): Promise<DataList<SupportTicketSummary>> {
   let request = client
     .from('support_tickets')
-    .select('id, ticket_number, category, subject, priority, status, assigned_to, created_at')
+    .select('id, ticket_number, category, subject, description, resolution_note, priority, status, assigned_to, created_at')
     .order('created_at', { ascending: false })
     .limit(50)
 

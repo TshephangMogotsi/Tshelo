@@ -114,3 +114,68 @@ source/archive integrity and actual dependency consumer resolution.
 Replace these pins with compatible official releases after the fixes are
 published and verified. Do not remove the regression tests when updating.
 Deployments remain explicitly disabled. PR #2 must pass combined CI before merge.
+
+## Merge evidence — 23 October 2026
+
+All required checks passed for commit `0237145059a1eb9cf370bb12b1511c538b60adb2`:
+https://github.com/TshephangMogotsi/Tshelo/actions/runs/39930444483
+PR #2 merged through normal branch protection as
+`504467cc476770d529eb57191e938939c58beafa`. The shared workspace was updated
+to the locked fixes; all 27 dependency-security checks passed there too.
+RELEASES_ENABLED remains false. No production deployment was triggered.
+
+Post-merge CI on main passed every job, including Release readiness:
+https://github.com/TshephangMogotsi/Tshelo/actions/runs/39931004084
+The two dependency blockers are resolved using the documented temporary source
+fixes; replace them after compatible official patched releases are verified.
+
+## EAS signing inspection — 23 October 2026
+
+Read-only Expo metadata confirms the linked project is @digital-natives/tshelo
+(project a0f76b53-0427-41d9-b5a1-a59024570558). Android com.tshelo.app has a
+default build credential with a JKS keystore. iOS com.datasentinels.tshelo has
+APP_STORE and AD_HOC credentials, each with a certificate and active provisioning
+profile. Both certificate/profile pairs expire on 13 April 2027 at 10:21:43 UTC.
+
+Only presence/status/expiry metadata was queried; no private keys, passwords or
+credential files were retrieved. No credentials were changed and no build started.
+This verifies stored EAS configuration, not current Apple portal revocation status
+or a successful native build. A later approved build must verify actual usability.
+GitHub secret names have been confirmed in their intended environments; their
+values/authentication have not been exercised. Releases remain disabled.
+
+## Native signing-build results — 23 October 2026
+
+Both production-profile EAS builds from tested main commit 504467c finished
+successfully with artifacts: Android 1.0.1 build 13 (68716f37-f58b-45ab-b340-3ca7286098c3),
+iOS 1.0.1 build 10 (e6d80f7a-3924-41eb-a449-a1615fc31d83). Signing credentials
+were frozen during the builds. Device runtime, GitHub-secret authentication and
+store submission remain outside this evidence. No OTA publication was performed.
+Sanitized results: releases/native-signing-builds-2026-10-23.json.
+
+## Approved CD activation — 23 October 2026
+
+The user explicitly approved enabling releases, publishing tshelo-admin through
+GitHub, and validating both native workflows without store submission.
+RELEASES_ENABLED is now true. PR #4 fixed an invalid tracked local-worktree gitlink
+that blocked checkout with persisted credentials disabled; it also preserved
+the hash-verified live waitlist/receipt/consent behavior, passed the Vercel token
+to the build step, froze EAS credentials, and separated target concurrency.
+All required main CI passed for ce840092a401b3b8932f21e46ee000c07ce279fe.
+
+Approved workflow runs:
+- Web: 39970691828 — failed at production configuration pull with Vercel project/team authorization error (403); no staging or promotion occurred. A Diginav-team-scoped VERCEL_TOKEN replacement has been requested.
+- Android: 39970697522 — authenticated using GitHub EXPO_TOKEN and submitted EAS build 5e7d075b-3ab1-4ee1-89f9-c75d9550cc52 (build 14); completion pending.
+- iOS: 39970703090 — authenticated using GitHub EXPO_TOKEN and submitted EAS build a58374a5-1aec-4cb3-8a8b-55d62a01d337 (build 11); completion pending.
+
+Each run reached the configured approval gate and was approved using the user's
+explicit authorization. The previous live deployment remains
+dpl_6RCb45M48KH64ZdEYKYi4DcEotR5, with tshelo-admin.vercel.app and
+tshelo-admin-diginav.vercel.app aliases. Web CD is not yet validated; do not
+report overall CD completion until the credential correction and runs pass.
+
+Latest checkpoint: the replacement Diginav-scoped VERCEL_TOKEN passed configuration pull. Web attempt 2 is building its production candidate; Android is still running; the iOS GitHub workflow passed. Monitoring stopped at the user’s request to conserve usage. The approved web workflow will continue through smoke tests and promotion automatically if those checks pass. Final live deployment and Android results still need confirmation.
+
+Follow-up check: web workflow 39970691828 completed successfully, including candidate smoke tests and production promotion. iOS workflow 39970703090 passed; Android workflow 39970697522 remains in progress.
+
+Final workflow check: Android run 39970697522 completed successfully. Web, Android and iOS release workflows have now all passed on ce840092a401b3b8932f21e46ee000c07ce279fe. Web was promoted to production; mobile builds were not submitted to stores. Device testing remains separate.

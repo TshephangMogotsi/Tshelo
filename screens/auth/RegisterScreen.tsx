@@ -17,6 +17,7 @@ import {
   nationalPhoneDigits,
   phoneInputConfig,
 } from '../../lib/phoneNumbers'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'Register'>
@@ -32,6 +33,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
   const phoneConfig  = phoneInputConfig(countryCode, dialCode)
 
   const { isDark } = useTheme()
+  const { isTablet } = useTabletLayout()
   const requireOnline = useRequireOnline()
   const inputBg   = isDark ? '#2D2E41' : '#FFFFFF'
   const textCol   = isDark ? '#F2F2F7' : '#1A1A2E'
@@ -86,7 +88,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
         {/* ── Title bar ──────────────────────────────── */}
-        <View style={styles.titleBar}>
+        <View style={[styles.titleBar, isTablet && styles.tabletWidth]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={20} color={textCol} />
           </TouchableOpacity>
@@ -95,7 +97,7 @@ export default function RegisterScreen({ navigation, route }: Props) {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -218,6 +220,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
+  tabletWidth: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 28,
+  },
   backBtn: {
     width: 36,
     height: 36,
@@ -238,6 +247,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 48,
+  },
+  scrollTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 20,
   },
 
   // ── Country pill ────────────────────────────────────────────

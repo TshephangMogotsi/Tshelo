@@ -9,6 +9,8 @@ BEGIN
   IF condition IS DISTINCT FROM true THEN RAISE EXCEPTION 'Payment encryption check failed: %', message; END IF;
 END;
 $$;
+GRANT EXECUTE ON FUNCTION pg_temp.assert_payment(boolean,text) TO authenticated, service_role;
+
 
 DO $$
 DECLARE signature text; role_name text;
@@ -39,6 +41,14 @@ VALUES ('a0000000-0000-4000-8000-000000000031', '+26770000031', 'Encryption roll
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', 'a0000000-0000-4000-8000-000000000031', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+-- A newly issued/refreshed token cannot replace an old authentication proof.
+SELECT set_config('request.jwt.claims', jsonb_build_object('sub','a0000000-0000-4000-8000-000000000031','role','authenticated','iat',extract(epoch FROM now()),'amr',jsonb_build_array(jsonb_build_object('method','otp','timestamp',extract(epoch FROM now())-601)))::text, true);
+DO $$ BEGIN
+  PERFORM public.update_own_payment_details('{"bank_account_number":"STALE-PROOF"}'::jsonb);
+  RAISE EXCEPTION 'stale payment authentication unexpectedly accepted';
+EXCEPTION WHEN SQLSTATE 'PT401' THEN NULL;
+END $$;
+SELECT set_config('request.jwt.claims', jsonb_build_object('sub','a0000000-0000-4000-8000-000000000031','role','authenticated','amr',jsonb_build_array(jsonb_build_object('method','otp','timestamp',extract(epoch FROM now()))))::text, true);
 SELECT public.update_own_payment_details('{"mobile_money_number":"26770000031","bank_account_number":"TEST-ACCOUNT-000031"}'::jsonb);
 
 DO $$
@@ -109,6 +119,7 @@ BEGIN
 END;
 $$;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', jsonb_build_object('sub','a0000000-0000-4000-8000-000000000031','role','authenticated','amr',jsonb_build_array(jsonb_build_object('method','otp','timestamp',extract(epoch FROM now()))))::text, true);
 DO $$
 BEGIN
   BEGIN
@@ -123,6 +134,7 @@ $$;
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claims', jsonb_build_object('sub','a0000000-0000-4000-8000-000000000031','role','authenticated','amr',jsonb_build_array(jsonb_build_object('method','otp','timestamp',extract(epoch FROM now()))))::text, true);
 SELECT public.update_own_payment_details('{"bank_account_number":null}'::jsonb);
 RESET ROLE;
 SET LOCAL ROLE service_role;

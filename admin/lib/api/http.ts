@@ -118,6 +118,7 @@ export async function readValidatedJson<T>(
 
 export function databaseErrorResponse(error: DatabaseError, requestId: string) {
   const mapping: Partial<Record<string, { code: ApiErrorCode; message: string }>> = {
+    PT401: { code: 'UNAUTHENTICATED', message: 'For your security, sign out and sign in again before changing payment details.' },
     '28000': { code: 'UNAUTHENTICATED', message: 'Authentication is required.' },
     '42501': { code: 'FORBIDDEN', message: 'This operation is not permitted.' },
     P0002: { code: 'NOT_FOUND', message: 'The requested resource was not found.' },

@@ -16,6 +16,7 @@ import BankPicker, { BankFormValue } from '../../components/BankPicker'
 import ProviderLogo from '../../components/ProviderLogo'
 import { detectProvider, type MobileMoneyProvider } from '../../lib/providers'
 import { openLegalDocument } from '../../lib/legalDocuments'
+import { useTabletLayout } from '../../lib/useTabletLayout'
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'ProfileSetup'>
@@ -29,6 +30,7 @@ const PROVIDER_META: Record<MobileMoneyProvider, { label: string; color: string;
 
 export default function ProfileSetupScreen({ navigation }: Props) {
   const { refreshProfile } = useAuth()
+  const { isTablet } = useTabletLayout()
   const requireOnline = useRequireOnline()
   const [displayName, setDisplayName] = useState('')
   const [bank, setBank] = useState<BankFormValue>({
@@ -99,7 +101,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, isTablet && styles.scrollTablet]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -199,6 +201,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 48,
+  },
+  scrollTablet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+    paddingTop: 56,
   },
   header: { marginBottom: 32 },
   stepBadge: {

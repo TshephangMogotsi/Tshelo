@@ -26,7 +26,10 @@ export type Expense = {
   id:              string
   vendor_name:     string | null
   description:     string
+  recorded_by_name?: string | null
   category:        string | null
+  custom_category?: string | null
+  receipt_path?:    string | null
   amount:          number
   created_at:      string
   notes?:          string | null

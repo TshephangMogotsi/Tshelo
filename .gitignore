@@ -58,7 +58,7 @@ supabase/.temp/
 .vercel
 .env*
 
-# MFA browser-test outputs.
+# MFA browser-test outputs may contain ephemeral authentication material.
 security/e2e/test-results/
 security/e2e/playwright-report/
 security/e2e/mfa-e2e-evidence.json

@@ -36,6 +36,8 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   member_removed:     'exit-outline',
   contribution_added: 'cash-outline',
   expense_added:      'receipt-outline',
+  deadline_reminder:  'time-outline',
+  event_reminder:     'calendar-outline',
   sms_detected:       'chatbubble-ellipses-outline',
   rich_auntie_tagged: 'ribbon-outline',
   event_announcement: 'megaphone-outline',
@@ -127,7 +129,7 @@ export default function NotificationsScreen({ navigation }: Props) {
       return
     }
 
-    if (item.data?.kind === 'event_announcement' && typeof item.data.eventId === 'string') {
+    if ((item.data?.kind === 'event_announcement' || item.data?.kind === 'event_reminder') && typeof item.data.eventId === 'string') {
       navigation.navigate('EventDetail', { eventId: item.data.eventId, tab: 'announcements' })
       return
     }
