@@ -32,7 +32,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const [isLoading,   setIsLoading]   = useState(true)
   const [showEdit,    setShowEdit]    = useState(false)
   const [editName,    setEditName]    = useState('')
-  const [editEmail,   setEditEmail]   = useState('')
   const [isSaving,    setIsSaving]    = useState(false)
   const profileRequest = useRef(createLatestApiRequest())
 
@@ -53,7 +52,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           })
           if (!loadedName) {
             setEditName('')
-            setEditEmail(data.email ?? '')
             setShowEdit(true)
           }
         } catch (error) {
@@ -70,7 +68,6 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
 
   function openEdit() {
     setEditName(profile.name)
-    setEditEmail(profile.email)
     setShowEdit(true)
   }
 
@@ -83,13 +80,13 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     }
     setIsSaving(true)
     try {
-      await api.users.updateMe({ name: trimmedName, email: editEmail.trim() || null })
+      await api.users.updateMe({ name: trimmedName })
     } catch (error) {
       Alert.alert('Could not save changes', toApiUiError(error).message)
       setIsSaving(false)
       return
     }
-    setProfile(p => ({ ...p, name: trimmedName, email: editEmail.trim() }))
+    setProfile(p => ({ ...p, name: trimmedName }))
     await refreshProfile()
     setIsSaving(false)
     setShowEdit(false)
@@ -272,17 +269,11 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
               />
 
               {/* Email */}
-              <Text style={styles.fieldLabel}>Email <Text style={styles.fieldOptional}>(optional)</Text></Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={editEmail}
-                onChangeText={setEditEmail}
-                placeholder="your@email.com"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                returnKeyType="done"
-              />
+              <Text style={styles.fieldLabel}>Email</Text>
+              <View style={[styles.fieldInput, styles.fieldReadOnly]}>
+                <Text style={styles.fieldReadOnlyText}>{profile.email || '—'}</Text>
+              </View>
+              <Text style={styles.fieldHint}>Email changes require verification through account recovery.</Text>
 
               {/* Phone — read only */}
               <Text style={styles.fieldLabel}>Phone Number <Text style={styles.fieldOptional}>(registered)</Text></Text>

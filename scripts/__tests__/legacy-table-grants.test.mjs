@@ -19,16 +19,21 @@ test('all application migrations replay with historical grants and retain permis
       try { await db.exec(migration) } catch (error) {
         throw new Error(`Migration replay failed: ${file}`, { cause: error })
       }
+      if (file === '20261103100000_secure_profile_email_identity.sql') {
+        assert.equal((await db.query("SELECT has_column_privilege('authenticated','public.users','email','UPDATE') AS allowed")).rows[0].allowed, true)
+        await db.exec(await readFile(new URL('../../supabase/tests/profile_email_identity.sql', import.meta.url), 'utf8'))
+      }
     }
     for (const file of ['legacy_table_privileges.sql', 'future_table_security.sql',
       'fund_admin_permission_matrix.sql', 'api_v1_boundaries.sql', 'consent_audit.sql',
-      'receipt_scan_audit.sql', 'vouch_membership.sql']) {
+      'receipt_scan_audit.sql', 'vouch_membership.sql', 'profile_email_identity.sql']) {
       try { await db.exec(await readFile(new URL(`../../supabase/tests/${file}`, import.meta.url), 'utf8')) } catch (error) {
         throw new Error(`Migrated-schema permission check failed: ${file}`, { cause: error })
       }
     }
     await db.exec(await readFile(new URL('../../supabase/monitoring/legacy_table_grants_snapshot.sql', import.meta.url), 'utf8'))
     await db.exec(await readFile(new URL('../../supabase/monitoring/legacy_table_grants_verification.sql', import.meta.url), 'utf8'))
+    await db.exec(await readFile(new URL('../../supabase/monitoring/profile_email_identity_verification.sql', import.meta.url), 'utf8'))
   } finally { await db.close() }
 })
 

@@ -54,3 +54,13 @@ it('does not bypass a verified MFA factor', async () => {
   expect((await POST(request(payload))).status).toBe(403)
   expect(mockVerifyOtp).not.toHaveBeenCalled()
 })
+
+it.each([[true, 'start'], [false, 'start'], [true, 'finish'], [false, 'finish']])('excludes administrators when active=%s during %s', async (active, action) => {
+  mockAdmin.from.mockImplementationOnce(() => ({ select() { return this }, eq() { return this }, maybeSingle: async () => ({ data: { id: 'test-user', is_banned: false, deleted_at: null }, error: null }) }))
+  mockAdmin.from.mockImplementationOnce(() => {
+    const filters: Record<string, unknown> = {}
+    return { select() { return this }, eq(key?: string, value?: unknown) { if (key) filters[key] = value; return this }, maybeSingle: async () => ({ data: filters.is_active === undefined || filters.is_active === active ? { user_id: 'test-user', id: 'test-user', is_banned: false, deleted_at: null } : null, error: null }) }
+  })
+  expect((await POST(request({ ...payload, action }))).status).toBe(403)
+  expect(mockVerifyOtp).not.toHaveBeenCalled()
+})

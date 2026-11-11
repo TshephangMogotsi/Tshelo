@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { getSupabaseAdminConfig } from '@/lib/config'
@@ -19,7 +20,18 @@ export async function POST(request: Request) {
   try {
     const { url, key } = getSupabaseAdminConfig()
     const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-    const { error } = await supabase.auth.admin.createUser({ email, app_metadata: { beta_web_approved: true } })
+    // Bind approval to an unpredictable Auth ID before insertion. Auth applies
+    // custom app_metadata after the profile trigger has already run.
+    const id = randomUUID()
+    const approval = await supabase.rpc('authorize_beta_signup', { p_user_id: id, p_email: email })
+    if (approval.error) throw new Error('Signup authorization failed')
+    let error: { code?: string } | null
+    try {
+      const created = await supabase.auth.admin.createUser({ id, email, app_metadata: { beta_web_approved: true } })
+      error = created.error
+    } finally {
+      await supabase.from('beta_signup_authorizations').delete().eq('user_id', id)
+    }
     // An existing approved account can use the same verification and onboarding flow.
     if (error && error.code !== 'email_exists' && error.code !== 'user_already_exists') {
       return NextResponse.json({ message: 'Registration is temporarily unavailable. Please try again.' }, { status: 503 })

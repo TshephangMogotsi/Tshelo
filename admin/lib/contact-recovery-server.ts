@@ -29,7 +29,7 @@ async function eligible(admin: SupabaseClient, id: string): Promise<User | null>
   const [{ data: auth, error }, profile, platformAdmin, factors] = await Promise.all([
     admin.auth.admin.getUserById(id),
     admin.from('users').select('id,is_banned,deleted_at').eq('id', id).maybeSingle(),
-    admin.from('platform_admins').select('user_id').eq('user_id', id).eq('is_active', true).maybeSingle(),
+    admin.from('platform_admins').select('user_id').eq('user_id', id).maybeSingle(),
     admin.auth.admin.mfa.listFactors({ userId: id }),
   ])
   if (error || profile.error || platformAdmin.error || factors.error || !factors.data || factors.data.factors.some(factor => factor.status === 'verified') || !auth.user || !profile.data || profile.data.is_banned || profile.data.deleted_at || platformAdmin.data || auth.user.app_metadata?.google_play_reviewer === true) return null

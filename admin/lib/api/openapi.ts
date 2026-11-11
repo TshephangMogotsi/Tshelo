@@ -1053,8 +1053,9 @@ export const tsheloOpenApiDocument = {
       UpdateCurrentUserRequest: {
         type: 'object', minProperties: 1, additionalProperties: false,
         properties: {
+          email: { type: ['string', 'null'], format: 'email', deprecated: true, description: 'Legacy compatibility only: must match the current profile email. Changes require verified Auth email change.' },
           name: { type: 'string', minLength: 2, maxLength: 100 },
-          email: { type: ['string', 'null'], format: 'email' }, avatar_url: { type: ['string', 'null'], format: 'uri' },
+          avatar_url: { type: ['string', 'null'], format: 'uri' },
           country_code: { type: 'string' }, preferred_currency: { type: 'string', pattern: '^[A-Z]{3}$' }, notifications_enabled: { type: 'boolean' },
           mobile_money_provider: { type: ['string', 'null'] }, bank_name: { type: ['string', 'null'] }, bank_branch_code: { type: ['string', 'null'] }, bank_account_number: { type: ['string', 'null'] },
           profile_completed: { type: 'boolean' }, onboarding_completed: { type: 'boolean' },

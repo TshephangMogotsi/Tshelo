@@ -11,7 +11,6 @@ import { formatDate, titleCase } from '@/lib/format'
 export function AccountProfile({ user }: { user: AppUser }) {
   const router = useRouter()
   const [name, setName] = useState(user.name)
-  const [email, setEmail] = useState(user.email ?? '')
   const [preferredCurrency, setPreferredCurrency] = useState(user.preferredCurrency ?? 'BWP')
   const [notificationsEnabled, setNotificationsEnabled] = useState(user.notificationsEnabled)
   const [saving, setSaving] = useState(false)
@@ -21,7 +20,6 @@ export function AccountProfile({ user }: { user: AppUser }) {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextName = name.trim()
-    const nextEmail = email.trim()
 
     if (nextName.length < 2) {
       setError('Enter your name using at least 2 characters.')
@@ -36,12 +34,10 @@ export function AccountProfile({ user }: { user: AppUser }) {
     try {
       await createApiClient().users.updateMe({
         name: nextName,
-        email: nextEmail || null,
         preferred_currency: preferredCurrency || 'BWP',
         notifications_enabled: notificationsEnabled,
       })
       setName(nextName)
-      setEmail(nextEmail)
       setSaved(true)
       router.refresh()
     } catch (cause) {
@@ -71,12 +67,14 @@ export function AccountProfile({ user }: { user: AppUser }) {
           <input
             name="email"
             type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            value={user.email ?? ''}
+            readOnly
+            aria-describedby="profile-email-help"
             autoComplete="email"
             maxLength={255}
-            placeholder="you@example.com"
+            placeholder="No email set"
           />
+          <span id="profile-email-help">Email changes require verification through account recovery.</span>
         </label>
         <label>
           <span>Preferred currency</span>
@@ -112,7 +110,7 @@ export function AccountProfile({ user }: { user: AppUser }) {
       {saved && <p className="member-profile-saved" role="status"><Check size={14} /> Profile saved.</p>}
 
       <div className="member-form-actions">
-        <span className="member-form-note">Phone and trust details are protected account information.</span>
+        <span className="member-form-note">Email, phone and trust details are protected account information.</span>
         <button className="primary" type="submit" disabled={saving}>
           <Save size={14} />
           {saving ? 'Saving…' : 'Save profile'}

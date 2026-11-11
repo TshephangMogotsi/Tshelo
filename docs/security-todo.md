@@ -49,6 +49,12 @@ SMS/push and customer consent history remain unverified.
 - [x] Enable collection after cleanup/notice checks and explicit approval; production
       missing/invalid-token requests were rejected and the positive live test passed.
 
+### Profile email identity (audit item 2)
+
+- [x] Verify the production email UPDATE grant, absence of profile email uniqueness and missing Auth sync trigger.
+- [x] Deploy the verified-Auth email guard/sync and immutable deletion-token account binding; independently verify deployed function bodies on 3 November. [Evidence and rollout status](profile-email-identity-2026-11-03.md).
+- [x] Release the compatible API/read-only web profile to the user-confirmed `tshelo-admin.vercel.app`, apply `20261103101000_revoke_profile_email_updates.sql`, and independently verify both client email UPDATE grants are absent on 6 November. Finding closed. [Final evidence](evidence/profile-email-identity-2026-11-03.json).
+
 ### Default table privileges
 
 - [x] Inspect live creator defaults.

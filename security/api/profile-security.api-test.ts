@@ -57,3 +57,20 @@ it('returns RPC failures rather than reporting a successful profile save', async
     expect(query.maybeSingle).not.toHaveBeenCalled()
   }
 })
+
+
+it('allows an unchanged legacy email without forwarding it to the UPDATE', async () => {
+  const { query, supabase } = setup()
+  query.maybeSingle.mockResolvedValue({ data: { email: 'owner@example.test' }, error: null } as never)
+  const result = await updateApiCurrentUser(supabase, actor, { name: 'Updated name', email: ' Owner@Example.test ' })
+  expect(result.error).toBeNull()
+  expect(query.update).toHaveBeenCalledWith({ name: 'Updated name' })
+})
+it.each(['someone@example.test', null])('rejects legacy email changes (%s) before any profile mutation', async email => {
+  const { client, query, supabase } = setup()
+  query.maybeSingle.mockResolvedValue({ data: { email: 'owner@example.test' }, error: null } as never)
+  const result = await updateApiCurrentUser(supabase, actor, { name: 'Updated name', email })
+  expect(result.error).toEqual(expect.objectContaining({ kind: 'validation' }))
+  expect(query.update).not.toHaveBeenCalled()
+  expect(client.rpc).not.toHaveBeenCalled()
+})

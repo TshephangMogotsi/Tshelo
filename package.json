@@ -27,11 +27,12 @@
     "test:dependency-security": "node --test scripts/__tests__/dependency-security.test.mjs scripts/__tests__/upstream-security-fixes.test.mjs",
     "test:ios-simulator": "node --test scripts/__tests__/ios-simulator.test.mjs",
     "verify:api": "node scripts/verify-api.mjs",
-    "verify": "npm run typecheck && npm run test:platform-admin-mfa && npm run test:phase-one-security && npm run test:phase-two-security && npm run test:legacy-table-grants && npm run test:consent-security && npm run test:vouch-membership && npm run test:waitlist-monitor && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security && npm run test:db-bootstrap && npm run test:dependency-security && npm run test:ios-simulator",
+    "verify": "npm run typecheck && npm run test:platform-admin-mfa && npm run test:beta-readiness-security && npm run test:phase-one-security && npm run test:phase-two-security && npm run test:legacy-table-grants && npm run test:consent-security && npm run test:vouch-membership && npm run test:waitlist-monitor && npm test -- --runInBand && npm run test:api-services && npm run test:api-verifier && npm run test:web && npm run test:event-files-db && npm run test:metro-security && npm run test:db-bootstrap && npm run test:dependency-security && npm run test:ios-simulator",
     "bundle:size": "node scripts/check-export-size.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "provision:google-play-reviewer": "node scripts/provision-google-play-reviewer.mjs",
     "postinstall": "patch-package",
+    "test:beta-readiness-security": "node --test scripts/__tests__/beta-readiness-security.test.mjs",
     "test:legacy-table-grants": "node --test scripts/__tests__/legacy-table-grants.test.mjs"
   },
   "engines": {
@@ -101,7 +102,7 @@
   "overrides": {
     "js-yaml": "3.15.2",
     "query-string": {
-      "decode-uri-component": "0.5.0"
+      "decode-uri-component": "0.5.1"
     },
     "xcode": {
       "uuid": "11.1.1"
@@ -110,6 +111,7 @@
       "postcss": "8.5.28"
     },
     "metro": "0.83.8",
+    "undici": "6.29.1",
     "metro-babel-transformer": "0.83.8",
     "metro-cache": "0.83.8",
     "metro-cache-key": "0.83.8",

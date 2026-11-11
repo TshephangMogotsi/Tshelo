@@ -6,7 +6,7 @@ RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE
   owner_id uuid := 'd1000000-0000-4000-8000-000000000001';
   other_id uuid := 'd1000000-0000-4000-8000-000000000002';
-  allowed text[] := ARRAY['name','email','avatar_url','country_code','preferred_currency','language','notifications_enabled','profile_completed','onboarding_completed','notification_preferences'];
+  allowed text[] := ARRAY['name','avatar_url','country_code','preferred_currency','language','notifications_enabled','profile_completed','onboarding_completed','notification_preferences'];
   assignment text; column_name text; country text; changed_rows bigint; n bigint;
   blocked_names jsonb := '[]'; explicit_denials int := 0; catalog_denials int := 0;
   bank_cipher bytea; mobile_cipher bytea; other_before jsonb; output jsonb;
@@ -23,7 +23,7 @@ BEGIN
     SELECT to_jsonb(u) INTO other_before FROM public.users u WHERE id=other_id;
     PERFORM set_config('request.jwt.claim.sub',owner_id::text,true);
     PERFORM set_config('request.jwt.claim.role','authenticated',true);
-    PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
+    PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated','amr',jsonb_build_array(jsonb_build_object('method','otp','timestamp',extract(epoch FROM now()))))::text,true);
     SET LOCAL ROLE authenticated;
 
     -- Actual escalating assignments for every field explicitly named in item 1,
@@ -49,7 +49,7 @@ BEGIN
         blocked_names := blocked_names || jsonb_build_array(split_part(assignment,'=',1));
       END;
     END LOOP;
-    -- Exhaustive coverage: every other users column outside the ten-field
+    -- Exhaustive coverage: every other users column outside the nine-field
     -- allowlist must reject even an own-row no-op UPDATE with SQLSTATE 42501.
     FOR column_name IN SELECT attname FROM pg_attribute WHERE attrelid='public.users'::regclass AND attnum>0 AND NOT attisdropped AND NOT attname=ANY(allowed) ORDER BY attnum LOOP
       BEGIN
@@ -59,9 +59,9 @@ BEGIN
       END;
     END LOOP;
 
-    UPDATE public.users SET name='Profile fixture edited',email='profile-fixture@example.invalid',avatar_url='https://example.invalid/avatar.jpg',country_code=country,preferred_currency='BWP',language='en',notifications_enabled=false,profile_completed=false,onboarding_completed=true,notification_preferences=preferences WHERE id=owner_id;
+    UPDATE public.users SET name='Profile fixture edited',avatar_url='https://example.invalid/avatar.jpg',country_code=country,preferred_currency='BWP',language='en',notifications_enabled=false,profile_completed=false,onboarding_completed=true,notification_preferences=preferences WHERE id=owner_id;
     GET DIAGNOSTICS changed_rows=ROW_COUNT;
-    IF changed_rows<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=owner_id AND name='Profile fixture edited' AND email='profile-fixture@example.invalid' AND avatar_url='https://example.invalid/avatar.jpg' AND country_code=country AND preferred_currency='BWP' AND language='en' AND notifications_enabled=false AND profile_completed=false AND onboarding_completed=true AND notification_preferences=preferences) THEN
+    IF changed_rows<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=owner_id AND name='Profile fixture edited' AND avatar_url='https://example.invalid/avatar.jpg' AND country_code=country AND preferred_currency='BWP' AND language='en' AND notifications_enabled=false AND profile_completed=false AND onboarding_completed=true AND notification_preferences=preferences) THEN
       RAISE EXCEPTION 'Permitted own profile/preferences edit failed';
     END IF;
     UPDATE public.users SET name='Cross-account forged edit' WHERE id=other_id;
